@@ -1,0 +1,16 @@
+{
+  "name": "@airnub/engine",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/engine.ts",
+  "types": "src/engine.ts",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "exports": {
+    "./dsl": "./src/dsl.ts",
+    "./engine": "./src/engine.ts",
+    "./types": "./src/types.ts"
+  }
+}

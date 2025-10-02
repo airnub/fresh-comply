@@ -1,0 +1,11 @@
+{
+  "name": "@airnub/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "files": ["schema.sql", "seeds.sql"],
+  "scripts": {
+    "migrate": "echo \"Run migrations via Supabase CLI\"",
+    "seed": "echo \"Apply seeds.sql to your database\""
+  }
+}

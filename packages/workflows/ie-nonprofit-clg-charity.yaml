@@ -1,0 +1,19 @@
+id: setup-nonprofit-ie-charity
+version: 2025-10-02
+steps:
+  - id: cro-incorporation
+    kind: action
+    title: "Incorporate a CLG on CRO CORE"
+    requires: [two_directors, secretary, ppsn_or_vin, eea_director_or_s137_bond]
+    verify:
+      - id: eea_director_present_or_s137_bond
+      - id: rbo_deadline_5_months
+  - id: rbo
+    kind: action
+    title: "File beneficial ownership (RBO) within 5 months"
+  - id: revenue
+    kind: action
+    title: "Register with Revenue (TR2) & set up ROS"
+  - id: charity
+    kind: action
+    title: "Apply to Charities Regulator; then CHY with Revenue"

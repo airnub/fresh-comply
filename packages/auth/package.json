@@ -1,0 +1,10 @@
+{
+  "name": "@airnub/auth",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/auth.ts",
+  "exports": {
+    "./auth": "./src/auth.ts"
+  }
+}

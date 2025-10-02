@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@airnub/ui": ["../../packages/ui/src"],
+      "@airnub/engine": ["../../packages/engine/src"],
+      "@airnub/utils": ["../../packages/utils/src"],
+      "@airnub/freshness": ["../../packages/freshness/src"],
+      "@airnub/doc-templates": ["../../packages/doc-templates/src"],
+      "@airnub/types": ["../../packages/types/src"]
+    },
+    "types": ["@types/node"]
+  },
+  "include": ["next-env.d.ts", "src/**/*"],
+  "exclude": ["node_modules"]
+}
