@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 
 const TERMS_DOC_URL = "https://github.com/airnub/fresh-comply/blob/main/docs/LEGAL/TERMS.md";
 
@@ -8,19 +9,24 @@ export default async function TermsPage({ params }: { params: Promise<{ locale: 
   const tLegal = await getTranslations({ locale, namespace: "legal" });
 
   return (
-    <div className="mt-6 space-y-4">
-      <section className="rounded border border-subtle bg-surface p-6 shadow">
-        <h1 className="text-2xl font-semibold text-foreground">{tLegal("terms.title")}</h1>
-        <p className="text-sm text-muted-foreground">{tLegal("terms.summary")}</p>
-        <Link
-          className="mt-4 inline-flex gap-2 rounded bg-accent px-3 py-2 text-sm font-medium text-on-accent"
-          href={TERMS_DOC_URL}
-          rel="noreferrer noopener"
-          target="_blank"
-        >
-          {tLegal("terms.cta")}
-        </Link>
-      </section>
-    </div>
+    <Flex direction="column" gap="4">
+      <Card asChild variant="surface" size="3">
+        <section aria-labelledby="legal-terms-heading">
+          <Flex direction="column" gap="3">
+            <Heading id="legal-terms-heading" size="5">
+              {tLegal("terms.title")}
+            </Heading>
+            <Text size="2" color="gray">
+              {tLegal("terms.summary")}
+            </Text>
+            <Button asChild>
+              <Link href={TERMS_DOC_URL} rel="noreferrer noopener" target="_blank">
+                {tLegal("terms.cta")}
+              </Link>
+            </Button>
+          </Flex>
+        </section>
+      </Card>
+    </Flex>
   );
 }

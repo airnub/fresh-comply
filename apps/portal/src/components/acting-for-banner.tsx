@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { Button, Callout, Flex, Text } from "@radix-ui/themes";
+import { EyeOpenIcon, EyeNoneIcon } from "@radix-ui/react-icons";
 
 export function ActingForBanner({ engager, client }: { engager: string; client: string }) {
   const [visible, setVisible] = useState(true);
@@ -9,38 +11,54 @@ export function ActingForBanner({ engager, client }: { engager: string; client: 
 
   if (!visible) {
     return (
-      <button
-        className="mt-2 text-sm text-muted-foreground underline"
+      <Button
+        variant="ghost"
+        color="gray"
+        size="2"
         onClick={() => setVisible(true)}
         aria-expanded={visible}
         aria-controls="acting-for-banner"
         type="button"
       >
-        {t("toggleShow")}
-      </button>
+        <Flex align="center" gap="2">
+          <EyeOpenIcon aria-hidden />
+          <span>{t("toggleShow")}</span>
+        </Flex>
+      </Button>
     );
   }
 
   return (
-    <div
-      id="acting-for-banner"
-      className="mt-2 flex items-center justify-between rounded border border-accent bg-highlight p-3 text-highlight-foreground"
-    >
-      <div>
-        <span className="block text-xs font-semibold uppercase tracking-wide">{t("badge")}</span>
-        <p className="mt-1 font-medium" aria-live="polite">
-          {t("separator", { engager, client })}
-        </p>
-      </div>
-      <button
-        className="text-sm font-medium underline"
-        onClick={() => setVisible(false)}
-        aria-expanded={visible}
-        aria-controls="acting-for-banner"
-        type="button"
-      >
-        {t("toggleHide")}
-      </button>
-    </div>
+    <Callout.Root id="acting-for-banner" color="amber" highContrast>
+      <Flex align="center" justify="between" gap="3" wrap="wrap">
+        <Flex align="center" gap="3">
+          <Callout.Icon>
+            <EyeOpenIcon aria-hidden />
+          </Callout.Icon>
+          <Flex direction="column" gap="1">
+            <Text size="1" weight="bold" color="amber">
+              {t("badge")}
+            </Text>
+            <Callout.Text aria-live="polite">
+              {t("separator", { engager, client })}
+            </Callout.Text>
+          </Flex>
+        </Flex>
+        <Button
+          variant="ghost"
+          color="amber"
+          size="2"
+          onClick={() => setVisible(false)}
+          aria-expanded={visible}
+          aria-controls="acting-for-banner"
+          type="button"
+        >
+          <Flex align="center" gap="2">
+            <EyeNoneIcon aria-hidden />
+            <span>{t("toggleHide")}</span>
+          </Flex>
+        </Button>
+      </Flex>
+    </Callout.Root>
   );
 }

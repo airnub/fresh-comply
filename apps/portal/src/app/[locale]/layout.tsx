@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, unstable_setRequestLocale } from "next-intl/server";
+import { Box, Container, Flex, Heading, Link as ThemeLink, Text } from "@radix-ui/themes";
 import { ThemeProvider } from "@airnub/ui/ThemeProvider";
+import { VisuallyHidden } from "@airnub/ui/A11y";
 import { ActingForBanner } from "../../components/acting-for-banner";
 import { LocaleSwitcher } from "../../components/LocaleSwitcher";
 import { ThemeToggle } from "../../components/ThemeToggle";
@@ -45,39 +47,65 @@ export default async function LocaleLayout({
     <NextIntlClientProvider locale={locale} messages={messages} timeZone="Europe/Dublin">
       <ThemeProvider>
         <SkipLink href="#main-content">{tApp("skipToContent")}</SkipLink>
-        <div className="flex min-h-screen flex-col">
-          <header className="border-b p-3">
-            <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-              <div>
-                <Link href={`/${locale}`} className="text-2xl font-semibold text-foreground">
-                  {tApp("title")}
-                </Link>
-                <p className="text-sm text-muted-foreground">{tApp("tagline")}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <LocaleSwitcher />
-                <ThemeToggle />
-              </div>
-            </div>
-          </header>
-          <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 p-6" tabIndex={-1}>
-            <ActingForBanner engager="Company A" client="Company X" />
-            {children}
-          </main>
-          <footer className="border-t bg-surface-alt p-6">
-            <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-              <nav aria-label={tFooter("legal")} className="flex flex-wrap gap-2">
-                {legalLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className="underline">
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-              <span className="sr-only">{tFooter("accessibility")}</span>
-              <p>© {new Date().getFullYear()} FreshComply • {tFooter("gdprReady")}</p>
-            </div>
-          </footer>
-        </div>
+        <Box minHeight="100vh" display="flex" flexDirection="column">
+          <Box asChild>
+            <header>
+              <Box py="4" style={{ borderBottom: "1px solid var(--gray-a4)" }}>
+                <Container size="3">
+                  <Flex align="center" justify="between" gap="4" wrap="wrap">
+                    <Box>
+                      <ThemeLink asChild underline="never" color="blue">
+                        <Link href={`/${locale}`}>
+                          <Heading size="5">{tApp("title")}</Heading>
+                        </Link>
+                      </ThemeLink>
+                      <Text as="p" size="2" color="gray">
+                        {tApp("tagline")}
+                      </Text>
+                    </Box>
+                    <Flex align="center" gap="3" wrap="wrap">
+                      <LocaleSwitcher />
+                      <ThemeToggle />
+                    </Flex>
+                  </Flex>
+                </Container>
+              </Box>
+            </header>
+          </Box>
+          <Box asChild flexGrow="1">
+            <main id="main-content" tabIndex={-1}>
+              <Container size="3" py="5">
+                <Flex direction="column" gap="5">
+                  <ActingForBanner engager="Company A" client="Company X" />
+                  {children}
+                </Flex>
+              </Container>
+            </main>
+          </Box>
+          <Box asChild>
+            <footer>
+              <Box py="4" style={{ borderTop: "1px solid var(--gray-a4)" }}>
+                <Container size="3">
+                  <Flex align="center" justify="between" gap="3" wrap="wrap">
+                    <Flex asChild gap="3" wrap="wrap">
+                      <nav aria-label={tFooter("legal")}>
+                        {legalLinks.map((link) => (
+                          <ThemeLink key={link.href} asChild underline="always" color="blue">
+                            <Link href={link.href}>{link.label}</Link>
+                          </ThemeLink>
+                        ))}
+                      </nav>
+                    </Flex>
+                    <VisuallyHidden>{tFooter("accessibility")}</VisuallyHidden>
+                    <Text size="2" color="gray">
+                      © {new Date().getFullYear()} FreshComply • {tFooter("gdprReady")}
+                    </Text>
+                  </Flex>
+                </Container>
+              </Box>
+            </footer>
+          </Box>
+        </Box>
       </ThemeProvider>
     </NextIntlClientProvider>
   );

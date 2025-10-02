@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
+import { VisuallyHidden as RadixVisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 export function Landmark<As extends ElementType = "section">({
   as,
@@ -21,7 +22,7 @@ export function Landmark<As extends ElementType = "section">({
 }
 
 export function VisuallyHidden({ children }: { children: ReactNode }) {
-  return <span className="sr-only">{children}</span>;
+  return <RadixVisuallyHidden>{children}</RadixVisuallyHidden>;
 }
 
 export function SkipLink({ href, children }: { href: string; children: ReactNode }) {

@@ -2,7 +2,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useTransition, useId, type ChangeEvent } from "react";
+import { useTransition } from "react";
+import { Select } from "@radix-ui/themes";
 import { localeNames, type AppLocale, isAppLocale } from "../i18n/config";
 import { localeCookieName } from "../i18n/request";
 
@@ -24,10 +25,8 @@ export function LocaleSwitcher() {
   const locale = useLocale() as AppLocale;
   const t = useTranslations("localeSwitcher");
   const [isPending, startTransition] = useTransition();
-  const selectId = useId();
 
-  function handleChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextLocale = event.target.value;
+  function handleSelectChange(nextLocale: string) {
     if (!isAppLocale(nextLocale)) return;
     document.cookie = `${localeCookieName}=${nextLocale}; path=/; max-age=31536000; SameSite=Lax`;
     const target = replaceLocale(pathname ?? "/", nextLocale);
@@ -37,22 +36,15 @@ export function LocaleSwitcher() {
   }
 
   return (
-    <label className="text-sm font-medium" htmlFor={selectId}>
-      <span className="sr-only">{t("label")}</span>
-      <select
-        id={selectId}
-        className="rounded border border-subtle bg-surface px-3 py-2"
-        value={locale}
-        aria-label={t("label")}
-        onChange={handleChange}
-        disabled={isPending}
-      >
+    <Select.Root value={locale} onValueChange={handleSelectChange} disabled={isPending}>
+      <Select.Trigger aria-label={t("label")} size="2" />
+      <Select.Content position="popper">
         {Object.entries(localeNames).map(([value, label]) => (
-          <option key={value} value={value}>
+          <Select.Item key={value} value={value}>
             {label}
-          </option>
+          </Select.Item>
         ))}
-      </select>
-    </label>
+      </Select.Content>
+    </Select.Root>
   );
 }

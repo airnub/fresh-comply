@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useId } from "react";
+import { Button, Flex, Switch, Text } from "@radix-ui/themes";
 import { useTheme, type ThemePreference } from "@airnub/ui/theme";
 
 const themeOptions: { value: ThemePreference; labelKey: string }[] = [
@@ -13,38 +15,41 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
 export function ThemeToggle() {
   const t = useTranslations("theme");
   const { theme, resolvedTheme, resolvedMotion, setTheme, setMotion } = useTheme();
+  const switchId = useId();
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium" id="theme-toggle-label">
+    <Flex direction="column" gap="3">
+      <Text as="p" size="2" weight="medium" id="theme-toggle-label">
         {t("label")}
-      </p>
-      <div role="group" aria-labelledby="theme-toggle-label" className="inline-flex flex-wrap gap-2">
+      </Text>
+      <Flex role="group" aria-labelledby="theme-toggle-label" gap="2" wrap="wrap">
         {themeOptions.map((option) => {
           const isActive = theme === option.value || (option.value === resolvedTheme && theme === "system");
           return (
-            <button
+            <Button
               key={option.value}
               type="button"
+              variant={isActive ? "solid" : "surface"}
+              color="blue"
+              size="2"
               onClick={() => setTheme(option.value)}
               aria-pressed={isActive}
-              className={`rounded border px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                isActive ? "bg-accent text-on-accent" : "bg-surface text-foreground"
-              }`}
             >
               {t(option.labelKey)}
-            </button>
+            </Button>
           );
         })}
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
+      </Flex>
+      <Flex align="center" gap="2">
+        <Switch
+          id={switchId}
           checked={resolvedMotion === "reduced"}
-          onChange={(event) => setMotion(event.target.checked ? "reduced" : "auto")}
+          onCheckedChange={(checked) => setMotion(checked ? "reduced" : "auto")}
         />
-        {t("reducedMotion")}
-      </label>
-    </div>
+        <Text asChild size="2">
+          <label htmlFor={switchId}>{t("reducedMotion")}</label>
+        </Text>
+      </Flex>
+    </Flex>
   );
 }

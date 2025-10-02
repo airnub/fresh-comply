@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { EvidenceDrawer, EvidenceItem } from "@airnub/ui";
 import { useTranslations } from "next-intl";
+import { Text } from "@radix-ui/themes";
 
 export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }) {
   const [items, setItems] = useState(initialItems);
@@ -30,7 +31,11 @@ export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }
 
   return (
     <div aria-live="polite">
-      {isPending && <p className="text-sm text-muted-foreground">{t("pending")}</p>}
+      {isPending && (
+        <Text size="2" color="gray">
+          {t("pending")}
+        </Text>
+      )}
       <EvidenceDrawer
         items={items}
         onReverify={handleReverify}
