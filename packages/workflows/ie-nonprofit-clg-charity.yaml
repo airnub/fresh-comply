@@ -4,6 +4,9 @@ steps:
   - id: cro-incorporation
     kind: action
     title: "Incorporate a CLG on CRO CORE"
+    title_i18n:
+      en-IE: "Incorporate a CLG on CRO CORE"
+      ga-IE: "Bunaigh CLG ar CRO CORE"
     requires: [two_directors, secretary, ppsn_or_vin, eea_director_or_s137_bond]
     verify:
       - id: eea_director_present_or_s137_bond
@@ -11,9 +14,18 @@ steps:
   - id: rbo
     kind: action
     title: "File beneficial ownership (RBO) within 5 months"
+    title_i18n:
+      en-IE: "File beneficial ownership (RBO) within 5 months"
+      ga-IE: "Comhdáil úinéireacht tairbhiúil (RBO) laistigh de 5 mhí"
   - id: revenue
     kind: action
     title: "Register with Revenue (TR2) & set up ROS"
+    title_i18n:
+      en-IE: "Register with Revenue (TR2) & set up ROS"
+      ga-IE: "Cláraigh le Revenue (TR2) agus cumraigh ROS"
   - id: charity
     kind: action
     title: "Apply to Charities Regulator; then CHY with Revenue"
+    title_i18n:
+      en-IE: "Apply to Charities Regulator; then CHY with Revenue"
+      ga-IE: "Cuir isteach chuig an Rialálaí Carthanas; ansin CHY le Revenue"

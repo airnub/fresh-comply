@@ -1,0 +1,104 @@
+{
+  "app": {
+    "title": "FreshComply Portal",
+    "tagline": "Multi-tenant engagements & compliance workflows",
+    "skipToContent": "Skip to main content",
+    "loading": "Loading"
+  },
+  "navigation": {
+    "home": "Home",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "subprocessors": "Subprocessors",
+    "cookies": "Cookies",
+    "locale": "Language",
+    "theme": "Theme"
+  },
+  "home": {
+    "welcome": "Welcome to FreshComply",
+    "intro": "Explore the workflow engine, freshness checks, document generation, and audit visibility in one place.",
+    "viewTimeline": "View timeline",
+    "openBoard": "Open task board",
+    "demoWorkflow": "Demo workflow",
+    "status": "Status: {status}",
+    "timelinePlural": "You have {count, plural, one {# active step} other {# active steps}}",
+    "statusLabel": {
+      "todo": "To do",
+      "in_progress": "In progress",
+      "waiting": "Waiting",
+      "blocked": "Blocked",
+      "done": "Done"
+    }
+  },
+  "actingFor": {
+    "badge": "Acting on behalf",
+    "toggleHide": "Hide engagement banner",
+    "toggleShow": "Show engagement banner",
+    "separator": "{engager} → {client}"
+  },
+  "audit": {
+    "title": "Audit trail",
+    "onBehalfOf": "On behalf of {organisation}"
+  },
+  "evidence": {
+    "reverify": "Re-verify evidence",
+    "pending": "Re-verifying…",
+    "updated": "Evidence refreshed on {date, date, medium}",
+    "notVerified": "Not yet verified"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "contrast": "High contrast",
+    "system": "System default",
+    "label": "Theme preference",
+    "reducedMotion": "Reduce motion"
+  },
+  "localeSwitcher": {
+    "label": "Choose language"
+  },
+  "legal": {
+    "privacy": {
+      "title": "Privacy Notice",
+      "updated": "Last updated {date, date, long}",
+      "summary": "FreshComply explains how we process personal data as both controller and processor.",
+      "cta": "Download full notice"
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "summary": "Contractual terms governing access to the FreshComply platform.",
+      "cta": "Read full terms"
+    },
+    "subprocessors": {
+      "title": "Subprocessor Registry",
+      "summary": "Vendors engaged to deliver the service and how we notify changes.",
+      "cta": "View registry"
+    },
+    "cookies": {
+      "title": "Cookie & Consent Policy",
+      "summary": "Categories of cookies used and how to manage preferences.",
+      "cta": "View cookie policy"
+    }
+  },
+  "footer": {
+    "legal": "Legal",
+    "accessibility": "Accessibility statement",
+    "gdprReady": "GDPR readiness"
+  },
+  "workflow": {
+    "timelineHeading": "Workflow timeline",
+    "timelineDescription": "Timeline view with phases, due dates, and assignments.",
+    "evidenceHeading": "Evidence & rule verification",
+    "evidenceDescription": "Review source links and refresh freshness checks as required.",
+    "documentsHeading": "Documents",
+    "downloadMarkdown": "Download {title}",
+    "downloadPdf": "Download accessible PDF"
+  },
+  "board": {
+    "title": "Task board",
+    "description": "Drag-and-drop coming soon. For now, review assignments across workflow statuses.",
+    "deadlines": "Upcoming deadlines",
+    "noDueDate": "No due date",
+    "due": "Due {date, date, medium}"
+  }
+}

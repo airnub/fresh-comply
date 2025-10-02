@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { EvidenceDrawer, EvidenceItem } from "@airnub/ui";
+import { useTranslations } from "next-intl";
 
 export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }) {
   const [items, setItems] = useState(initialItems);
   const [isPending, startTransition] = useTransition();
+  const t = useTranslations("evidence");
 
   async function handleReverify(id: string) {
     startTransition(async () => {
@@ -27,9 +29,14 @@ export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }
   }
 
   return (
-    <div>
-      {isPending && <p className="text-sm text-muted-foreground">Re-verifying…</p>}
-      <EvidenceDrawer items={items} onReverify={handleReverify} />
+    <div aria-live="polite">
+      {isPending && <p className="text-sm text-muted-foreground">{t("pending")}</p>}
+      <EvidenceDrawer
+        items={items}
+        onReverify={handleReverify}
+        reverifyLabel={t("reverify")}
+        formatTimestamp={(value) => (value ? t("updated", { date: new Date(value) }) : t("notVerified"))}
+      />
     </div>
   );
 }

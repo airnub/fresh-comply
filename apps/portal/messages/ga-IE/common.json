@@ -1,0 +1,104 @@
+{
+  "app": {
+    "title": "FreshComply",
+    "tagline": "Sreafaí oibre comhlíonta il-thionónta",
+    "skipToContent": "Léim go príomh-ábhar",
+    "loading": "Á lódáil"
+  },
+  "navigation": {
+    "home": "Baile",
+    "privacy": "Príobháideachas",
+    "terms": "Téarmaí",
+    "subprocessors": "Fo-fhorbróirí",
+    "cookies": "Fianáin",
+    "locale": "Teanga",
+    "theme": "Téama"
+  },
+  "home": {
+    "welcome": "Fáilte go FreshComply",
+    "intro": "Déan iniúchadh ar an inneall sreafa, seiceálacha úire, giniúint cáipéisí agus infheictheacht iniúchta in aon áit amháin.",
+    "viewTimeline": "Féach ar an amlíne",
+    "openBoard": "Oscail an bord tascanna",
+    "demoWorkflow": "Sreabhadh taispeána",
+    "status": "Stádas: {status}",
+    "timelinePlural": "Tá {count, plural, one {# chéim ghníomhach} other {# chéim ghníomhacha}} agat",
+    "statusLabel": {
+      "todo": "Le déanamh",
+      "in_progress": "Ar siúl",
+      "waiting": "Ag fanacht",
+      "blocked": "Blocáilte",
+      "done": "Críochnaithe"
+    }
+  },
+  "actingFor": {
+    "badge": "Ag gníomhú thar ceann",
+    "toggleHide": "Folaigh an meirge rannpháirtíochta",
+    "toggleShow": "Taispeáin an meirge rannpháirtíochta",
+    "separator": "{engager} → {client}"
+  },
+  "audit": {
+    "title": "Rian iniúchta",
+    "onBehalfOf": "Thar ceann {organisation}"
+  },
+  "evidence": {
+    "reverify": "Athfhíoraigh an fhianaise",
+    "pending": "Athfhíorú ar siúl…",
+    "updated": "Nuashonraíodh an fhianaise ar {date, date, medium}",
+    "notVerified": "Níl fíorú déanta fós"
+  },
+  "theme": {
+    "light": "Solas",
+    "dark": "Dorcha",
+    "contrast": "Ardchodarsnacht",
+    "system": "Réamhshocrú an chórais",
+    "label": "Rogha téama",
+    "reducedMotion": "Laghdaigh gluaiseacht"
+  },
+  "localeSwitcher": {
+    "label": "Roghnaigh teanga"
+  },
+  "legal": {
+    "privacy": {
+      "title": "Fógra Príobháideachais",
+      "updated": "Nuashonraithe {date, date, long}",
+      "summary": "Míníonn FreshComply conas a phróiseálann muid sonraí pearsanta mar rialaitheoir agus mar phróiseálaí.",
+      "cta": "Íoslódáil an fógra iomlán"
+    },
+    "terms": {
+      "title": "Téarmaí Seirbhíse",
+      "summary": "Téarmaí conarthacha a rialaíonn rochtain ar FreshComply.",
+      "cta": "Léigh na téarmaí iomlána"
+    },
+    "subprocessors": {
+      "title": "Clár Fo-fhorbróirí",
+      "summary": "Soláthraithe a úsáidtear chun an tseirbhís a sheachadadh agus conas a thugaimid fógra faoi athruithe.",
+      "cta": "Féach ar an gclár"
+    },
+    "cookies": {
+      "title": "Beartas Fianán & Toiliú",
+      "summary": "Catagóirí fianán agus conas roghanna a bhainistiú.",
+      "cta": "Féach ar bheartas fianán"
+    }
+  },
+  "footer": {
+    "legal": "Dlí",
+    "accessibility": "Ráiteas inrochtana",
+    "gdprReady": "Réidh don GDPR"
+  },
+  "workflow": {
+    "timelineHeading": "Amlíne an sreafa oibre",
+    "timelineDescription": "Amharc ar chéimeanna, dátaí dlite agus sannadh tascanna.",
+    "evidenceHeading": "Fianaise agus fíorú rialacha",
+    "evidenceDescription": "Athbhreithnigh foinsí agus athnuaigh seiceálacha úire nuair is gá.",
+    "documentsHeading": "Cáipéisí",
+    "downloadMarkdown": "Íoslódáil {title}",
+    "downloadPdf": "Íoslódáil PDF inrochtana"
+  },
+  "board": {
+    "title": "Bord tascanna",
+    "description": "Féach ar shannadh agus stádais an sreafa oibre; feidhmeanna tarraing-agus-scaoil le teacht.",
+    "deadlines": "Spriocdhátaí atá le teacht",
+    "noDueDate": "Gan spriocdháta",
+    "due": "Sprioc: {date, date, medium}"
+  }
+}
