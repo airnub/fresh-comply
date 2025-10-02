@@ -1,4 +1,6 @@
 import React from "react";
+import { Button, Card, Flex, Link, Text } from "@radix-ui/themes";
+import { ExternalLinkIcon } from "@radix-ui/react-icons";
 
 export type EvidenceItem = {
   id: string;
@@ -16,39 +18,46 @@ type EvidenceDrawerProps = {
 
 export function EvidenceDrawer({ items, onReverify, reverifyLabel = "Re-verify", formatTimestamp }: EvidenceDrawerProps) {
   return (
-    <div className="space-y-3">
+    <Flex direction="column" gap="3">
       {items.map((item) => (
-        <div key={item.id} className="rounded border border-subtle bg-surface p-3 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium">{item.title}</p>
-              <p className="text-sm text-muted-foreground">
-                {formatTimestamp
-                  ? formatTimestamp(item.lastVerifiedAt)
-                  : `Verified on ${item.lastVerifiedAt ? new Date(item.lastVerifiedAt).toLocaleString() : "—"}`}
-              </p>
-            </div>
-            {onReverify && (
-              <button
-                className="rounded bg-accent px-3 py-1 text-sm font-medium text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                onClick={() => onReverify(item.id)}
-                type="button"
-              >
-                {reverifyLabel}
-              </button>
-            )}
-          </div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-link">
-            {item.sources.map((source) => (
-              <li key={source.url}>
-                <a className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" href={source.url} target="_blank" rel="noreferrer">
-                  {source.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Card key={item.id} variant="surface" size="2">
+          <Flex direction="column" gap="3">
+            <Flex align="start" justify="between" gap="4" wrap="wrap">
+              <Flex direction="column" gap="1">
+                <Text as="p" weight="medium" size="3">
+                  {item.title}
+                </Text>
+                <Text as="span" size="2" color="gray">
+                  {formatTimestamp
+                    ? formatTimestamp(item.lastVerifiedAt)
+                    : `Verified on ${item.lastVerifiedAt ? new Date(item.lastVerifiedAt).toLocaleString() : "—"}`}
+                </Text>
+              </Flex>
+              {onReverify && (
+                <Button onClick={() => onReverify(item.id)} variant="soft">
+                  {reverifyLabel}
+                </Button>
+              )}
+            </Flex>
+            <Flex asChild direction="column" gap="2">
+              <ul>
+                {item.sources.map((source) => (
+                  <Text asChild key={source.url} size="2">
+                    <li>
+                      <Link href={source.url} target="_blank" rel="noreferrer" underline="always">
+                        <Flex align="center" gap="1">
+                          <span>{source.label}</span>
+                          <ExternalLinkIcon aria-hidden />
+                        </Flex>
+                      </Link>
+                    </li>
+                  </Text>
+                ))}
+              </ul>
+            </Flex>
+          </Flex>
+        </Card>
       ))}
-    </div>
+    </Flex>
   );
 }

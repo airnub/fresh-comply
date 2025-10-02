@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { Theme } from "@radix-ui/themes";
 import { motionCookieName, themeCookieName, type MotionPreference, type ThemePreference } from "./constants";
 
 type ResolvedTheme = "light" | "dark" | "high-contrast";
@@ -129,7 +130,23 @@ export function ThemeClientProvider({
     [theme, resolvedTheme, motion, resolvedMotion, setTheme, setMotion]
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  const appearance = resolvedTheme === "dark" ? "dark" : "light";
+  const highContrast = resolvedTheme === "high-contrast";
+
+  return (
+    <ThemeContext.Provider value={value}>
+      <Theme
+        appearance={appearance}
+        accentColor="blue"
+        grayColor="slate"
+        panelBackground="translucent"
+        radius="large"
+        className={highContrast ? "rt-high-contrast" : undefined}
+      >
+        {children}
+      </Theme>
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

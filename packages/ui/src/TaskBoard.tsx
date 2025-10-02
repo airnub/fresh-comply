@@ -1,4 +1,5 @@
 import React from "react";
+import { Badge, Card, Flex, Grid, Text, type BadgeProps } from "@radix-ui/themes";
 
 export type Task = {
   id: string;
@@ -18,6 +19,14 @@ const DEFAULT_LABELS: Record<Task["status"], string> = {
   done: "Done"
 };
 
+const STATUS_BADGES: Record<Task["status"], BadgeProps["color"]> = {
+  todo: "gray",
+  in_progress: "indigo",
+  waiting: "amber",
+  blocked: "red",
+  done: "green"
+};
+
 type TaskBoardProps = {
   tasks: Task[];
   statusLabels?: Partial<Record<Task["status"], string>>;
@@ -26,29 +35,51 @@ type TaskBoardProps = {
 
 export function TaskBoard({ tasks, statusLabels, formatDueDate }: TaskBoardProps) {
   return (
-    <div className="grid-five">
-      {STATUSES.map((status) => (
-        <div key={status} className="rounded border border-subtle bg-surface shadow-sm">
-          <header className="border-b border-subtle bg-surface-alt px-3 py-2 text-sm font-semibold">
-            {statusLabels?.[status] ?? DEFAULT_LABELS[status]}
-          </header>
-          <ul className="space-y-2 p-3">
-            {tasks
-              .filter((task) => task.status === status)
-              .map((task) => (
-                <li key={task.id} className="rounded border border-subtle bg-surface-alt p-2 shadow-sm">
-                  <p className="font-medium">{task.title}</p>
-                  {task.assignee && <p className="text-sm text-muted-foreground">{task.assignee}</p>}
-                  {task.dueDate && (
-                    <p className="text-xs text-muted-foreground">
-                      {formatDueDate ? formatDueDate(task.dueDate) : `Due ${new Date(task.dueDate).toLocaleDateString()}`}
-                    </p>
-                  )}
-                </li>
-              ))}
-          </ul>
-        </div>
-      ))}
-    </div>
+    <Grid columns={{ initial: "1", md: "5" }} gap="3">
+      {STATUSES.map((status) => {
+        const columnTasks = tasks.filter((task) => task.status === status);
+        return (
+          <Card key={status} variant="surface" size="2">
+            <Flex direction="column" gap="3">
+              <Flex align="center" justify="between">
+                <Text as="span" weight="medium">
+                  {statusLabels?.[status] ?? DEFAULT_LABELS[status]}
+                </Text>
+                <Badge variant="soft" radius="full" color={STATUS_BADGES[status]}>
+                  {columnTasks.length}
+                </Badge>
+              </Flex>
+              <Flex asChild direction="column" gap="2">
+                <ul>
+                  {columnTasks.map((task) => (
+                    <Card asChild key={task.id} variant="classic" size="1">
+                      <li>
+                        <Flex direction="column" gap="1">
+                          <Text as="p" weight="medium" size="2">
+                            {task.title}
+                          </Text>
+                          {task.assignee && (
+                            <Text as="span" size="2" color="gray">
+                              {task.assignee}
+                            </Text>
+                          )}
+                          {task.dueDate && (
+                            <Text as="span" size="1" color="gray">
+                              {formatDueDate
+                                ? formatDueDate(task.dueDate)
+                                : `Due ${new Date(task.dueDate).toLocaleDateString()}`}
+                            </Text>
+                          )}
+                        </Flex>
+                      </li>
+                    </Card>
+                  ))}
+                </ul>
+              </Flex>
+            </Flex>
+          </Card>
+        );
+      })}
+    </Grid>
   );
 }

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Timeline } from "@airnub/ui";
 import { getTranslations } from "next-intl/server";
+import { Card, Flex, Grid, Heading, Link as ThemeLink, Text } from "@radix-ui/themes";
 import { getDemoRun } from "../../../../../lib/demo-data";
 import { EvidencePanel } from "../../../../../components/evidence-panel";
 import { AuditLog } from "../../../../../components/audit-log";
@@ -26,62 +27,82 @@ export default async function WorkflowRunPage({
   }));
 
   return (
-    <div className="mt-6 space-y-6">
-      <section className="rounded border border-subtle bg-surface p-6 shadow">
-        <h2 className="text-2xl font-semibold text-foreground">{tWorkflow("timelineHeading")}</h2>
-        <p className="text-sm text-muted-foreground">{tWorkflow("timelineDescription")}</p>
-        <div className="mt-4">
-          <Timeline
-            items={run.timeline.map((step) => ({
-              id: step.id,
-              title: step.title,
-              status: step.status,
-              dueDate: step.dueDate,
-              assignee: step.assignee
-            }))}
-          />
-        </div>
-      </section>
+    <Flex direction="column" gap="6">
+      <Card asChild variant="surface" size="3">
+        <section aria-labelledby="workflow-timeline-heading">
+          <Flex direction="column" gap="3">
+            <Heading id="workflow-timeline-heading" size="5">
+              {tWorkflow("timelineHeading")}
+            </Heading>
+            <Text size="2" color="gray">
+              {tWorkflow("timelineDescription")}
+            </Text>
+            <Timeline
+              items={run.timeline.map((step) => ({
+                id: step.id,
+                title: step.title,
+                status: step.status,
+                dueDate: step.dueDate,
+                assignee: step.assignee
+              }))}
+            />
+          </Flex>
+        </section>
+      </Card>
 
-      <section className="grid-two">
-        <div className="rounded border border-subtle bg-surface p-6 shadow">
-          <h3 className="text-base font-semibold text-foreground">{tWorkflow("evidenceHeading")}</h3>
-          <p className="text-sm text-muted-foreground">{tWorkflow("evidenceDescription")}</p>
-          <div className="mt-4">
-            <EvidencePanel initialItems={evidenceItems} />
-          </div>
-        </div>
-        <div className="space-y-6">
+      <Grid columns={{ initial: "1", md: "2" }} gap="4">
+        <Card asChild variant="surface" size="3">
+          <section aria-labelledby="workflow-evidence-heading">
+            <Flex direction="column" gap="3">
+              <Heading id="workflow-evidence-heading" size="4">
+                {tWorkflow("evidenceHeading")}
+              </Heading>
+              <Text size="2" color="gray">
+                {tWorkflow("evidenceDescription")}
+              </Text>
+              <EvidencePanel initialItems={evidenceItems} />
+            </Flex>
+          </section>
+        </Card>
+        <Flex direction="column" gap="4">
           <AuditLog entries={run.audit} />
-          <div className="rounded border border-subtle bg-surface p-3 shadow">
-            <h3 className="text-base font-semibold text-foreground">{tWorkflow("documentsHeading")}</h3>
-            <ul className="mt-2 space-y-2 text-sm">
-              {run.documents.map((doc) => (
-                <li key={doc.title}>
-                  <a
-                    className="underline"
-                    href={`data:text/markdown;charset=utf-8,${encodeURIComponent(doc.content)}`}
-                    download={doc.title}
-                    rel="noopener"
-                  >
-                    {tWorkflow("downloadMarkdown", { title: doc.title })}
-                  </a>
-                  <div>
-                    <a
-                      className="underline"
-                      href={`data:application/pdf;base64,${doc.pdfBase64}`}
-                      download={doc.title.replace(/\.md$/, ".pdf")}
-                      rel="noopener"
-                    >
-                      {tWorkflow("downloadPdf")}
-                    </a>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-    </div>
+          <Card asChild variant="surface" size="2">
+            <section aria-labelledby="workflow-documents-heading">
+              <Flex direction="column" gap="3">
+                <Heading id="workflow-documents-heading" size="4">
+                  {tWorkflow("documentsHeading")}
+                </Heading>
+                <Flex asChild direction="column" gap="2">
+                  <ul>
+                    {run.documents.map((doc) => (
+                      <li key={doc.title}>
+                        <Flex direction="column" gap="1">
+                          <ThemeLink
+                            href={`data:text/markdown;charset=utf-8,${encodeURIComponent(doc.content)}`}
+                            download={doc.title}
+                            rel="noopener"
+                            underline="always"
+                          >
+                            {tWorkflow("downloadMarkdown", { title: doc.title })}
+                          </ThemeLink>
+                          <ThemeLink
+                            href={`data:application/pdf;base64,${doc.pdfBase64}`}
+                            download={doc.title.replace(/\.md$/, ".pdf")}
+                            rel="noopener"
+                            underline="always"
+                          >
+                            {tWorkflow("downloadPdf")}
+                          </ThemeLink>
+                        </Flex>
+                      </li>
+                    ))}
+                  </ul>
+                </Flex>
+              </Flex>
+            </section>
+          </Card>
+        </Flex>
+      </Grid>
+    </Flex>
   );
 }

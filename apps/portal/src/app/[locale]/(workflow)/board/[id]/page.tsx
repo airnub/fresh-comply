@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { TaskBoard } from "@airnub/ui";
 import { getTranslations } from "next-intl/server";
+import { Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { getDemoRun } from "../../../../../lib/demo-data";
 
 export default async function TaskBoardPage({
@@ -26,37 +27,55 @@ export default async function TaskBoardPage({
   } as const;
 
   return (
-    <div className="mt-6 space-y-4">
-      <section className="rounded border border-subtle bg-surface p-6 shadow">
-        <h2 className="text-2xl font-semibold text-foreground">{tBoard("title")}</h2>
-        <p className="text-sm text-muted-foreground">{tBoard("description")}</p>
-        <div className="mt-4">
-          <TaskBoard
-            tasks={run.timeline.map((step) => ({
-              id: step.id,
-              title: step.title,
-              status: step.status,
-              assignee: step.assignee,
-              dueDate: step.dueDate
-            }))}
-            statusLabels={statusLabels}
-            formatDueDate={(isoDate) => tBoard("due", { date: new Date(isoDate) })}
-          />
-        </div>
-      </section>
-      <section className="rounded border border-subtle bg-surface p-6 shadow">
-        <h3 className="text-base font-semibold text-foreground">{tBoard("deadlines")}</h3>
-        <ul className="mt-2 space-y-2 text-sm">
-          {run.timeline.map((step) => (
-            <li key={step.id} className="flex justify-between">
-              <span>{step.title}</span>
-              <span className="text-muted-foreground">
-                {step.dueDate ? tBoard("due", { date: new Date(step.dueDate) }) : tBoard("noDueDate")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+    <Flex direction="column" gap="4">
+      <Card asChild variant="surface" size="3">
+        <section aria-labelledby="board-heading">
+          <Flex direction="column" gap="3">
+            <Heading id="board-heading" size="5">
+              {tBoard("title")}
+            </Heading>
+            <Text size="2" color="gray">
+              {tBoard("description")}
+            </Text>
+            <TaskBoard
+              tasks={run.timeline.map((step) => ({
+                id: step.id,
+                title: step.title,
+                status: step.status,
+                assignee: step.assignee,
+                dueDate: step.dueDate
+              }))}
+              statusLabels={statusLabels}
+              formatDueDate={(isoDate) => tBoard("due", { date: new Date(isoDate) })}
+            />
+          </Flex>
+        </section>
+      </Card>
+      <Card asChild variant="surface" size="3">
+        <section aria-labelledby="board-deadlines-heading">
+          <Flex direction="column" gap="3">
+            <Heading id="board-deadlines-heading" size="4">
+              {tBoard("deadlines")}
+            </Heading>
+            <Flex asChild direction="column" gap="2">
+              <ul>
+                {run.timeline.map((step) => (
+                  <li key={step.id}>
+                    <Flex justify="between" align="center">
+                      <Text as="span" size="2" weight="medium">
+                        {step.title}
+                      </Text>
+                      <Text as="span" size="2" color="gray">
+                        {step.dueDate ? tBoard("due", { date: new Date(step.dueDate) }) : tBoard("noDueDate")}
+                      </Text>
+                    </Flex>
+                  </li>
+                ))}
+              </ul>
+            </Flex>
+          </Flex>
+        </section>
+      </Card>
+    </Flex>
   );
 }
