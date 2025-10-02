@@ -1,0 +1,8 @@
+{
+  "name": "@airnub/workflows",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "files": ["ie-nonprofit-clg-charity.yaml"],
+  "dependencies": {}
+}

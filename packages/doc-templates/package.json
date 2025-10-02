@@ -1,0 +1,14 @@
+{
+  "name": "@airnub/doc-templates",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "handlebars": "^4.7.8",
+    "mdx-bundler": "^10.0.1"
+  },
+  "exports": {
+    "./index": "./src/index.ts"
+  }
+}

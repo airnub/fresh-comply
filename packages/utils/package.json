@@ -1,0 +1,12 @@
+{
+  "name": "@airnub/utils",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    "./date": "./src/date.ts",
+    "./ics": "./src/ics.ts",
+    "./index": "./src/index.ts"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@airnub/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "fresh-comply": "src/index.ts"
+  },
+  "dependencies": {
+    "yargs": "^17.7.2"
+  }
+}

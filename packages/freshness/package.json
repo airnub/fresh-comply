@@ -1,0 +1,13 @@
+{
+  "name": "@airnub/freshness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/sources.ts",
+  "types": "src/sources.ts",
+  "exports": {
+    "./sources": "./src/sources.ts",
+    "./verify": "./src/verify.ts",
+    "./watcher": "./src/watcher.ts"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules
+.next
+pnpm-lock.yaml
+.env
+.DS_Store
+.idea
+.vscode/*.log
+packages/**/dist
+.pnpm-store
+coverage

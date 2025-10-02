@@ -1,0 +1,15 @@
+{
+  "name": "@airnub/connectors",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    "./cro": "./src/cro.ts",
+    "./charities": "./src/charities.ts",
+    "./revenue": "./src/revenue.ts",
+    "./rbo": "./src/rbo.ts",
+    "./funding": "./src/funding.ts",
+    "./index": "./src/index.ts"
+  }
+}
