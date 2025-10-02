@@ -11,6 +11,10 @@
     "./Timeline": "./src/Timeline.tsx",
     "./TaskBoard": "./src/TaskBoard.tsx",
     "./EvidenceDrawer": "./src/EvidenceDrawer.tsx",
+    "./ThemeProvider": "./src/ThemeProvider.tsx",
+    "./theme": "./src/theme/index.ts",
+    "./A11y": "./src/A11y.tsx",
+    "./tokens": "./tokens.css",
     "./index": "./src/index.ts"
   }
 }

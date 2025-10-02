@@ -1,14 +1,15 @@
 {
   "name": "@airnub/fresh-comply",
   "private": true,
-  "packageManager": "pnpm@10",
+  "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "db:migrate": "pnpm --filter @airnub/db run migrate",
-    "seed": "pnpm --filter @airnub/db run seed"
+    "seed": "pnpm --filter @airnub/db run seed",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "devDependencies": {
     "turbo": "^2.0.0"

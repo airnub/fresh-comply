@@ -1,0 +1,13 @@
+{
+  "defaults": {
+    "screenCapture": "reports/pa11y.png",
+    "chromeLaunchConfig": {
+      "args": ["--no-sandbox"]
+    }
+  },
+  "urls": [
+    "http://localhost:3000/en-IE",
+    "http://localhost:3000/en-IE/(workflow)/run/demo-run",
+    "http://localhost:3000/ga-IE"
+  ]
+}

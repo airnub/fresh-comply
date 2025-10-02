@@ -5,7 +5,14 @@ import { verifyRule } from "@airnub/freshness/verify";
 import { SOURCES } from "@airnub/freshness/sources";
 import { renderBoardMinutes } from "@airnub/doc-templates/index";
 
-const DSL_PATH = path.resolve(process.cwd(), "packages/workflows/ie-nonprofit-clg-charity.yaml");
+const DSL_PATH = path.resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "workflows",
+  "ie-nonprofit-clg-charity.yaml"
+);
 
 export type DemoStep = {
   id: string;

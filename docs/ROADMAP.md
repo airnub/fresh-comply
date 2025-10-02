@@ -15,3 +15,18 @@
 - Engagement flows (act on behalf), audit, ICS feeds
 - SLA/escalation notifications; public read-only progress view (optional)
 - ROS integration exploration (cert onboarding) or guided filing polish
+
+## Milestone 4 (Weeks 12–14)
+- Internationalization rollout: locale-aware routing, translation pipeline, ga-IE pilot content
+- Theme system: light/dark/high-contrast tokens, SSR theme provider, reduced-motion defaults
+- Update workflow metadata to support `*_i18n` fields; translator QA checklist
+
+## Milestone 5 (Weeks 15–17)
+- Accessibility audit (WCAG 2.2 AA), remediation of critical issues, automated lint + Pa11y CI
+- Keyboard navigation scripts, focus management, accessible document outputs
+- Inclusive design review with representative users
+
+## Milestone 6 (Weeks 18–20)
+- GDPR go-live: consent banner, legal pages, DSR intake queue, audit log enhancements
+- DPA & subprocessor registry publication with notification workflow
+- Internal tabletop exercise for breach response and annual RoPA/DPIA review

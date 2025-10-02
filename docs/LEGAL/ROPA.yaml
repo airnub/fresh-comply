@@ -1,0 +1,46 @@
+organisation: FreshComply Ltd.
+last_updated: 2025-10-02
+contact:
+  dpo: datatrust-ie@freshcomply.eu
+  address: Stephen Court, Hanover Street, Dublin 2, Ireland
+records:
+  - processing_activity: "Customer workflow hosting"
+    role: processor
+    purposes:
+      - Execute compliance workflows and tasks for customer organisations
+    data_subjects:
+      - Customer employees
+      - Customer clients and officers
+    personal_data_categories:
+      - Identification data
+      - Compliance evidence files
+      - Generated policy documents
+    recipients:
+      - Customer administrators
+      - Subprocessors: Supabase Ltd., Vercel Inc.
+    international_transfers:
+      mechanism: SCCs Module 2
+      recipient_country: United States
+    retention: "Active engagement + 6 years (statutory) unless otherwise instructed"
+    safeguards:
+      - Encryption at rest (AES-256)
+      - Access via RBAC + MFA
+      - Audit logging of admin actions
+  - processing_activity: "Platform analytics"
+    role: controller
+    purposes:
+      - Improve performance and usability
+    data_subjects:
+      - Portal users
+    personal_data_categories:
+      - Pseudonymised identifiers
+      - Event metadata (timestamp, feature)
+    recipients:
+      - FreshComply product team
+      - Subprocessors: Sentry GmbH
+    international_transfers:
+      mechanism: None (EU data residency)
+    retention: "Rolling 13 months"
+    safeguards:
+      - IP truncation
+      - Access restricted to product analytics group

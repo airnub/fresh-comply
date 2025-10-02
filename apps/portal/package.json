@@ -5,24 +5,36 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:a11y": "cypress run --e2e --spec cypress/e2e/accessibility.cy.ts",
+    "test:pa11y": "pa11y-ci ../../pa11yci.json"
   },
   "dependencies": {
-    "next": "15.0.0",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "clsx": "^2.1.0",
-    "@airnub/ui": "workspace:*",
+    "@airnub/doc-templates": "workspace:*",
     "@airnub/engine": "workspace:*",
     "@airnub/freshness": "workspace:*",
-    "@airnub/doc-templates": "workspace:*",
     "@airnub/types": "workspace:*",
-    "@airnub/utils": "workspace:*"
+    "@airnub/ui": "workspace:*",
+    "@airnub/utils": "workspace:*",
+    "@formatjs/intl-localematcher": "^0.5.4",
+    "clsx": "^2.1.0",
+    "negotiator": "^0.6.3",
+    "next": "15.0.0",
+    "next-intl": "^3.13.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@types/negotiator": "^0.6.3",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "cypress": "^13.13.0",
+    "cypress-axe": "^1.5.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "15.0.0",
+    "eslint-plugin-jsx-a11y": "^6.9.0",
+    "pa11y-ci": "^3.1.0",
     "typescript": "^5.5.4"
   }
 }

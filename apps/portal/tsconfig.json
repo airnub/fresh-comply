@@ -6,15 +6,48 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@airnub/ui": ["../../packages/ui/src"],
-      "@airnub/engine": ["../../packages/engine/src"],
-      "@airnub/utils": ["../../packages/utils/src"],
-      "@airnub/freshness": ["../../packages/freshness/src"],
-      "@airnub/doc-templates": ["../../packages/doc-templates/src"],
-      "@airnub/types": ["../../packages/types/src"]
+      "@airnub/ui": [
+        "../../packages/ui/src"
+      ],
+      "@airnub/engine": [
+        "../../packages/engine/src"
+      ],
+      "@airnub/utils": [
+        "../../packages/utils/src"
+      ],
+      "@airnub/freshness": [
+        "../../packages/freshness/src"
+      ],
+      "@airnub/doc-templates": [
+        "../../packages/doc-templates/src"
+      ],
+      "@airnub/types": [
+        "../../packages/types/src"
+      ]
     },
-    "types": ["@types/node"]
+    "types": [
+      "@types/node"
+    ],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "include": ["next-env.d.ts", "src/**/*"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "src/**/*",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
