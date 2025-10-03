@@ -1,3 +1,5 @@
+import type { Operation } from "fast-json-patch";
+
 export type NodeKind = "question" | "info" | "action" | "upload" | "doc.generate" | "tool.call" | "verify" | "schedule" | "review";
 export type RuleRef = { id: string };
 export type ManualStepExecution = {
@@ -90,4 +92,148 @@ export type WorkflowDSL = {
   steps: StepDef[];
   edges?: WorkflowEdge[];
   metadata?: Record<string, unknown>;
+};
+
+export type OverlayPatch = {
+  operations: Operation[];
+  source?: string;
+};
+
+export type RuleVersionSelector = string | { version: string } | { range: string };
+
+export type TemplateVersionSelector = string | { version: string } | { range: string };
+
+export type RuleSourceSnapshot = {
+  sourceKey: string;
+  snapshotId: string;
+  fingerprint: string;
+};
+
+export type RuleVersionRecord = {
+  id: string;
+  ruleId: string;
+  version: string;
+  checksum: string;
+  sources: RuleSourceSnapshot[];
+};
+
+export type TemplateVersionRecord = {
+  id: string;
+  templateId: string;
+  version: string;
+  checksum: string;
+};
+
+export type OverlayReference = {
+  id: string;
+  version: string;
+};
+
+export type WorkflowOverlayVersionRecord = {
+  id: string;
+  overlayId: string;
+  version: string;
+  checksum: string;
+  patch: OverlayPatch;
+};
+
+export type WorkflowDefinitionVersionRecord = {
+  id: string;
+  workflowDefId: string;
+  workflowKey: string;
+  version: string;
+  checksum: string;
+  graph: WorkflowDSL;
+  ruleBindings: Record<string, RuleVersionSelector>;
+  templateBindings: Record<string, TemplateVersionSelector>;
+};
+
+export type WorkflowLockfileWorkflow = {
+  id: string;
+  version: string;
+  checksum: string;
+};
+
+export type WorkflowLockfileOverlay = {
+  id: string;
+  version: string;
+  checksum: string;
+};
+
+export type WorkflowLockfileRule = {
+  id: string;
+  version: string;
+  checksum: string;
+  sources: RuleSourceSnapshot[];
+};
+
+export type WorkflowLockfileTemplate = {
+  id: string;
+  version: string;
+  checksum: string;
+};
+
+export type WorkflowLockfile = {
+  workflowDef: WorkflowLockfileWorkflow;
+  overlays: WorkflowLockfileOverlay[];
+  rules: Record<string, WorkflowLockfileRule>;
+  templates: Record<string, WorkflowLockfileTemplate>;
+};
+
+export type MaterializeDataSource = {
+  getWorkflowDefinitionVersion(
+    defId: string,
+    version: string
+  ): Promise<WorkflowDefinitionVersionRecord | undefined>;
+  getOverlayVersion(ref: OverlayReference): Promise<WorkflowOverlayVersionRecord | undefined>;
+  getRuleVersion(
+    ruleId: string,
+    selector: RuleVersionSelector
+  ): Promise<RuleVersionRecord | undefined>;
+  getTemplateVersion(
+    templateId: string,
+    selector: TemplateVersionSelector
+  ): Promise<TemplateVersionRecord | undefined>;
+};
+
+export type MaterializeContext = {
+  data: MaterializeDataSource;
+};
+
+export type MaterializedRun = {
+  workflow: WorkflowDSL;
+  steps: StepDef[];
+  warnings: string[];
+  lockfile: WorkflowLockfile;
+  definitionVersion: WorkflowDefinitionVersionRecord;
+  overlayVersions: WorkflowOverlayVersionRecord[];
+  ruleVersions: Record<string, RuleVersionRecord>;
+  templateVersions: Record<string, TemplateVersionRecord>;
+};
+
+export type SourceRecord = Record<string, unknown>;
+
+export type VerificationSourceEvidence = {
+  sourceKey: string;
+  snapshotId: string;
+  expectedFingerprint: string;
+  observedFingerprint: string;
+  matches: boolean;
+  fetchedAt: string;
+  recordCount: number;
+  sample: SourceRecord[];
+};
+
+export type RuleVerificationEvidence = {
+  ruleId: string;
+  version: string;
+  checksum: string;
+  verifiedAt: string;
+  status: "verified" | "stale";
+  sources: VerificationSourceEvidence[];
+};
+
+export type VerificationResult = {
+  verifiedAt: string;
+  rules: Record<string, RuleVerificationEvidence>;
 };
