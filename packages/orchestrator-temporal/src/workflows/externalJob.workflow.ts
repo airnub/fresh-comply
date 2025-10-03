@@ -122,11 +122,15 @@ export async function externalJobWorkflow(
     body: input.payload.payload
   };
 
+  const tenantId = input.payload.tenantId ?? input.tenantId;
+  const partnerOrgId = input.partnerOrgId ?? null;
+
   const startResult = await externalActivities.startExternalJob({
-    tenantId: input.payload.tenantId ?? input.tenantId,
+    tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId,
     request: requestConfig
   });
 
@@ -151,9 +155,11 @@ export async function externalJobWorkflow(
           return;
         }
         await externalActivities.escalateExternalJob({
+          tenantId,
           orgId: input.orgId,
           runId: input.runId,
           stepKey: input.stepKey,
+          partnerOrgId,
           reason: escalateReason,
           metadata: {
             timeoutSeconds,
@@ -201,10 +207,11 @@ export async function externalJobWorkflow(
           }
           try {
             const pollResult = await externalActivities.pollExternalJob({
-              tenantId: input.payload.tenantId ?? input.tenantId,
+              tenantId,
               orgId: input.orgId,
               runId: input.runId,
               stepKey: input.stepKey,
+              partnerOrgId,
               request: pollRequest,
               success: pollingConfig.successWhen,
               failure: pollingConfig.failureWhen,
@@ -237,9 +244,11 @@ export async function externalJobWorkflow(
             }
           } catch (error) {
             await externalActivities.escalateExternalJob({
+              tenantId,
               orgId: input.orgId,
               runId: input.runId,
               stepKey: input.stepKey,
+              partnerOrgId,
               reason: "polling_error",
               metadata: {
                 attempt,
@@ -252,9 +261,11 @@ export async function externalJobWorkflow(
 
         if (!callbackPayload) {
           await externalActivities.escalateExternalJob({
+            tenantId,
             orgId: input.orgId,
             runId: input.runId,
             stepKey: input.stepKey,
+            partnerOrgId,
             reason: "polling_exhausted",
             metadata: {
               attempts: maxAttempts,
@@ -279,9 +290,11 @@ export async function externalJobWorkflow(
   await Promise.allSettled(watchers);
 
   const persisted = await externalActivities.persistExternalResult({
+    tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId,
     status: isSuccessStatus(callbackPayload?.status) ? "done" : "blocked",
     output: {
       start: startResult.http,

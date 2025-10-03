@@ -17,6 +17,8 @@ export async function lookupCroName(
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "lookupCroName"
     }
@@ -62,6 +64,8 @@ export async function uploadPackToStorage(
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "uploadPackToStorage",
       "freshcomply.template_id": input.templateId

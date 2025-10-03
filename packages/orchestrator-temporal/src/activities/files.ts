@@ -24,6 +24,8 @@ export async function buildA1Pack(
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "buildA1Pack"
     }

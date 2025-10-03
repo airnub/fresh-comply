@@ -3,7 +3,6 @@ import { persistStepProgress, recordAuditEvent, type StepActivityContext } from 
 import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
 
 export interface ExternalJobStartInput extends StepActivityContext {
-  tenantId: string;
   request: HttpRequestConfig;
 }
 
@@ -12,7 +11,6 @@ export interface ExternalJobStartResult {
 }
 
 export interface ExternalJobPollInput extends StepActivityContext {
-  tenantId: string;
   request: HttpRequestConfig;
   success?: { path: string; equals?: unknown; in?: unknown[] };
   failure?: { path: string; equals?: unknown; in?: unknown[] };
@@ -71,6 +69,8 @@ export async function startExternalJob(input: ExternalJobStartInput): Promise<Ex
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "startExternalJob"
     }
@@ -82,9 +82,7 @@ export async function startExternalJob(input: ExternalJobStartInput): Promise<Ex
     });
 
     await persistStepProgress({
-      orgId: input.orgId,
-      runId: input.runId,
-      stepKey: input.stepKey,
+      ...input,
       status: "waiting",
       output: { http },
       notes: "External job initiated; awaiting callback"
@@ -100,6 +98,8 @@ export async function pollExternalJob(input: ExternalJobPollInput): Promise<Exte
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "pollExternalJob",
       "freshcomply.poll.attempt": input.attempt
@@ -134,6 +134,8 @@ export async function persistExternalResult<T>(input: PersistExternalResultInput
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "persistExternalResult",
       "freshcomply.step.status": input.status
@@ -146,6 +148,8 @@ export async function escalateExternalJob(input: EscalationInput) {
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "escalateExternalJob",
       "freshcomply.escalation.reason": input.reason
@@ -155,6 +159,8 @@ export async function escalateExternalJob(input: EscalationInput) {
       orgId: input.orgId,
       runId: input.runId,
       stepKey: input.stepKey,
+      tenantId: input.tenantId,
+      partnerOrgId: input.partnerOrgId,
       action: "external_job_escalation",
       metadata: {
         reason: input.reason,

@@ -10,6 +10,8 @@ export async function POST(request: Request) {
   return withTelemetrySpan(`POST ${ROUTE}`, {
     runId: headerMetadata.runId,
     stepId: headerMetadata.stepId,
+    tenantId: headerMetadata.tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId,
     attributes: {
       "http.request.method": "POST",
       "http.route": ROUTE
@@ -38,8 +40,14 @@ export async function POST(request: Request) {
       workflow,
       input,
       subjectOrgId,
-      environment
+      environment,
+      partnerOrgId
     } = body as Record<string, unknown>;
+
+    const resolvedPartnerOrgId =
+      typeof partnerOrgId === "string" && partnerOrgId.length > 0
+        ? partnerOrgId
+        : headerMetadata.partnerOrgId ?? null;
 
     if (typeof tenantId !== "string" || tenantId.length === 0) {
       const response = NextResponse.json({ ok: false, error: "tenantId is required" }, { status: 400 });
@@ -70,9 +78,8 @@ export async function POST(request: Request) {
       stepId: stepKey,
       workflow,
       orgId,
-      attributes: {
-        "freshcomply.tenant_id": tenantId
-      }
+      tenantId,
+      partnerOrgId: resolvedPartnerOrgId
     });
 
     try {
@@ -83,6 +90,7 @@ export async function POST(request: Request) {
         runId,
         stepKey,
         payload: input,
+        partnerOrgId: resolvedPartnerOrgId ?? undefined,
         searchAttributes: {
           subjectOrg: typeof subjectOrgId === "string" ? subjectOrgId : orgId,
           environment: typeof environment === "string" ? environment : undefined

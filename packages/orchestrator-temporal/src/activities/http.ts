@@ -77,11 +77,12 @@ export async function performSignedHttpRequest(options: HttpExecutionContext): P
     runId: options.context.runId,
     stepId: options.context.stepKey,
     orgId: options.context.orgId,
+    tenantId: options.context.tenantId,
+    partnerOrgId: options.context.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "performSignedHttpRequest",
       "freshcomply.http.method": options.request.method,
       "freshcomply.http.url_alias": options.request.urlAlias,
-      "freshcomply.tenant_id": options.tenantId,
       "http.request.method": options.request.method
     }
   }, async (span) => {
@@ -99,6 +100,10 @@ export async function performSignedHttpRequest(options: HttpExecutionContext): P
     headers.set("X-FC-Idempotency-Key", idempotencyKey ?? `${context.runId}:${context.stepKey}`);
     headers.set("X-FC-Run-Id", context.runId);
     headers.set("X-FC-Step-Key", context.stepKey);
+    headers.set("X-FC-Tenant-Id", context.tenantId);
+    if (context.partnerOrgId) {
+      headers.set("X-FC-Partner-Org-Id", context.partnerOrgId);
+    }
 
     for (const [key, value] of Object.entries(request.headers ?? {})) {
       headers.set(key, value);

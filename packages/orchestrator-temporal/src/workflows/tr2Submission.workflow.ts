@@ -42,16 +42,20 @@ export async function tr2SubmissionWorkflow(input: Tr2WorkflowInput): Promise<Tr
 
   status = "running";
   submission = await revenue.submitTr2ViaBridge({
+    tenantId: input.tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId: input.partnerOrgId ?? null,
     payload: input.payload.payload
   });
 
   poll = await revenue.pollTr2Status({
+    tenantId: input.tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId: input.partnerOrgId ?? null,
     ticketId: submission.ticketId
   });
 

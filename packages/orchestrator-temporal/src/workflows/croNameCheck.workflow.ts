@@ -21,9 +21,11 @@ export async function croNameCheckWorkflow(
 
   status = "running";
   result = await cro.lookupCroName({
+    tenantId: input.tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId: input.partnerOrgId ?? null,
     proposedName: input.payload.proposedName
   });
   status = "completed";

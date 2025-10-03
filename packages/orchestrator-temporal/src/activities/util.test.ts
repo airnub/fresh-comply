@@ -5,9 +5,11 @@ import { createBusinessKey, persistStepProgress, type StepActivityContext } from
 
 test("createBusinessKey composes a stable identifier", () => {
   const context: StepActivityContext = {
+    tenantId: "tenant-xyz",
     orgId: "org-123",
     runId: "run-456",
-    stepKey: "cro-name-check"
+    stepKey: "cro-name-check",
+    partnerOrgId: "partner-789"
   };
 
   const key = createBusinessKey(context);
@@ -17,9 +19,11 @@ test("createBusinessKey composes a stable identifier", () => {
 
 test("persistStepProgress returns enriched payload with timestamp", async () => {
   const payload = {
+    tenantId: "tenant-xyz",
     orgId: "org-123",
     runId: "run-456",
     stepKey: "cro-name-check",
+    partnerOrgId: "partner-789",
     status: "in_progress" as const,
     output: { available: true }
   };

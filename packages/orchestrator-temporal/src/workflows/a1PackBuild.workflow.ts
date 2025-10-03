@@ -28,9 +28,11 @@ export async function a1PackBuildWorkflow(
 
   status = "running";
   result = await files.buildA1Pack({
+    tenantId: input.tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId: input.partnerOrgId ?? null,
     orgName: input.payload.orgName,
     meetingDate: input.payload.meetingDate,
     meetingTime: input.payload.meetingTime,

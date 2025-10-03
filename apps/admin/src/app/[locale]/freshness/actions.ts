@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient, getSupabaseUser, SupabaseConfigurationError } from "../../../lib/auth/supabase-ssr";
 import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
 
@@ -21,6 +22,11 @@ async function resolveContext() {
   }
 }
 
+function readOrgId(user: User | null | undefined, key: string): string | null {
+  const value = user?.app_metadata?.[key] ?? user?.user_metadata?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 export async function approvePendingUpdate(id: string, reason: string): Promise<ModerationResult> {
   return withTelemetrySpan("action.freshness.approve", {
     attributes: {
@@ -35,6 +41,10 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: true };
     }
+
+    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const partnerOrgId = readOrgId(context.user, "partner_org_id");
+    annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
     const { data, error } = await client
@@ -84,6 +94,10 @@ export async function rejectPendingUpdate(id: string, reason: string): Promise<M
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: true };
     }
+
+    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const partnerOrgId = readOrgId(context.user, "partner_org_id");
+    annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
     const { error } = await client
