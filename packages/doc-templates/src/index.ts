@@ -11,6 +11,29 @@ export type RenderedDocument = {
   pdfBase64: string;
 };
 
+export type DocumentBrandingBlock = {
+  text?: string;
+  logoUrl?: string;
+  accentColor?: string;
+  disclaimer?: string;
+};
+
+export type DocumentBrandingTypography = {
+  bodyFont?: string;
+  headingFont?: string;
+};
+
+export type DocumentBrandingMetadata = {
+  header?: DocumentBrandingBlock;
+  footer?: DocumentBrandingBlock;
+  typography?: DocumentBrandingTypography;
+  palette?: Record<string, string>;
+};
+
+export type RenderDocumentOptions = {
+  branding?: DocumentBrandingMetadata;
+};
+
 function checksumFor(content: string): string {
   let hash = 0;
   for (let i = 0; i < content.length; i += 1) {
@@ -20,17 +43,24 @@ function checksumFor(content: string): string {
   return `demo-${Math.abs(hash)}`;
 }
 
-export function renderBoardMinutes(context: Record<string, unknown>): RenderedDocument {
+export function renderBoardMinutes(
+  context: Record<string, unknown>,
+  options: RenderDocumentOptions = {}
+): RenderedDocument {
   const templateDir = path.dirname(fileURLToPath(import.meta.url));
   const templatePath = path.resolve(templateDir, "../templates/board_minutes_a1.hbs");
   const raw = fs.readFileSync(templatePath, "utf8");
   const compiled = Handlebars.compile(raw);
-  const content = compiled(context);
-  const pdfBase64 = createPdfFromText(content);
+  const templateContext = {
+    ...context,
+    branding: options.branding ?? null
+  };
+  const content = compiled(templateContext);
+  const pdfBase64 = createPdfFromText(content, options.branding);
   return { filename: "board_minutes_a1.md", content, checksum: checksumFor(content), pdfBase64 };
 }
 
-function createPdfFromText(text: string): string {
+function createPdfFromText(text: string, branding?: DocumentBrandingMetadata): string {
   const header = "%PDF-1.4\n";
   let body = "";
   const offsets: number[] = [0];
@@ -46,7 +76,42 @@ function createPdfFromText(text: string): string {
     "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
   );
 
-  const lines = text.split("\n");
+  const lines: string[] = [];
+
+  if (branding?.header) {
+    if (branding.header.text) {
+      lines.push(branding.header.text);
+    }
+    if (branding.header.logoUrl) {
+      lines.push(`Logo: ${branding.header.logoUrl}`);
+    }
+    if (lines.length > 0) {
+      lines.push("");
+    }
+  }
+
+  lines.push(...text.split("\n"));
+
+  if (branding?.typography?.bodyFont || branding?.typography?.headingFont) {
+    lines.push("");
+    lines.push(
+      `Typography — body: ${branding.typography?.bodyFont ?? "Helvetica"}, heading: ${branding.typography?.headingFont ?? "Helvetica"}`
+    );
+  }
+
+  if (branding?.footer) {
+    lines.push("");
+    if (branding.footer.text) {
+      lines.push(branding.footer.text);
+    }
+    if (branding.footer.disclaimer) {
+      lines.push(branding.footer.disclaimer);
+    }
+    if (branding.footer.accentColor) {
+      lines.push(`Brand colour: ${branding.footer.accentColor}`);
+    }
+  }
+
   const segments = lines.map((line, index) => {
     const safe = escapePdfText(line || " ");
     if (index === 0) {

@@ -1,4 +1,5 @@
 import { proxyActivities, setHandler } from "@temporalio/workflow";
+import type { DocumentBrandingMetadata } from "@airnub/doc-templates/index";
 import type * as fileActivities from "../activities/files.js";
 import type { PackBuildResult } from "../activities/files.js";
 import { getResultQuery, getStatusQuery, type StepWorkflowInput, type StepWorkflowStatus } from "./shared.js";
@@ -16,6 +17,7 @@ export async function a1PackBuildWorkflow(
     meetingDate: string;
     meetingTime: string;
     meetingLocation: string;
+    branding?: DocumentBrandingMetadata;
   }>
 ): Promise<PackBuildResult> {
   let status: StepWorkflowStatus = "pending";
@@ -32,7 +34,8 @@ export async function a1PackBuildWorkflow(
     orgName: input.payload.orgName,
     meetingDate: input.payload.meetingDate,
     meetingTime: input.payload.meetingTime,
-    meetingLocation: input.payload.meetingLocation
+    meetingLocation: input.payload.meetingLocation,
+    branding: input.payload.branding
   });
   status = "completed";
   return result;

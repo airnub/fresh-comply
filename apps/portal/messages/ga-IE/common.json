@@ -237,5 +237,63 @@
     "callType": "Cineál glao",
     "metadata": "{domain, select, other {{domain}}} {county, select, other {· {county}}}",
     "loadError": "Níl sonraí maoinithe ar fáil faoi láthair. Déan iarracht arís ar ball."
+  },
+  "partnerAdmin": {
+    "title": "Partner admin",
+    "description": "Bainistigh brandáil agus fearainn bánlipéadaithe don tionónta seo.",
+    "nav": {
+      "branding": "Brandáil",
+      "domains": "Fearainn"
+    },
+    "branding": {
+      "heading": "Brandáil agus téama",
+      "intro": "Cumraigh lógónna, dathanna agus clónna an tionónta ar fud an tairseach agus na ndoiciméad easpórtáilte.",
+      "lastUpdated": "Nuashonraithe {date, date, medium}",
+      "fields": {
+        "logoUrl": "URL an lógó",
+        "faviconUrl": "URL an deilbhín",
+        "primaryColor": "Príomh-dhath",
+        "accentColor": "Dath aibhsithe",
+        "headerText": "Téacs ceanntásca",
+        "footerText": "Téacs buntásca",
+        "bodyFont": "Cló an choirp",
+        "headingFont": "Cló na gceannteideal",
+        "pdfFooterText": "Nóta buntásca PDF"
+      },
+      "actions": {
+        "save": "Sábháil brandáil",
+        "saving": "Á sábháil…"
+      },
+      "messages": {
+        "success": "Nuashonraíodh brandáil an tionónta.",
+        "error": "Níor éirigh le nuashonrú brandála."
+      }
+    },
+    "domains": {
+      "heading": "Fearainn saincheaptha",
+      "intro": "Bainistigh fearainn an tionónta, rianaigh stádas teastais agus socraigh an príomh-óstach.",
+      "fields": {
+        "domain": "Fearann"
+      },
+      "table": {
+        "status": "Stádas",
+        "verifiedAt": "Fíoraithe",
+        "actions": "Gníomhartha"
+      },
+      "actions": {
+        "add": "Cuir fearann leis",
+        "verify": "Marcáil mar fhíoraithe",
+        "setPrimary": "Socraigh mar phríomhfhfearann",
+        "remove": "Bain"
+      },
+      "messages": {
+        "added": "Sábháladh an fearann.",
+        "verified": "Marcáladh an fearann mar fhíoraithe.",
+        "removed": "Baineadh an fearann.",
+        "error": "Ní féidir fearainn a bhainistiú faoi láthair.",
+        "empty": "Níl aon fhearainn cumraithe go fóill.",
+        "primary": "Nuashonraíodh an príomhfhfearann."
+      }
+    }
   }
 }

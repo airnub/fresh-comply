@@ -1,1 +1,22 @@
-Board Meeting of {{orgName}} CLG (the "Company")\nDate: {{date}}  Time: {{time}}  Location: {{location}}\n\nRESOLVED THAT the Company proceed to incorporate by filing Form A1 with the Companies Registration Office and that the Secretary is authorised to submit the application and pay the prescribed fee.\n\nSigned: ___________________  Chair
+{{#if branding.header}}
+{{#if branding.header.text}}{{branding.header.text}}{{/if}}
+{{#if branding.header.logoUrl}}
+![Logo]({{branding.header.logoUrl}})
+{{/if}}
+
+{{/if}}
+Board Meeting of {{orgName}} CLG (the "Company")
+Date: {{date}}  Time: {{time}}  Location: {{location}}
+
+{{#if branding.typography.bodyFont}}
+_This document renders with {{branding.typography.bodyFont}} for body copy._
+{{/if}}
+RESOLVED THAT the Company proceed to incorporate by filing Form A1 with the Companies Registration Office and that the Secretary is authorised to submit the application and pay the prescribed fee.
+
+Signed: ___________________  Chair
+{{#if branding.footer}}
+
+---
+{{#if branding.footer.text}}{{branding.footer.text}}{{/if}}
+{{#if branding.footer.accentColor}}Brand colour: {{branding.footer.accentColor}}{{/if}}
+{{/if}}

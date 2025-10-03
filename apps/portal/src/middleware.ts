@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { type AppLocale, defaultLocale, isAppLocale } from "./i18n/config";
 import { ensureLeadingLocale, negotiateLocale, setLocaleCookie } from "./i18n/request";
 import { buildSecurityHeaders, generateNonce, SECURITY_NONCE_HEADER } from "@airnub/utils/security-headers";
+import {
+  createBrandingStyleVariables,
+  createHtmlBrandingAttributes,
+  encodeTenantBrandingHeader,
+  resolveTenantBranding
+} from "./lib/tenant-branding";
 
 const PUBLIC_FILE = /\.(.*)$/;
 
@@ -71,6 +77,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const nonce = generateNonce();
+  const host = request.headers.get("host");
+  const branding = await resolveTenantBranding(host);
+  const brandingHeader = encodeTenantBrandingHeader(branding);
+  const brandingAttributes = createHtmlBrandingAttributes(branding);
+  const brandingStyles = createBrandingStyleVariables(branding);
   const segments = pathname.split("/").filter(Boolean);
   const currentSegment = segments[0];
 
@@ -79,6 +90,11 @@ export async function middleware(request: NextRequest) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-next-intl-locale", locale);
     requestHeaders.set(SECURITY_NONCE_HEADER, nonce);
+    requestHeaders.set("x-tenant-branding", brandingHeader);
+    requestHeaders.set("x-tenant-id", branding.tenantOrgId);
+    requestHeaders.set("x-tenant-domain", branding.domain ?? "");
+    requestHeaders.set("x-tenant-theme-attrs", JSON.stringify(brandingAttributes));
+    requestHeaders.set("x-tenant-css-vars", JSON.stringify(brandingStyles));
 
     const response = NextResponse.next({
       request: {
@@ -86,6 +102,9 @@ export async function middleware(request: NextRequest) {
       }
     });
 
+    response.headers.set("x-tenant-branding", brandingHeader);
+    response.headers.set("x-tenant-id", branding.tenantOrgId);
+    response.headers.set("x-tenant-domain", branding.domain ?? "");
     setLocaleCookie(response, locale);
     await getSupabaseSession(request, response);
     return applySecurityHeaders(response, nonce);
@@ -96,6 +115,9 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = ensureLeadingLocale(pathname === "/" ? "" : pathname, locale);
     const response = NextResponse.redirect(url);
+    response.headers.set("x-tenant-branding", brandingHeader);
+    response.headers.set("x-tenant-id", branding.tenantOrgId);
+    response.headers.set("x-tenant-domain", branding.domain ?? "");
     await getSupabaseSession(request, response);
     setLocaleCookie(response, locale);
     return applySecurityHeaders(response, nonce);
@@ -105,12 +127,20 @@ export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-next-intl-locale", locale);
   requestHeaders.set(SECURITY_NONCE_HEADER, nonce);
+  requestHeaders.set("x-tenant-branding", brandingHeader);
+  requestHeaders.set("x-tenant-id", branding.tenantOrgId);
+  requestHeaders.set("x-tenant-domain", branding.domain ?? "");
+  requestHeaders.set("x-tenant-theme-attrs", JSON.stringify(brandingAttributes));
+  requestHeaders.set("x-tenant-css-vars", JSON.stringify(brandingStyles));
 
   const response = NextResponse.next({
     request: {
       headers: requestHeaders
     }
   });
+  response.headers.set("x-tenant-branding", brandingHeader);
+  response.headers.set("x-tenant-id", branding.tenantOrgId);
+  response.headers.set("x-tenant-domain", branding.domain ?? "");
   const session = await getSupabaseSession(request, response);
 
   if (!session) {
@@ -118,6 +148,9 @@ export async function middleware(request: NextRequest) {
     signInUrl.pathname = "/auth/sign-in";
     signInUrl.searchParams.set("redirectTo", pathname);
     const redirectResponse = NextResponse.redirect(signInUrl);
+    redirectResponse.headers.set("x-tenant-branding", brandingHeader);
+    redirectResponse.headers.set("x-tenant-id", branding.tenantOrgId);
+    redirectResponse.headers.set("x-tenant-domain", branding.domain ?? "");
     return applySecurityHeaders(redirectResponse, nonce);
   }
 

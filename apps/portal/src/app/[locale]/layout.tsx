@@ -12,6 +12,8 @@ import { ThemeToggle } from "../../components/ThemeToggle";
 import SkipLink from "../../components/SkipLink";
 import { locales, isAppLocale } from "../../i18n/config";
 import { getActiveUserProfile } from "../../server/supabase";
+import { headers } from "next/headers";
+import { getTenantBrandingFromHeaders } from "../../lib/tenant-branding";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -26,6 +28,8 @@ export default async function LocaleLayout({
   children: ReactNode;
   params: Promise<{ locale: string }>;
 }) {
+  const headerStore = headers();
+  const branding = getTenantBrandingFromHeaders(headerStore);
   const { locale } = await params;
   if (!isAppLocale(locale)) {
     notFound();
@@ -50,6 +54,8 @@ export default async function LocaleLayout({
 
   const userDisplayName = profile.name ?? profile.email;
   const signOutAction = `/auth/sign-out?redirect=${encodeURIComponent(`/${locale}`)}`;
+  const brandTitle = (branding.pdfHeader?.text as string | undefined) ?? tApp("title");
+  const brandLogo = branding.logoUrl ?? undefined;
 
   const legalLinks: { href: string; label: string }[] = [
     { href: `/${locale}/privacy`, label: tNav("privacy") },
@@ -71,7 +77,17 @@ export default async function LocaleLayout({
                       <Box>
                         <ThemeLink asChild underline="never" color="blue">
                           <Link href={`/${locale}`}>
-                            <Heading size="5">{tApp("title")}</Heading>
+                            <Flex align="center" gap="3">
+                              {brandLogo ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={brandLogo}
+                                  alt={`${brandTitle} logo`}
+                                  style={{ height: "32px", width: "auto" }}
+                                />
+                              ) : null}
+                              <Heading size="5">{brandTitle}</Heading>
+                            </Flex>
                         </Link>
                       </ThemeLink>
                       <Text as="p" size="2" color="gray">

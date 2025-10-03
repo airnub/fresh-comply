@@ -6,6 +6,7 @@ import type { Rule } from "@airnub/freshness/verify";
 import { verifyRule } from "@airnub/freshness/verify";
 import { SOURCES } from "@airnub/freshness/sources";
 import { renderBoardMinutes } from "@airnub/doc-templates/index";
+import { DEFAULT_TENANT_BRANDING, toDocumentBrandingMetadata } from "./tenant-branding";
 
 const DSL_PATH = path.resolve(
   process.cwd(),
@@ -125,12 +126,17 @@ export async function getDemoRun(): Promise<DemoRun> {
     })
   );
 
-  const documents = [renderBoardMinutes({
-    orgName: "Company X (Client)",
-    date: new Date().toISOString().split("T")[0],
-    time: "09:30",
-    location: "FreshComply HQ"
-  })];
+  const documents = [
+    renderBoardMinutes(
+      {
+        orgName: "Company X (Client)",
+        date: new Date().toISOString().split("T")[0],
+        time: "09:30",
+        location: "FreshComply HQ"
+      },
+      { branding: toDocumentBrandingMetadata(DEFAULT_TENANT_BRANDING) }
+    )
+  ];
 
   const audit = [
     {
