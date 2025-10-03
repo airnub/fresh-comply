@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { callAdminRpc, jsonError, resolveAdminContext } from "../_utils";
+import { z } from "zod";
+import { callAdminRpc, jsonError, parseJsonBody, resolveAdminContext } from "../../_lib";
 
-interface UpdateStepTypePayload {
-  reason?: string;
-  patch?: Record<string, unknown>;
-}
+const updateStepTypeSchema = z.object({
+  reason: z.string().min(1, "Reason code is required"),
+  patch: z.record(z.any(), { invalid_type_error: "Update payload is required" }),
+});
 
 export async function PATCH(request: Request, { params }: { params: { stepTypeId: string } }) {
-  const context = await resolveAdminContext();
+  const context = await resolveAdminContext(["platform_admin"]);
   if (context instanceof NextResponse) {
     return context;
   }
@@ -17,27 +18,17 @@ export async function PATCH(request: Request, { params }: { params: { stepTypeId
     return jsonError(400, "Step type id is required");
   }
 
-  let payload: UpdateStepTypePayload;
-  try {
-    payload = (await request.json()) as UpdateStepTypePayload;
-  } catch (error) {
-    return jsonError(400, "Invalid JSON body");
-  }
-
-  if (!payload.reason || !payload.reason.trim()) {
-    return jsonError(422, "Reason code is required", { validationErrors: ["Reason code is required"] });
-  }
-
-  if (!payload.patch) {
-    return jsonError(422, "Update payload is required");
+  const parsed = await parseJsonBody(request, updateStepTypeSchema);
+  if (parsed instanceof NextResponse) {
+    return parsed;
   }
 
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_update_step_type", {
-      reason: payload.reason,
+      reason: parsed.reason,
       actor_id: context.userId,
       step_type_id: stepTypeId,
-      patch: payload.patch,
+      patch: parsed.patch,
     });
 
     return NextResponse.json({
