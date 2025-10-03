@@ -21,8 +21,8 @@
   },
 
   "mounts": [
-    "type=cache,source=pnpm-store,target=/home/node/.pnpm-store",
-    "type=cache,source=next-cache,target=${containerWorkspaceFolder}/.next/cache"
+    "type=volume,source=pnpm-store,target=/home/node/.pnpm-store",
+    "type=volume,source=next-cache,target=${containerWorkspaceFolder}/.next/cache"
   ],
 
   "remoteUser": "vscode",
