@@ -1,4 +1,4 @@
-import { createTemporalClient, getTaskQueue } from "./client.js";
+import { createTemporalClient, getTaskQueueForTenant } from "./client.js";
 import { buildSearchAttributes } from "./search-attributes.js";
 import type { StepWorkflowInput } from "./workflows/shared.js";
 import * as workflows from "./workflows/index.js";
@@ -18,6 +18,7 @@ export const SUPPORTED_WORKFLOWS = Object.keys(WORKFLOW_REGISTRY) as SupportedWo
 
 export type StartWorkflowOptions<TPayload = unknown> = {
   workflow: SupportedWorkflow;
+  tenantId: string;
   orgId: string;
   runId: string;
   stepKey: string;
@@ -36,6 +37,7 @@ export type StartWorkflowResult = {
 export async function startStepWorkflow<TPayload>(
   options: StartWorkflowOptions<TPayload>
 ): Promise<StartWorkflowResult> {
+  const taskQueue = getTaskQueueForTenant(options.tenantId);
   return withTelemetrySpan("temporal.workflow.start", {
     runId: options.runId,
     stepId: options.stepKey,
@@ -43,7 +45,8 @@ export async function startStepWorkflow<TPayload>(
     orgId: options.orgId,
     attributes: {
       "freshcomply.temporal.operation": "start",
-      "freshcomply.temporal.task_queue": getTaskQueue()
+      "freshcomply.temporal.task_queue": taskQueue,
+      "freshcomply.tenant_id": options.tenantId
     }
   }, async (span) => {
     const client = await createTemporalClient();
@@ -57,6 +60,7 @@ export async function startStepWorkflow<TPayload>(
       const workflowId = `${options.orgId}:${options.runId}:${options.stepKey}:${options.workflow}`;
       const args: [StepWorkflowInput<TPayload>] = [
         {
+          tenantId: options.tenantId,
           orgId: options.orgId,
           runId: options.runId,
           stepKey: options.stepKey,
@@ -64,6 +68,7 @@ export async function startStepWorkflow<TPayload>(
         }
       ];
       const searchAttributes = buildSearchAttributes({
+        tenantId: options.tenantId,
         runId: options.runId,
         subjectOrg: options.searchAttributes?.subjectOrg ?? options.orgId,
         stepKey: options.stepKey,
@@ -72,7 +77,7 @@ export async function startStepWorkflow<TPayload>(
       const handle = await client.start<typeof workflowImpl>(workflowImpl, {
         args: args as Parameters<typeof workflowImpl>,
         workflowId,
-        taskQueue: getTaskQueue(),
+        taskQueue,
         searchAttributes
       });
       annotateSpan(span, {
@@ -94,6 +99,7 @@ export async function startStepWorkflow<TPayload>(
 }
 
 export type SignalWorkflowOptions = {
+  tenantId: string;
   workflowId: string;
   signal: string;
   payload?: unknown;
@@ -106,7 +112,8 @@ export async function signalWorkflow(
     attributes: {
       "freshcomply.temporal.operation": "signal",
       "freshcomply.temporal.workflow_id": options.workflowId,
-      "freshcomply.signal": options.signal
+      "freshcomply.signal": options.signal,
+      "freshcomply.tenant_id": options.tenantId
     }
   }, async (span) => {
     const client = await createTemporalClient();
@@ -126,16 +133,22 @@ export async function signalWorkflow(
   });
 }
 
-export async function queryWorkflowStatus(workflowId: string) {
+export type QueryWorkflowOptions = {
+  tenantId: string;
+  workflowId: string;
+};
+
+export async function queryWorkflowStatus(options: QueryWorkflowOptions) {
   return withTelemetrySpan("temporal.workflow.query", {
     attributes: {
       "freshcomply.temporal.operation": "query",
-      "freshcomply.temporal.workflow_id": workflowId
+      "freshcomply.temporal.workflow_id": options.workflowId,
+      "freshcomply.tenant_id": options.tenantId
     }
   }, async () => {
     const client = await createTemporalClient();
     try {
-      const handle = client.getHandle(workflowId);
+      const handle = client.getHandle(options.workflowId);
       const status = await handle.query("getStatus" as never);
       const result = await handle.query("getResult" as never);
       return { status, result };

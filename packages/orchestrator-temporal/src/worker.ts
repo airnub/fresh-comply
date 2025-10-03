@@ -5,11 +5,25 @@ import * as fileActivities from "./activities/files.js";
 import * as utilActivities from "./activities/util.js";
 import * as freshnessActivities from "./activities/freshness.js";
 import * as externalJobActivities from "./activities/externalJob.js";
-import { getTaskQueue, getTemporalAddress, getTemporalNamespace } from "./client.js";
+import {
+  getTaskQueue,
+  getTaskQueueForTenant,
+  getTemporalAddress,
+  getTemporalNamespace,
+  getTenantQueueAllowList
+} from "./client.js";
 
 async function runWorker() {
   const connection = await NativeConnection.connect({ address: getTemporalAddress() });
-  const worker = await Worker.create({
+  const tenantAllowList = getTenantQueueAllowList();
+  const taskQueues = Array.from(
+    new Set([
+      getTaskQueue(),
+      ...tenantAllowList.map((tenantId) => getTaskQueueForTenant(tenantId))
+    ])
+  );
+
+  const workerOptions = {
     connection,
     namespace: getTemporalNamespace(),
     workflowsPath: new URL("./workflows", import.meta.url).pathname,
@@ -20,19 +34,31 @@ async function runWorker() {
       ...utilActivities,
       ...externalJobActivities,
       ...freshnessActivities
-    },
-    taskQueue: getTaskQueue()
-  });
+    }
+  } as const;
+
+  const workers = await Promise.all(
+    taskQueues.map(async (taskQueue) =>
+      Worker.create({
+        ...workerOptions,
+        taskQueue
+      })
+    )
+  );
+
+  console.log(
+    `[temporal-worker] listening on task queues: ${taskQueues.join(", ")}`
+  );
 
   const shutdown = async () => {
-    await worker.shutdown();
+    await Promise.all(workers.map((worker) => worker.shutdown()));
     await connection.close();
   };
 
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
 
-  await worker.run();
+  await Promise.all(workers.map((worker) => worker.run()));
 }
 
 runWorker().catch((error) => {

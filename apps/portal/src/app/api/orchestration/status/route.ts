@@ -17,21 +17,26 @@ export async function GET(request: Request) {
   }, async (span) => {
     const url = new URL(request.url);
     const workflowId = url.searchParams.get("workflowId");
+    const tenantId = url.searchParams.get("tenantId");
 
-    if (!workflowId) {
-      const response = NextResponse.json({ ok: false, error: "workflowId is required" }, { status: 400 });
+    if (!workflowId || !tenantId) {
+      const response = NextResponse.json(
+        { ok: false, error: "workflowId and tenantId are required" },
+        { status: 400 }
+      );
       setHttpAttributes(span, { method: "GET", route: ROUTE, status: response.status });
       return response;
     }
 
     annotateSpan(span, {
       attributes: {
-        "freshcomply.workflow_id": workflowId
+        "freshcomply.workflow_id": workflowId,
+        "freshcomply.tenant_id": tenantId
       }
     });
 
     try {
-      const result = await queryWorkflowStatus(workflowId);
+      const result = await queryWorkflowStatus({ tenantId, workflowId });
       const response = NextResponse.json({ ok: true, status: result.status, result: result.result });
       setHttpAttributes(span, { method: "GET", route: ROUTE, status: response.status });
       return response;

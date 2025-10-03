@@ -3,6 +3,7 @@ import type { SearchAttributes } from "@temporalio/common";
 import * as proto from "@temporalio/proto";
 
 export const SEARCH_ATTRIBUTES = {
+  tenantId: "TenantId",
   runId: "RunId",
   subjectOrg: "SubjectOrg",
   stepKey: "StepKey",
@@ -10,6 +11,7 @@ export const SEARCH_ATTRIBUTES = {
 } as const;
 
 export type SearchAttributeValues = {
+  tenantId: string;
   runId: string;
   subjectOrg: string;
   stepKey: string;
@@ -18,6 +20,7 @@ export type SearchAttributeValues = {
 
 export function buildSearchAttributes(values: SearchAttributeValues): SearchAttributes {
   const attrs: SearchAttributes = {
+    [SEARCH_ATTRIBUTES.tenantId]: [values.tenantId],
     [SEARCH_ATTRIBUTES.runId]: [values.runId],
     [SEARCH_ATTRIBUTES.subjectOrg]: [values.subjectOrg],
     [SEARCH_ATTRIBUTES.stepKey]: [values.stepKey]

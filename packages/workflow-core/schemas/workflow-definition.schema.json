@@ -40,6 +40,7 @@
         "workflow": { "type": "string" },
         "taskQueue": { "type": "string" },
         "defaultTaskQueue": { "type": "string" },
+        "tenantId": { "type": "string" },
         "config": { "$ref": "#/definitions/ExecutionConfig" }
       },
       "allOf": [
@@ -110,7 +111,8 @@
                   "messageSchema": { "type": "string" },
                   "temporalWorkflow": { "type": "string" },
                   "defaultTaskQueue": { "type": "string" },
-                  "taskQueueOverride": { "type": "string" }
+                  "taskQueueOverride": { "type": "string" },
+                  "tenantId": { "type": "string" }
                 },
                 "additionalProperties": false
               }
@@ -122,7 +124,13 @@
     },
     "ExecutionConfig": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "workflow": { "type": "string" },
+        "taskQueue": { "type": "string" },
+        "defaultTaskQueue": { "type": "string" },
+        "tenantId": { "type": "string" }
+      }
     },
     "VerificationRule": {
       "type": "object",

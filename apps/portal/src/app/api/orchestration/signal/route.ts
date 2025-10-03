@@ -30,7 +30,13 @@ export async function POST(request: Request) {
       return response;
     }
 
-    const { workflowId, signal, payload } = body as Record<string, unknown>;
+    const { tenantId, workflowId, signal, payload } = body as Record<string, unknown>;
+
+    if (typeof tenantId !== "string" || tenantId.length === 0) {
+      const response = NextResponse.json({ ok: false, error: "tenantId is required" }, { status: 400 });
+      setHttpAttributes(span, { method: "POST", route: ROUTE, status: response.status });
+      return response;
+    }
 
     if (typeof workflowId !== "string" || typeof signal !== "string") {
       const response = NextResponse.json({ ok: false, error: "workflowId and signal are required" }, { status: 400 });
@@ -41,12 +47,14 @@ export async function POST(request: Request) {
     annotateSpan(span, {
       attributes: {
         "freshcomply.workflow_id": workflowId,
-        "freshcomply.signal": signal
+        "freshcomply.signal": signal,
+        "freshcomply.tenant_id": tenantId
       }
     });
 
     try {
       const result = await signalWorkflow({
+        tenantId,
         workflowId,
         signal,
         payload

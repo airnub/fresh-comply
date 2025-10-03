@@ -30,7 +30,22 @@ export async function POST(request: Request) {
       return response;
     }
 
-    const { orgId, runId, stepKey, workflow, input, subjectOrgId, environment } = body as Record<string, unknown>;
+    const {
+      tenantId,
+      orgId,
+      runId,
+      stepKey,
+      workflow,
+      input,
+      subjectOrgId,
+      environment
+    } = body as Record<string, unknown>;
+
+    if (typeof tenantId !== "string" || tenantId.length === 0) {
+      const response = NextResponse.json({ ok: false, error: "tenantId is required" }, { status: 400 });
+      setHttpAttributes(span, { method: "POST", route: ROUTE, status: response.status });
+      return response;
+    }
 
     if (typeof orgId !== "string" || typeof runId !== "string" || typeof stepKey !== "string") {
       const response = NextResponse.json({ ok: false, error: "orgId, runId, and stepKey are required" }, { status: 400 });
@@ -54,12 +69,16 @@ export async function POST(request: Request) {
       runId,
       stepId: stepKey,
       workflow,
-      orgId
+      orgId,
+      attributes: {
+        "freshcomply.tenant_id": tenantId
+      }
     });
 
     try {
       const result = await startStepWorkflow({
         workflow: workflow as SupportedWorkflow,
+        tenantId,
         orgId,
         runId,
         stepKey,

@@ -123,7 +123,7 @@ export async function externalJobWorkflow(
   };
 
   const startResult = await externalActivities.startExternalJob({
-    tenantId: input.payload.tenantId,
+    tenantId: input.payload.tenantId ?? input.tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
@@ -201,7 +201,7 @@ export async function externalJobWorkflow(
           }
           try {
             const pollResult = await externalActivities.pollExternalJob({
-              tenantId: input.payload.tenantId,
+              tenantId: input.payload.tenantId ?? input.tenantId,
               orgId: input.orgId,
               runId: input.runId,
               stepKey: input.stepKey,
