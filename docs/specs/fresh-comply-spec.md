@@ -12,6 +12,7 @@
 > * *Live Workflow — Irish Non‑Profit Setup (Product Spec v2025‑10‑02)*
 > * *@airnub/fresh‑comply — Coding Agent Prompt & Repo Scaffolding (v2025‑10‑02)*
 > * *Follow‑on Coding Agent Prompt — i18n, Theme, A11y, GDPR (v2025‑10‑02)*
+> * *FreshComply Admin App — Back Office Spec (see docs/specs/admin-app-spec.md)*
 
 ---
 

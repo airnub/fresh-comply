@@ -1,0 +1,179 @@
+{
+  "auth": {
+    "title": "Sign in to FreshComply Admin",
+    "subtitle": "Enter your work email to receive a secure link",
+    "emailLabel": "Work email",
+    "otpNotice": "We'll send a one-time link to your inbox.",
+    "submit": "Send sign-in link",
+    "supportHeadline": "Need help?",
+    "supportNote": "Contact the on-call operations engineer to request access."
+  },
+  "navigation": {
+    "title": "Admin Console",
+    "adminBadge": "Internal",
+    "primary": "Primary navigation",
+    "dashboard": "Dashboard",
+    "search": "Search",
+    "runs": "Runs",
+    "freshness": "Freshness",
+    "orgs": "Orgs",
+    "dsr": "DSR",
+    "cases": "Cases"
+  },
+  "dashboard": {
+    "heading": "Operational overview",
+    "subheading": "Monitor workflow health, queues, and audit signals.",
+    "metrics": {
+      "activeRuns": "Active runs",
+      "activeRunsHint": "Runs currently progressing through steps.",
+      "awaitingApproval": "Awaiting approval",
+      "awaitingApprovalHint": "Items that require admin action.",
+      "dsrSla": "DSR SLA",
+      "dsrSlaHint": "Requests resolved within SLA windows."
+    }
+  },
+  "search": {
+    "heading": "Global search",
+    "subheading": "Find runs, steps, organisations, or support cases.",
+    "label": "Query",
+    "placeholder": "Search by name, ID, or email",
+    "submit": "Search",
+    "columns": {
+      "type": "Type",
+      "name": "Name",
+      "status": "Status"
+    },
+    "tableCaption": "Latest search results",
+    "empty": "No results for this query yet."
+  },
+  "runs": {
+    "heading": "Run {runId}",
+    "subheading": "Review timeline, evidence, and notifications.",
+    "overview": "Overview",
+    "timeline": "Timeline",
+    "diffHeading": "Recent change",
+    "actions": {
+      "reassign": "Reassign",
+      "due": "Change due date",
+      "status": "Update status",
+      "regenerate": "Regenerate doc",
+      "digest": "Send digest",
+      "cancel": "Cancel workflow"
+    },
+    "fields": {
+      "status": "Status",
+      "owner": "Owner",
+      "dueDate": "Due date",
+      "mode": "Execution mode"
+    },
+    "reason": {
+      "reassignTitle": "Reassign step",
+      "reassignDescription": "Provide a reason for the reassignment.",
+      "dueTitle": "Shift due date",
+      "dueDescription": "Explain why the due date is changing.",
+      "statusTitle": "Update status",
+      "statusDescription": "Document why the status is changing.",
+      "regenerateTitle": "Regenerate document",
+      "regenerateDescription": "Describe why the document needs to be regenerated.",
+      "digestTitle": "Resend digest",
+      "digestDescription": "Explain why a new digest should be sent.",
+      "submitting": "Submitting\u2026"
+    },
+    "listHeading": "Workflow runs ({count})",
+    "listSubheading": "Select a run to inspect orchestration details.",
+    "viewRun": "View run",
+    "actionsTitle": "Actions"
+  },
+  "temporal": {
+    "heading": "Temporal for {runId}",
+    "subheading": "Inspect workflow state via managed APIs.",
+    "recentActivities": "Recent activities",
+    "actions": "Workflow controls",
+    "sendSignal": "Send signal",
+    "retryLast": "Retry last activity",
+    "cancelWorkflow": "Cancel workflow",
+    "securityNote": "All actions are proxied through FreshComply services and audited."
+  },
+  "freshness": {
+    "heading": "Freshness moderation",
+    "subheading": "Review watcher diffs before publishing updates.",
+    "columns": {
+      "watcher": "Watcher",
+      "impact": "Impact"
+    },
+    "tableCaption": "Pending watcher updates",
+    "empty": "No pending watcher updates.",
+    "diffHeading": "Diff preview",
+    "diffHint": "Changes awaiting approval are highlighted below.",
+    "approveTitle": "Approve change",
+    "approveDescription": "Describe why this watcher update is ready to publish.",
+    "approve": "Approve",
+    "rejectTitle": "Reject change",
+    "rejectDescription": "Share feedback for the watcher author.",
+    "reject": "Reject",
+    "reason": {
+      "submitting": "Submitting\u2026"
+    }
+  },
+  "orgs": {
+    "heading": "Organisations & memberships",
+    "subheading": "Manage organisations, users, and engagement links.",
+    "actions": {
+      "addOrg": "Add organisation",
+      "inviteUser": "Invite user"
+    },
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "engagements": "Engagements"
+    },
+    "tableCaption": "Directory",
+    "empty": "No organisations found."
+  },
+  "dsr": {
+    "heading": "DSR console",
+    "subheading": "Track privacy requests and SLA timers.",
+    "columns": {
+      "subject": "Data subject",
+      "received": "Received",
+      "status": "Status"
+    },
+    "tableCaption": "Open requests",
+    "empty": "No DSRs awaiting action.",
+    "ackTitle": "Acknowledge request",
+    "ackDescription": "Explain how the request was acknowledged.",
+    "exportTitle": "Export data",
+    "exportDescription": "Describe the exported bundle.",
+    "eraseTitle": "Erase data",
+    "eraseDescription": "Capture erasure rationale before proceeding.",
+    "actions": {
+      "acknowledge": "Acknowledge",
+      "export": "Export",
+      "erase": "Erase"
+    },
+    "reason": {
+      "submitting": "Submitting\u2026"
+    }
+  },
+  "cases": {
+    "heading": "Support cases",
+    "subheading": "Moderate support workflows and escalations.",
+    "columns": {
+      "subject": "Subject",
+      "status": "Status"
+    },
+    "tableCaption": "Recent cases",
+    "empty": "No cases found.",
+    "createTitle": "Create support case",
+    "createDescription": "Provide context for the new case.",
+    "escalateTitle": "Escalate case",
+    "escalateDescription": "Explain why the case is being escalated.",
+    "actions": {
+      "create": "Create case",
+      "escalate": "Escalate"
+    },
+    "reason": {
+      "submitting": "Submitting\u2026"
+    }
+  }
+}
