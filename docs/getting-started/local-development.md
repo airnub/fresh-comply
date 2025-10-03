@@ -64,4 +64,6 @@ The portal runs on `http://localhost:3000` and the admin app on `http://localhos
 
 Copy `.env.example` to `.env.local` at the repo root and fill in any service credentials you need. The Supabase sync script updates only the keys it manages (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and their `NEXT_PUBLIC_*` variants) so you can safely keep other secrets side by side.
 
+When running the Temporal worker locally, set `TEMPORAL_TENANT_QUEUE_ALLOW_LIST` to the comma-separated tenant IDs whose queues the worker should poll (for example, `tenant-acme-main,tenant-umbrella-main`). This prevents a dev worker from accidentally processing another tenant's tasks.
+
 See the [Supabase guide](../guides/supabase.md) for details on migrations, type generation, and policy patterns.

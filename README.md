@@ -25,6 +25,8 @@ pnpm run dev:worker   # launch the Temporal worker bundle
 pnpm dev              # start the Next.js portal
 ```
 
+Before starting the worker, set `TEMPORAL_TENANT_QUEUE_ALLOW_LIST` in your `.env.local` to the comma-separated tenant IDs whose queues it should process (for example, `tenant-acme-main,tenant-umbrella-main`). Workers ignore any queues not present in this allow list even if workflows reference them.
+
 The Temporal UI (http://localhost:8080) is provided for operations engineers only and should not be exposed to end users.
 
 ## Admin Runbook
