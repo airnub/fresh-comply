@@ -1,11 +1,15 @@
-name: Tenant X Compliance Pack
+name: tenantx-compliance
 version: 1.2.0
-compatibleWithWorkflow:
+compatibleWith:
   - setup-nonprofit-ie-charity@^2025.10
-scopes:
-  - tenant:tenant-x
+scope:
+  - tenant
+signing: sha256
+features:
+  - temporal
+  - docs
 overlays:
   - workflow: setup-nonprofit-ie-charity
     patch: overlay.patch.json
-i18n:
+messages:
   en-IE: ./messages/en-IE.json
