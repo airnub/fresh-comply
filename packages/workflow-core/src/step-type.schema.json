@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StepTypeDefinition",
+  "type": "object",
+  "required": ["name", "execution", "inputSchema"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "i18n": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["mode"],
+          "properties": {
+            "mode": { "const": "manual" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["mode", "workflow"],
+          "properties": {
+            "mode": { "const": "temporal" },
+            "workflow": { "type": "string" },
+            "defaultTaskQueue": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["mode", "method", "urlAlias"],
+          "properties": {
+            "mode": { "const": "external:webhook" },
+            "method": {
+              "type": "string",
+              "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            },
+            "urlAlias": { "type": "string" },
+            "tokenAlias": { "type": "string" },
+            "headers": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "signing": {
+              "type": "object",
+              "required": ["algo", "secretAlias"],
+              "properties": {
+                "algo": { "type": "string", "enum": ["hmac-sha256"] },
+                "secretAlias": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["mode", "urlAlias"],
+          "properties": {
+            "mode": { "const": "external:websocket" },
+            "urlAlias": { "type": "string" },
+            "tokenAlias": { "type": "string" },
+            "messageSchema": { "type": "string" },
+            "temporalWorkflow": { "type": "string" },
+            "defaultTaskQueue": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "inputSchema": { "type": "string" },
+    "outputSchema": { "type": "string" },
+    "permissions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean", "default": false },
+        "lawful_basis": {
+          "type": "string",
+          "enum": [
+            "contract",
+            "legal_obligation",
+            "legitimate_interest",
+            "consent"
+          ]
+        },
+        "retention": { "type": "string" }
+      }
+    }
+  }
+}

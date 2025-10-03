@@ -52,15 +52,32 @@ Each route focuses on a key operational workflow:
 
 ## 5. Data Model Additions
 - Tables: `support_cases`, `support_notes`, `admin_actions`, `feature_flags`, `legal_holds`.
-- Workflow extensions: `workflow_runs.orchestration_workflow_id`, `workflow_runs.execution_mode`, step-level auditing for reassignment/redo.
-- Stored procedures for: step reassignment, due date shift, status marking, document regeneration queue, digest resend, watcher publish/reject, org/user CRUD, engagement linking, DSR actions, support case lifecycle.
+- Step Type Registry: `step_types` (slug + latest version), `step_type_versions` (semver + definition JSON), `tenant_step_type_installs` (per-tenant enable/pin), `tenant_secret_bindings` (alias → provider/path), `json_schemas` (shared request/response schemas).
+- Workflow extensions: `workflow_runs.orchestration_workflow_id`, `workflow_runs.execution_mode`, step-level auditing for reassignment/redo, `steps.step_type_id`, `steps.step_type_version`.
+- Stored procedures for: step reassignment, due date shift, status marking, document regeneration queue, digest resend, watcher publish/reject, org/user CRUD, engagement linking, DSR actions, support case lifecycle, step type publish/retire, tenant enable/disable, secret alias binding.
 
-## 6. Testing & Accessibility
+## 6. Step Type Registry & Secret Alias Management
+- **Access Control:** Only `platform_admin` may create or edit step types. Tenants see a read-only catalog and can enable allowed types + map secret aliases. Every mutation records `admin_action_id`, reason, diff snapshot, and enforces two-person approval if flagged.
+- **Step Types List:** Paginated table showing slug, latest version, execution mode, created/updated metadata, enabled tenants count, and status (active/retired). Filters by mode and version.
+- **Create / Edit Step Type:**
+  - Form captures name, description, locales (`i18n` bundle), execution mode selector (`manual`, `temporal`, `external:webhook`, `external:websocket`).
+  - Mode-specific fields: Temporal workflow + optional default task queue; Webhook method, URL alias, token alias, header templates, optional signing secret alias; WebSocket URL/token aliases, message schema ref, temporal workflow + task queue recommendation.
+  - Attach input schema (required) and optional output schema from `json_schemas`; defaults for permissions/policy (retention, lawful basis, required flag).
+  - Version picker enforces semver and surfaces diff from prior version. Publishing writes to `step_type_versions`, updates `step_types.latest_version`, and emits audit record.
+- **Version History Drawer:** Inspect JSON definition, changelog, impacted tenants, and download schema bundle for CLI tooling.
+- **Tenant Enablement:** Toggle to install step type for a tenant (optionally pin to version or follow latest). Creates/updates `tenant_step_type_installs` via RPC with RBAC + audit. Bulk enable includes confirmation modal with policy warnings.
+- **Secret Alias Bindings:**
+  - Table of aliases installed by tenant (`secrets.crm.apiToken`). Columns: alias, provider (`hashicorp`, `aws-sm`, `env`, `supabase-kv`), provider ref/path, last verified timestamp.
+  - Add/Edit modal requires alias pattern validation, provider selection, path/ARN/key input. Admin never sees secret value. "Test connection" triggers backend HEAD/echo using stored credential and surfaces success/error state.
+  - Deleting alias requires reason + double-confirm, checks for active step type usage before removal.
+- **Safety:** UI never shows resolved secret values; copy actions share alias only. Inline lint prevents saving step types that contain literal secrets or missing schema references. All actions log to audit trail.
+
+## 7. Testing & Accessibility
 - Unit tests: RBAC helpers, admin RPCs, audit logging hooks.
-- Playwright flows: step reassignment, freshness approval, Temporal signal replay, DSR export download.
+- Playwright flows: step reassignment, freshness approval, Temporal signal replay, DSR export download, step type publish/install, secret alias binding lifecycle.
 - Accessibility: Axe and Pa11y checks covering Dashboard, Run Inspector, Temporal panel.
 
-## 7. Runbook
+## 8. Runbook
 ```
 pnpm run dev:stack   # Temporal + Postgres (local)
 pnpm run dev:worker  # Temporal worker bundle

@@ -28,30 +28,101 @@
       "required": ["mode"],
       "additionalProperties": false,
       "properties": {
-        "mode": { "type": "string", "enum": ["manual", "temporal", "external"] },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "temporal",
+            "external:webhook",
+            "external:websocket"
+          ]
+        },
         "workflow": { "type": "string" },
         "taskQueue": { "type": "string" },
-        "webhook": { "type": "string", "format": "uri" },
-        "input_schema": { "type": "string" },
-        "permissions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "secret_aliases": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
+        "defaultTaskQueue": { "type": "string" },
+        "config": { "$ref": "#/definitions/ExecutionConfig" }
       },
       "allOf": [
         {
           "if": { "properties": { "mode": { "const": "temporal" } } },
-          "then": { "required": ["workflow", "taskQueue"] }
+          "then": {
+            "anyOf": [
+              { "required": ["workflow"] },
+              {
+                "properties": {
+                  "config": {
+                    "type": "object",
+                    "required": ["workflow"],
+                    "properties": {
+                      "workflow": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            ]
+          }
         },
         {
-          "if": { "properties": { "mode": { "const": "external" } } },
-          "then": { "required": ["webhook"] }
+          "if": { "properties": { "mode": { "const": "external:webhook" } } },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "required": ["method", "urlAlias"],
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+                  },
+                  "urlAlias": { "type": "string" },
+                  "tokenAlias": { "type": "string" },
+                  "path": { "type": "string" },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  },
+                  "signing": {
+                    "type": "object",
+                    "required": ["algo", "secretAlias"],
+                    "properties": {
+                      "algo": { "type": "string", "enum": ["hmac-sha256"] },
+                      "secretAlias": { "type": "string" }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["config"]
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "external:websocket" } } },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "required": ["urlAlias"],
+                "properties": {
+                  "urlAlias": { "type": "string" },
+                  "tokenAlias": { "type": "string" },
+                  "messageSchema": { "type": "string" },
+                  "temporalWorkflow": { "type": "string" },
+                  "defaultTaskQueue": { "type": "string" },
+                  "taskQueueOverride": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["config"]
+          }
         }
       ]
+    },
+    "ExecutionConfig": {
+      "type": "object",
+      "additionalProperties": true
     },
     "VerificationRule": {
       "type": "object",
@@ -82,6 +153,7 @@
           "type": "object",
           "additionalProperties": { "type": "string" }
         },
+        "stepType": { "type": "string" },
         "execution": { "$ref": "#/definitions/Execution" },
         "required": { "type": "boolean" },
         "requires": {
