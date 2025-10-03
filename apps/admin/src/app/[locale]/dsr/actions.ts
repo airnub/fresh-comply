@@ -25,7 +25,9 @@ async function resolveContext() {
   }
 }
 
-function resolveServiceClient() {
+type ServiceClient = ReturnType<typeof getServiceSupabaseClient> | null;
+
+function resolveServiceClient(): ServiceClient {
   try {
     return getServiceSupabaseClient();
   } catch (error) {
@@ -34,6 +36,41 @@ function resolveServiceClient() {
       return null;
     }
     throw error;
+  }
+}
+
+async function appendDsrAuditEntry(
+  service: ServiceClient,
+  request: { id: string; tenant_org_id: string; subject_org_id: string | null },
+  actorId: string | null | undefined,
+  action: string,
+  reasonCode: string,
+  payload: Record<string, unknown>
+) {
+  if (!service) {
+    return;
+  }
+
+  if (!actorId) {
+    console.warn("Skipping DSR audit append due to missing actor");
+    return;
+  }
+
+  const { error } = await service.rpc("rpc_append_audit_entry", {
+    action,
+    actor_id: actorId,
+    reason_code: reasonCode,
+    payload,
+    target_kind: "dsr_request",
+    target_id: request.id,
+    tenant_org_id: request.tenant_org_id,
+    actor_org_id: request.tenant_org_id,
+    on_behalf_of_org_id: request.subject_org_id,
+    subject_org_id: request.subject_org_id,
+  });
+
+  if (error) {
+    console.error("Unable to append DSR audit entry", { action, error });
   }
 }
 
@@ -134,23 +171,12 @@ export async function reassignDsrRequest(id: string, email: string, reason: stri
       return { ok: false, error: updateError.message };
     }
 
-    if (service) {
-      await service.from("audit_log").insert({
-        tenant_org_id: request.tenant_org_id,
-        actor_user_id: user?.id ?? null,
-        actor_org_id: request.tenant_org_id,
-        on_behalf_of_org_id: request.subject_org_id ?? null,
-        subject_org_id: request.subject_org_id ?? null,
-        entity: "dsr_request",
-        action: "dsr.request.reassigned",
-        meta_json: {
-          request_id: id,
-          assignee_email: normalizedEmail,
-          assignee_user_id: assigneeUserId,
-          reason
-        }
-      });
-    }
+    await appendDsrAuditEntry(service, request, user?.id, "dsr.request.reassigned", reason, {
+      request_id: id,
+      assignee_email: normalizedEmail,
+      assignee_user_id: assigneeUserId,
+      reason,
+    });
 
     revalidatePath("/", "layout");
     span.setAttribute("freshcomply.action.outcome", "success");
@@ -191,22 +217,11 @@ export async function completeDsrRequest(id: string, reason: string): Promise<Ds
     }
 
     const service = resolveServiceClient();
-    if (service) {
-      await service.from("audit_log").insert({
-        tenant_org_id: request.tenant_org_id,
-        actor_user_id: user?.id ?? null,
-        actor_org_id: request.tenant_org_id,
-        on_behalf_of_org_id: request.subject_org_id ?? null,
-        subject_org_id: request.subject_org_id ?? null,
-        entity: "dsr_request",
-        action: "dsr.request.completed",
-        meta_json: {
-          request_id: id,
-          reason,
-          resolved_at: now
-        }
-      });
-    }
+    await appendDsrAuditEntry(service, request, user?.id, "dsr.request.completed", reason, {
+      request_id: id,
+      reason,
+      resolved_at: now,
+    });
 
     revalidatePath("/", "layout");
     span.setAttribute("freshcomply.action.outcome", "success");
@@ -261,23 +276,19 @@ export async function togglePauseDsrRequest(id: string, reason: string): Promise
     }
 
     const service = resolveServiceClient();
-    if (service) {
-      await service.from("audit_log").insert({
-        tenant_org_id: request.tenant_org_id,
-        actor_user_id: user?.id ?? null,
-        actor_org_id: request.tenant_org_id,
-        on_behalf_of_org_id: request.subject_org_id ?? null,
-        subject_org_id: request.subject_org_id ?? null,
-        entity: "dsr_request",
-        action: nextStatus === "paused" ? "dsr.request.paused" : "dsr.request.resumed",
-        meta_json: {
-          request_id: id,
-          reason,
-          status: nextStatus,
-          updated_at: now
-        }
-      });
-    }
+    await appendDsrAuditEntry(
+      service,
+      request,
+      user?.id,
+      nextStatus === "paused" ? "dsr.request.paused" : "dsr.request.resumed",
+      reason,
+      {
+        request_id: id,
+        reason,
+        status: nextStatus,
+        updated_at: now,
+      }
+    );
 
     revalidatePath("/", "layout");
     span.setAttribute("freshcomply.action.outcome", "success");
