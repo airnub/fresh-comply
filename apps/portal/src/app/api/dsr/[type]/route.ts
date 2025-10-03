@@ -113,7 +113,10 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
       }
 
       await supabase.from("audit_log").insert({
+        tenant_org_id: requestRow.tenant_org_id,
         actor_org_id: requestRow.tenant_org_id,
+        on_behalf_of_org_id: input.subjectOrgId ?? requestRow.tenant_org_id ?? null,
+        subject_org_id: input.subjectOrgId ?? null,
         action: "dsr.request.received",
         meta_json: {
           request_id: requestRow.id,
@@ -155,7 +158,10 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
             .eq("id", requestRow.id);
 
           await supabase.from("audit_log").insert({
+            tenant_org_id: requestRow.tenant_org_id,
             actor_org_id: requestRow.tenant_org_id,
+            on_behalf_of_org_id: input.subjectOrgId ?? requestRow.tenant_org_id ?? null,
+            subject_org_id: input.subjectOrgId ?? null,
             action: "dsr.request.acknowledged",
             meta_json: {
               request_id: requestRow.id,

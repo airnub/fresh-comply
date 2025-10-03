@@ -2,6 +2,7 @@ create table organisations(
   id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text unique not null,
+  tenant_org_id uuid not null references organisations(id),
   created_at timestamptz default now()
 );
 
@@ -23,6 +24,8 @@ create table engagements(
   id uuid primary key default gen_random_uuid(),
   engager_org_id uuid references organisations(id),
   client_org_id uuid references organisations(id),
+  tenant_org_id uuid not null references organisations(id),
+  subject_org_id uuid references organisations(id),
   status text check (status in ('active','ended')) default 'active',
   scope text,
   created_at timestamptz default now()
@@ -42,6 +45,7 @@ create table workflow_runs(
   workflow_def_id uuid references workflow_defs(id),
   subject_org_id uuid references organisations(id),
   engager_org_id uuid references organisations(id),
+  tenant_org_id uuid not null references organisations(id),
   status text check (status in ('draft','active','done','archived')) default 'active',
   orchestration_provider text not null default 'none',
   orchestration_workflow_id text,
@@ -61,6 +65,8 @@ create table steps(
   due_date date,
   assignee_user_id uuid references users(id),
   step_type_version_id uuid,
+  tenant_org_id uuid not null references organisations(id),
+  subject_org_id uuid references organisations(id),
   permissions text[] default '{}'::text[]
 );
 
@@ -157,6 +163,8 @@ create table workflow_overlay_layers(
 create table documents(
   id uuid primary key default gen_random_uuid(),
   run_id uuid references workflow_runs(id),
+  tenant_org_id uuid not null references organisations(id),
+  subject_org_id uuid references organisations(id),
   template_id text,
   path text,
   checksum text,
@@ -168,6 +176,8 @@ create table audit_log(
   actor_user_id uuid references users(id),
   actor_org_id uuid references organisations(id),
   on_behalf_of_org_id uuid references organisations(id),
+  tenant_org_id uuid not null references organisations(id),
+  subject_org_id uuid references organisations(id),
   run_id uuid references workflow_runs(id),
   step_id uuid references steps(id),
   action text,
@@ -299,12 +309,17 @@ returns boolean
 language sql
 stable
 as $$
-  select exists (
-    select 1
-    from memberships m
-    where m.org_id = target_org_id
-      and m.user_id = auth.uid()
-  );
+  select target_org_id is not null
+    and exists (
+      select 1
+      from memberships m
+      join organisations membership_org
+        on membership_org.id = m.org_id
+      join organisations target_org
+        on target_org.id = target_org_id
+      where m.user_id = auth.uid()
+        and membership_org.tenant_org_id = target_org.tenant_org_id
+    );
 $$;
 
 create or replace function public.can_access_run(target_run_id uuid)
@@ -315,11 +330,22 @@ as $$
   select exists (
     select 1
     from workflow_runs wr
-    join memberships m
-      on m.user_id = auth.uid()
-     and (m.org_id = wr.subject_org_id or m.org_id = wr.engager_org_id)
     where wr.id = target_run_id
+      and (
+        public.is_member_of_org(wr.tenant_org_id)
+        or (wr.subject_org_id is not null and public.is_member_of_org(wr.subject_org_id))
+        or (wr.engager_org_id is not null and public.is_member_of_org(wr.engager_org_id))
+      )
   );
+$$;
+
+create or replace function public.is_platform_service_actor()
+returns boolean
+language sql
+stable
+as $$
+  select auth.role() = 'service_role'
+    or coalesce(auth.jwt() ->> 'role_path', '') like 'platform.service.%';
 $$;
 
 alter table organisations enable row level security;
@@ -344,114 +370,122 @@ alter table dsr_request_jobs enable row level security;
 
 create policy "Members read organisations" on organisations
   for select
-  using (auth.role() = 'service_role' or public.is_member_of_org(id));
+  using (
+    public.is_platform_service_actor()
+    or public.is_member_of_org(tenant_org_id)
+  );
 
 create policy "Service role manages organisations" on organisations
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Users can view their profile" on users
   for select
-  using (auth.role() = 'service_role' or id = auth.uid());
+  using (public.is_platform_service_actor() or id = auth.uid());
 
 create policy "Users can update their profile" on users
   for update
-  using (auth.role() = 'service_role' or id = auth.uid())
-  with check (auth.role() = 'service_role' or id = auth.uid());
+  using (public.is_platform_service_actor() or id = auth.uid())
+  with check (public.is_platform_service_actor() or id = auth.uid());
 
 create policy "Service role manages users" on users
   for insert
-  with check (auth.role() = 'service_role');
+  with check (public.is_platform_service_actor());
 
 create policy "Service role removes users" on users
   for delete
-  using (auth.role() = 'service_role');
+  using (public.is_platform_service_actor());
 
 create policy "Users can read their memberships" on memberships
   for select
-  using (auth.role() = 'service_role' or user_id = auth.uid());
+  using (public.is_platform_service_actor() or user_id = auth.uid());
 
 create policy "Service role manages memberships" on memberships
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members view engagements" on engagements
   for select
   using (
-    auth.role() = 'service_role'
-    or public.is_member_of_org(engager_org_id)
-    or public.is_member_of_org(client_org_id)
+    public.is_platform_service_actor()
+    or public.is_member_of_org(tenant_org_id)
+    or (engager_org_id is not null and public.is_member_of_org(engager_org_id))
+    or (client_org_id is not null and public.is_member_of_org(client_org_id))
+    or (subject_org_id is not null and public.is_member_of_org(subject_org_id))
   );
 
 create policy "Service role manages engagements" on engagements
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Authenticated can view workflow definitions" on workflow_defs
   for select
-  using (auth.role() in ('authenticated', 'service_role'));
+  using (
+    auth.role() = 'authenticated'
+    or public.is_platform_service_actor()
+  );
 
 create policy "Service role manages workflow definitions" on workflow_defs
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members access workflow runs" on workflow_runs
   for select
-  using (auth.role() = 'service_role' or public.can_access_run(id));
+  using (public.is_platform_service_actor() or public.can_access_run(id));
 
 create policy "Service role manages workflow runs" on workflow_runs
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members read steps" on steps
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.can_access_run(run_id)
   );
 
 create policy "Service role manages steps" on steps
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members read documents" on documents
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.can_access_run(run_id)
   );
 
 create policy "Service role manages documents" on documents
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members read audit log" on audit_log
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or (run_id is not null and public.can_access_run(run_id))
-    or (run_id is null and (
-      (actor_org_id is not null and public.is_member_of_org(actor_org_id))
-      or (on_behalf_of_org_id is not null and public.is_member_of_org(on_behalf_of_org_id))
-    ))
+    or (
+      run_id is null
+      and public.is_member_of_org(tenant_org_id)
+    )
   );
 
 create policy "Service role manages audit log" on audit_log
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members view DSR requests" on dsr_requests
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.is_member_of_org(tenant_org_id)
     or (subject_org_id is not null and public.is_member_of_org(subject_org_id))
   );
@@ -459,107 +493,122 @@ create policy "Members view DSR requests" on dsr_requests
 create policy "Members manage DSR requests" on dsr_requests
   for all
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.is_member_of_org(tenant_org_id)
   )
   with check (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.is_member_of_org(tenant_org_id)
   );
 
 create policy "Service role manages DSR jobs" on dsr_request_jobs
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Service role manages json schemas" on json_schemas
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Admins read json schemas" on json_schemas
   for select
-  using (auth.role() in ('service_role', 'authenticated'));
+  using (public.is_platform_service_actor() or auth.role() = 'authenticated');
 
 create policy "Service role manages step types" on step_types
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Admins read step types" on step_types
   for select
-  using (auth.role() in ('service_role', 'authenticated'));
+  using (public.is_platform_service_actor() or auth.role() = 'authenticated');
 
 create policy "Service role manages step type versions" on step_type_versions
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Admins read step type versions" on step_type_versions
   for select
-  using (auth.role() in ('service_role', 'authenticated'));
+  using (public.is_platform_service_actor() or auth.role() = 'authenticated');
 
 create policy "Service role manages tenant installs" on tenant_step_type_installs
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Tenant members read installs" on tenant_step_type_installs
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
+    or public.is_member_of_org(org_id)
+  );
+
+create policy "Tenant members manage installs" on tenant_step_type_installs
+  for all
+  using (
+    public.is_platform_service_actor()
+    or public.is_member_of_org(org_id)
+  )
+  with check (
+    public.is_platform_service_actor()
     or public.is_member_of_org(org_id)
   );
 
 create policy "Service role manages tenant secret bindings" on tenant_secret_bindings
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Tenant members manage secret bindings" on tenant_secret_bindings
-  for select
+  for all
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
+    or public.is_member_of_org(org_id)
+  )
+  with check (
+    public.is_platform_service_actor()
     or public.is_member_of_org(org_id)
   );
 
 create policy "Service role manages tenant overlays" on tenant_workflow_overlays
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Tenant members manage overlays" on tenant_workflow_overlays
-  for select
+  for all
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.is_member_of_org(org_id)
   )
   with check (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or public.is_member_of_org(org_id)
   );
 
 create policy "Service role manages overlay snapshots" on workflow_overlay_snapshots
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members read overlay snapshots" on workflow_overlay_snapshots
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or (run_id is not null and public.can_access_run(run_id))
   );
 
 create policy "Service role manages overlay layers" on workflow_overlay_layers
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (public.is_platform_service_actor())
+  with check (public.is_platform_service_actor());
 
 create policy "Members read overlay layers" on workflow_overlay_layers
   for select
   using (
-    auth.role() = 'service_role'
+    public.is_platform_service_actor()
     or exists (
       select 1
       from workflow_overlay_snapshots s
@@ -571,6 +620,10 @@ create policy "Members read overlay layers" on workflow_overlay_layers
 create table if not exists admin_actions(
   id uuid primary key default gen_random_uuid(),
   actor_id uuid references users(id) not null,
+  tenant_org_id uuid references organisations(id),
+  actor_org_id uuid references organisations(id),
+  on_behalf_of_org_id uuid references organisations(id),
+  subject_org_id uuid references organisations(id),
   action text not null,
   reason text not null,
   payload jsonb not null default '{}'::jsonb,
@@ -578,15 +631,6 @@ create table if not exists admin_actions(
   second_actor_id uuid references users(id),
   created_at timestamptz not null default now(),
   approved_at timestamptz
-);
-
-create table if not exists audit_log(
-  id uuid primary key default gen_random_uuid(),
-  action_id uuid references admin_actions(id) on delete cascade,
-  entity text,
-  entity_id uuid,
-  diff jsonb,
-  created_at timestamptz not null default now()
 );
 
 create or replace function admin_record_action(
@@ -597,7 +641,11 @@ create or replace function admin_record_action(
   p_entity text default null,
   p_entity_id uuid default null,
   p_requires_second boolean default false,
-  p_second_actor_id uuid default null
+  p_second_actor_id uuid default null,
+  p_tenant_org_id uuid default null,
+  p_actor_org_id uuid default null,
+  p_on_behalf_of_org_id uuid default null,
+  p_subject_org_id uuid default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -605,20 +653,137 @@ set search_path = public
 as $$
 declare
   v_action_id uuid;
+  v_tenant_org_id uuid := p_tenant_org_id;
+  v_actor_org_id uuid := p_actor_org_id;
+  v_on_behalf_of_org_id uuid := p_on_behalf_of_org_id;
+  v_subject_org_id uuid := p_subject_org_id;
+  v_run_id uuid := null;
+  v_step_id uuid := null;
 begin
   if p_requires_second and (p_second_actor_id is null or p_second_actor_id = p_actor_id) then
     raise exception 'Second approver required';
   end if;
 
-  insert into admin_actions(actor_id, action, reason, payload, requires_second_approval, second_actor_id, approved_at)
-  values(p_actor_id, p_action, p_reason, coalesce(p_payload, '{}'::jsonb), p_requires_second, p_second_actor_id,
-         case when p_requires_second then now() else null end)
+  if coalesce(p_payload ? 'run_id', false) then
+    v_run_id := (p_payload ->> 'run_id')::uuid;
+  end if;
+
+  if coalesce(p_payload ? 'step_id', false) then
+    v_step_id := (p_payload ->> 'step_id')::uuid;
+  end if;
+
+  if v_tenant_org_id is null and v_run_id is not null then
+    select tenant_org_id, subject_org_id
+      into v_tenant_org_id, v_subject_org_id
+    from workflow_runs
+    where id = v_run_id;
+  end if;
+
+  if v_tenant_org_id is null and v_step_id is not null then
+    select wr.tenant_org_id, wr.subject_org_id, wr.id
+      into v_tenant_org_id, v_subject_org_id, v_run_id
+    from steps s
+    join workflow_runs wr on wr.id = s.run_id
+    where s.id = v_step_id;
+  end if;
+
+  if v_tenant_org_id is null and coalesce(p_payload ? 'document_id', false) then
+    select wr.tenant_org_id, wr.subject_org_id, wr.id
+      into v_tenant_org_id, v_subject_org_id, v_run_id
+    from documents d
+    join workflow_runs wr on wr.id = d.run_id
+    where d.id = (p_payload ->> 'document_id')::uuid;
+  end if;
+
+  if v_tenant_org_id is null and coalesce(p_payload ? 'tenant_org_id', false) then
+    v_tenant_org_id := (p_payload ->> 'tenant_org_id')::uuid;
+  end if;
+
+  if v_subject_org_id is null and coalesce(p_payload ? 'subject_org_id', false) then
+    v_subject_org_id := (p_payload ->> 'subject_org_id')::uuid;
+  end if;
+
+  if v_actor_org_id is null then
+    v_actor_org_id := v_tenant_org_id;
+  end if;
+
+  if v_on_behalf_of_org_id is null and v_subject_org_id is not null then
+    v_on_behalf_of_org_id := v_subject_org_id;
+  end if;
+
+  if v_tenant_org_id is null then
+    declare
+      v_membership_tenant uuid;
+      v_membership_org uuid;
+    begin
+      select o.tenant_org_id, m.org_id
+        into v_membership_tenant, v_membership_org
+      from memberships m
+      join organisations o on o.id = m.org_id
+      where m.user_id = p_actor_id
+      order by o.created_at asc
+      limit 1;
+      if v_membership_tenant is not null then
+        v_tenant_org_id := v_membership_tenant;
+        if v_actor_org_id is null then
+          v_actor_org_id := v_membership_org;
+        end if;
+      end if;
+    end;
+  end if;
+
+  if v_tenant_org_id is null then
+    v_tenant_org_id := v_actor_org_id;
+  end if;
+
+  if v_tenant_org_id is null then
+    raise exception 'tenant_org_id required for admin actions';
+  end if;
+
+  insert into admin_actions(actor_id, tenant_org_id, actor_org_id, on_behalf_of_org_id, subject_org_id, action, reason, payload, requires_second_approval, second_actor_id, approved_at)
+  values(
+    p_actor_id,
+    v_tenant_org_id,
+    v_actor_org_id,
+    v_on_behalf_of_org_id,
+    v_subject_org_id,
+    p_action,
+    p_reason,
+    coalesce(p_payload, '{}'::jsonb),
+    p_requires_second,
+    p_second_actor_id,
+    case when p_requires_second then now() else null end
+  )
   returning id into v_action_id;
 
-  insert into audit_log(action_id, entity, entity_id, diff)
-  values(v_action_id, p_entity, p_entity_id, coalesce(p_payload, '{}'::jsonb));
+  insert into audit_log(
+    tenant_org_id,
+    actor_user_id,
+    actor_org_id,
+    on_behalf_of_org_id,
+    subject_org_id,
+    run_id,
+    step_id,
+    action,
+    meta_json
+  )
+  values(
+    v_tenant_org_id,
+    p_actor_id,
+    v_actor_org_id,
+    v_on_behalf_of_org_id,
+    v_subject_org_id,
+    v_run_id,
+    v_step_id,
+    p_action,
+    jsonb_build_object(
+      'entity', p_entity,
+      'entity_id', p_entity_id,
+      'payload', coalesce(p_payload, '{}'::jsonb)
+    )
+  );
 
-  return jsonb_build_object('action_id', v_action_id, 'action', p_action);
+  return jsonb_build_object('action_id', v_action_id, 'action', p_action, 'tenant_org_id', v_tenant_org_id);
 end;
 $$;
 

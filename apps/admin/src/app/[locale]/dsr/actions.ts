@@ -136,8 +136,10 @@ export async function reassignDsrRequest(id: string, email: string, reason: stri
 
     if (service) {
       await service.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_user_id: user?.id ?? null,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.tenant_org_id,
         action: "dsr.request.reassigned",
         meta_json: {
           request_id: id,
@@ -189,8 +191,10 @@ export async function completeDsrRequest(id: string, reason: string): Promise<Ds
     const service = resolveServiceClient();
     if (service) {
       await service.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_user_id: user?.id ?? null,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.tenant_org_id,
         action: "dsr.request.completed",
         meta_json: {
           request_id: id,
@@ -255,8 +259,10 @@ export async function togglePauseDsrRequest(id: string, reason: string): Promise
     const service = resolveServiceClient();
     if (service) {
       await service.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_user_id: user?.id ?? null,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.tenant_org_id,
         action: nextStatus === "paused" ? "dsr.request.paused" : "dsr.request.resumed",
         meta_json: {
           request_id: id,

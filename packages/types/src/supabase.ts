@@ -141,21 +141,32 @@ export type Database = {
           id: string;
           name: string;
           slug: string;
+          tenant_org_id: string;
           created_at: string | null;
         };
         Insert: {
           id?: string;
           name: string;
           slug: string;
+          tenant_org_id: string;
           created_at?: string | null;
         };
         Update: {
           id?: string;
           name?: string;
           slug?: string;
+          tenant_org_id?: string;
           created_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "organisations_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       users: {
         Row: {
@@ -216,6 +227,8 @@ export type Database = {
           id: string;
           engager_org_id: string;
           client_org_id: string;
+          tenant_org_id: string;
+          subject_org_id: string | null;
           status: "active" | "ended";
           scope: string | null;
           created_at: string | null;
@@ -224,6 +237,8 @@ export type Database = {
           id?: string;
           engager_org_id: string;
           client_org_id: string;
+          tenant_org_id: string;
+          subject_org_id?: string | null;
           status?: "active" | "ended";
           scope?: string | null;
           created_at?: string | null;
@@ -232,6 +247,8 @@ export type Database = {
           id?: string;
           engager_org_id?: string;
           client_org_id?: string;
+          tenant_org_id?: string;
+          subject_org_id?: string | null;
           status?: "active" | "ended";
           scope?: string | null;
           created_at?: string | null;
@@ -247,6 +264,20 @@ export type Database = {
           {
             foreignKeyName: "engagements_engager_org_id_fkey";
             columns: ["engager_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "engagements_subject_org_id_fkey";
+            columns: ["subject_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "engagements_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -284,8 +315,9 @@ export type Database = {
         Row: {
           id: string;
           workflow_def_id: string | null;
-          subject_org_id: string;
+          subject_org_id: string | null;
           engager_org_id: string | null;
+          tenant_org_id: string;
           status: "draft" | "active" | "done" | "archived";
           orchestration_provider: string;
           orchestration_workflow_id: string | null;
@@ -296,8 +328,9 @@ export type Database = {
         Insert: {
           id?: string;
           workflow_def_id?: string | null;
-          subject_org_id: string;
+          subject_org_id?: string | null;
           engager_org_id?: string | null;
+          tenant_org_id: string;
           status?: "draft" | "active" | "done" | "archived";
           orchestration_provider?: string;
           orchestration_workflow_id?: string | null;
@@ -308,8 +341,9 @@ export type Database = {
         Update: {
           id?: string;
           workflow_def_id?: string | null;
-          subject_org_id?: string;
+          subject_org_id?: string | null;
           engager_org_id?: string | null;
+          tenant_org_id?: string;
           status?: "draft" | "active" | "done" | "archived";
           orchestration_provider?: string;
           orchestration_workflow_id?: string | null;
@@ -340,6 +374,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "workflow_runs_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "workflow_runs_workflow_def_id_fkey";
             columns: ["workflow_def_id"];
             isOneToOne: false;
@@ -360,6 +401,8 @@ export type Database = {
           due_date: string | null;
           assignee_user_id: string | null;
           step_type_version_id: string | null;
+          tenant_org_id: string;
+          subject_org_id: string | null;
           permissions: string[] | null;
         };
         Insert: {
@@ -373,6 +416,8 @@ export type Database = {
           due_date?: string | null;
           assignee_user_id?: string | null;
           step_type_version_id?: string | null;
+          tenant_org_id: string;
+          subject_org_id?: string | null;
           permissions?: string[] | null;
         };
         Update: {
@@ -386,6 +431,8 @@ export type Database = {
           due_date?: string | null;
           assignee_user_id?: string | null;
           step_type_version_id?: string | null;
+          tenant_org_id?: string;
+          subject_org_id?: string | null;
           permissions?: string[] | null;
         };
         Relationships: [
@@ -408,6 +455,20 @@ export type Database = {
             columns: ["step_type_version_id"];
             isOneToOne: false;
             referencedRelation: "step_type_versions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "steps_subject_org_id_fkey";
+            columns: ["subject_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "steps_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
             referencedColumns: ["id"];
           }
         ];
@@ -764,6 +825,8 @@ export type Database = {
         Row: {
           id: string;
           run_id: string;
+          tenant_org_id: string;
+          subject_org_id: string | null;
           template_id: string | null;
           path: string | null;
           checksum: string | null;
@@ -772,6 +835,8 @@ export type Database = {
         Insert: {
           id?: string;
           run_id: string;
+          tenant_org_id: string;
+          subject_org_id?: string | null;
           template_id?: string | null;
           path?: string | null;
           checksum?: string | null;
@@ -780,6 +845,8 @@ export type Database = {
         Update: {
           id?: string;
           run_id?: string;
+          tenant_org_id?: string;
+          subject_org_id?: string | null;
           template_id?: string | null;
           path?: string | null;
           checksum?: string | null;
@@ -792,15 +859,31 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "workflow_runs";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_subject_org_id_fkey";
+            columns: ["subject_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
           }
         ];
       };
       audit_log: {
         Row: {
           id: string;
+          tenant_org_id: string;
           actor_user_id: string | null;
           actor_org_id: string | null;
           on_behalf_of_org_id: string | null;
+          subject_org_id: string | null;
           run_id: string | null;
           step_id: string | null;
           action: string | null;
@@ -809,9 +892,11 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          tenant_org_id: string;
           actor_user_id?: string | null;
           actor_org_id?: string | null;
           on_behalf_of_org_id?: string | null;
+          subject_org_id?: string | null;
           run_id?: string | null;
           step_id?: string | null;
           action?: string | null;
@@ -820,9 +905,11 @@ export type Database = {
         };
         Update: {
           id?: string;
+          tenant_org_id?: string;
           actor_user_id?: string | null;
           actor_org_id?: string | null;
           on_behalf_of_org_id?: string | null;
+          subject_org_id?: string | null;
           run_id?: string | null;
           step_id?: string | null;
           action?: string | null;
@@ -830,6 +917,20 @@ export type Database = {
           created_at?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "audit_log_subject_org_id_fkey";
+            columns: ["subject_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "audit_log_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "audit_log_actor_org_id_fkey";
             columns: ["actor_org_id"];
@@ -1253,6 +1354,10 @@ export type Database = {
         Args: {
           target_org_id: string;
         };
+        Returns: boolean;
+      };
+      is_platform_service_actor: {
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
     };
