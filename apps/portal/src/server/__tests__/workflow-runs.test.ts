@@ -122,6 +122,118 @@ test("createWorkflowRun materialises lockfile and stores snapshot", async () => 
   });
 });
 
+test("createWorkflowRun resolves range selectors to latest satisfying versions", async () => {
+  const overlayOperations = [
+    {
+      op: "add",
+      path: "/steps/-",
+      value: { id: "overlay-step", kind: "info", title: "Tenant step" }
+    }
+  ];
+
+  await withWorkspaceModules(async () => {
+    const { createWorkflowRun } = await import("../workflow-runs.js");
+
+    const { client } = createInMemorySupabase({
+      workflow_defs: [
+        {
+          id: WORKFLOW_DEF_ID,
+          key: baseGraph.id,
+          version: baseGraph.version,
+          title: "Demo",
+          dsl_json: baseGraph
+        }
+      ],
+      workflow_def_versions: [
+        {
+          id: "definition-version-range",
+          tenant_org_id: TENANT_ID,
+          workflow_def_id: WORKFLOW_DEF_ID,
+          version: baseGraph.version,
+          checksum: "wf-range-checksum",
+          graph_jsonb: baseGraph,
+          rule_ranges: { "rule.deadline": { range: ">=2.0.0 <3.0.0" } },
+          template_ranges: { constitution: { range: "^3.0.0" } }
+        }
+      ],
+      workflow_pack_versions: [
+        {
+          id: "overlay-version-range",
+          tenant_org_id: TENANT_ID,
+          pack_id: "tenant-pack",
+          version: "1.3.0",
+          checksum: "overlay-range-checksum",
+          overlay_jsonb: overlayOperations
+        }
+      ],
+      rule_versions: [
+        {
+          id: "rule-version-1",
+          tenant_org_id: TENANT_ID,
+          rule_id: "rule.deadline",
+          version: "1.5.0",
+          checksum: "rule-checksum-1",
+          sources: []
+        },
+        {
+          id: "rule-version-2",
+          tenant_org_id: TENANT_ID,
+          rule_id: "rule.deadline",
+          version: "2.0.0",
+          checksum: "rule-checksum-2",
+          sources: []
+        },
+        {
+          id: "rule-version-3",
+          tenant_org_id: TENANT_ID,
+          rule_id: "rule.deadline",
+          version: "2.5.0",
+          checksum: "rule-checksum-3",
+          sources: []
+        }
+      ],
+      template_versions: [
+        {
+          id: "template-version-1",
+          tenant_org_id: TENANT_ID,
+          template_id: "constitution",
+          version: "2.9.0",
+          checksum: "template-checksum-1",
+          storage_ref: "s3://templates/constitution-2-9"
+        },
+        {
+          id: "template-version-2",
+          tenant_org_id: TENANT_ID,
+          template_id: "constitution",
+          version: "3.0.0",
+          checksum: "template-checksum-2",
+          storage_ref: "s3://templates/constitution-3-0"
+        },
+        {
+          id: "template-version-3",
+          tenant_org_id: TENANT_ID,
+          template_id: "constitution",
+          version: "3.2.0",
+          checksum: "template-checksum-3",
+          storage_ref: "s3://templates/constitution-3-2"
+        }
+      ]
+    });
+
+    const overlays: OverlayReference[] = [{ id: "tenant-pack", version: "1.3.0" }];
+    const result = await createWorkflowRun(client, {
+      workflowKey: baseGraph.id,
+      workflowVersion: baseGraph.version,
+      subjectOrgId: "00000000-0000-0000-0000-000000000111",
+      tenantOrgId: TENANT_ID,
+      overlays
+    });
+
+    assert.equal(result.lockfile.rules["rule.deadline"].version, "2.5.0");
+    assert.equal(result.lockfile.templates.constitution.version, "3.2.0");
+  });
+});
+
 async function withWorkspaceModules<T>(callback: () => Promise<T>): Promise<T> {
   const tempRoot = mkdtempSync(join(tmpdir(), "portal-engine-stub-"));
   const scopeRoot = join(tempRoot, "@airnub");
