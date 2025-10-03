@@ -13,6 +13,7 @@
 > * *@airnub/fresh‑comply — Coding Agent Prompt & Repo Scaffolding (v2025‑10‑02)*
 > * *Follow‑on Coding Agent Prompt — i18n, Theme, A11y, GDPR (v2025‑10‑02)*
 > * *FreshComply Admin App — Back Office Spec (see docs/specs/admin-app-spec.md)*
+> * *Workflow Extension Packs — Specification (see docs/specs/extensions.md)*
 
 ---
 
@@ -43,7 +44,7 @@
 * **Backend:** **Supabase Postgres** (+ RLS), **Supabase Storage** (docs), **Redis** (jobs/queues).
 * **LLM:** OpenAI Responses API + tool calls (connectors, doc generation, rule checks).
 * **Connectors:** CRO Open Services (read), data.gov.ie (Charities Register CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
-* **Temporal Orchestration:** Temporal workers drive short-lived, retryable actions (connect/submit/poll) with Signals/Queries for human checkpoints; long compliance windows remain in the calendar engine.
+* **Temporal Orchestration:** Temporal workers drive short-lived, retryable actions (connect/submit/poll) with Signals/Queries for human checkpoints; long compliance windows remain in the calendar engine. Tenant task queues are resolved from workflow execution metadata (see `execution.taskQueue`).
 * **Freshness & Compliance Engine:** Source registry, watchers, moderation queue, versioned rules, **Re‑verify** endpoint.
 * **Document Factory:** Handlebars/MDX → Markdown/PDF with signature blocks + checksums.
 * **Notifications:** In‑app realtime + Email; digests & escalations; uniform UX (see §10).
@@ -63,11 +64,11 @@
 
 ## 4) Workflow DSL & Runtime
 
-* **DSL:** YAML/JSON describing Questions → Branches → Steps (`question | info | action | upload | doc.generate | tool.call | verify | schedule | review`).
+* **DSL:** YAML/JSON describing Questions → Branches → Steps (`question | info | action | upload | doc.generate | tool.call | verify | schedule | review`). Tenant overlays merge via JSON Patch prior to run instantiation (Core → Jurisdiction → Industry → Tenant Pack → Run-time answers).
 * **Rules:** Versioned objects with logic, sources[], `last_verified_at`.
 * **Runtime:** Materialise steps, enforce `requires`, emit Assignments, schedule CalendarEvents, render Evidence badges.
 
-* **Execution modes:** Each step declares `execution.mode` (`manual` | `temporal`) and optional workflow metadata; manual steps rely on the calendar/notification layer for long waits, while Temporal orchestrates short-lived actions with Signals/Queries for human checkpoints.
+* **Execution modes:** Each step declares `execution.mode` (`manual` | `temporal` | `external`) and optional workflow metadata; manual steps rely on the calendar/notification layer for long waits, Temporal orchestrates short-lived actions with Signals/Queries for human checkpoints, and `external` steps call tenant-hosted automations through signed webhooks.
 
 **Example (abridged):**
 

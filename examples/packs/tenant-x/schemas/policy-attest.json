@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["attestedBy", "attestedAt"],
+  "properties": {
+    "attestedBy": {
+      "type": "string",
+      "title": "Attested by"
+    },
+    "attestedAt": {
+      "type": "string",
+      "format": "date",
+      "title": "Attested on"
+    },
+    "notes": {
+      "type": "string",
+      "title": "Notes",
+      "maxLength": 500
+    }
+  }
+}

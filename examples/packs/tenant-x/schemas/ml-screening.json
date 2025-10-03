@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["riskLevel", "justification"],
+  "properties": {
+    "riskLevel": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "title": "Risk level"
+    },
+    "justification": {
+      "type": "string",
+      "minLength": 10,
+      "title": "Justification"
+    },
+    "analyst": {
+      "type": "string",
+      "title": "Reviewer"
+    }
+  }
+}

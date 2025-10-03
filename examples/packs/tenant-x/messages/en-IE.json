@@ -1,0 +1,5 @@
+{
+  "tenantx-ml-screening.title": "Machine learning screening (Tenant X)",
+  "tenantx-ml-screening.description": "Automated screening that checks directors against Tenant X risk heuristics.",
+  "tenantx-policy-attest.title": "Board policy attestation (Tenant X)",
+  "tenantx-policy-attest.description": "Collect signed confirmation that the board adopted Tenant X security policy."}
