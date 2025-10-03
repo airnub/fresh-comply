@@ -27,7 +27,9 @@ export const Step = z.object({
   title: z.string(),
   status: z.enum(["todo", "in_progress", "waiting", "blocked", "done"]),
   orchestrationRunId: z.string().optional(),
-  executionMode: z.enum(["manual", "temporal"]).optional(),
+  executionMode: z
+    .enum(["manual", "temporal", "external:webhook", "external:websocket"])
+    .optional(),
   dueDate: z.string().datetime().optional(),
   assigneeUserId: Id.optional(),
   stepTypeVersionId: Id.optional(),

@@ -17,14 +17,50 @@ const ORCHESTRATION_STATUS_LABELS: Record<string, string> = {
   failed: "Failed"
 };
 
+type ExecutionMode = "manual" | "temporal" | "external:webhook" | "external:websocket";
+
+function formatOrchestrationStatus(status?: keyof typeof ORCHESTRATION_STATUS_LABELS | string) {
+  if (!status) {
+    return "Not started";
+  }
+  return ORCHESTRATION_STATUS_LABELS[status as keyof typeof ORCHESTRATION_STATUS_LABELS] ?? status;
+}
+
+function buildExecutionBadge(
+  mode: ExecutionMode,
+  orchestrationStatus?: keyof typeof ORCHESTRATION_STATUS_LABELS | string
+) {
+  const colors: Record<ExecutionMode, BadgeProps["color"]> = {
+    manual: "gray",
+    temporal: "blue",
+    "external:webhook": "amber",
+    "external:websocket": "teal"
+  };
+  const label = (() => {
+    switch (mode) {
+      case "temporal":
+        return `Temporal · ${formatOrchestrationStatus(orchestrationStatus)}`;
+      case "external:webhook":
+        return "External · Webhook";
+      case "external:websocket":
+        return `External · WebSocket${
+          orchestrationStatus ? ` · ${formatOrchestrationStatus(orchestrationStatus)}` : ""
+        }`;
+      default:
+        return "Manual";
+    }
+  })();
+  return { color: colors[mode] ?? "gray", label };
+}
+
 export type TimelineItem = {
   id: string;
   title: string;
   status: string;
   dueDate?: string;
   assignee?: string;
-  executionMode?: "manual" | "temporal";
-  orchestrationStatus?: keyof typeof ORCHESTRATION_STATUS_LABELS;
+  executionMode?: ExecutionMode;
+  orchestrationStatus?: keyof typeof ORCHESTRATION_STATUS_LABELS | string;
   orchestrationResult?: string;
   freshness?: {
     status: "verified" | "stale" | "pending";
@@ -55,15 +91,17 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
                           {formattedStatus}
                         </Badge>
                         {item.executionMode && (
-                          <Badge color={item.executionMode === "temporal" ? "blue" : "gray"} radius="full" variant="soft">
-                            {item.executionMode === "temporal"
-                              ? `Temporal · ${
-                                  item.orchestrationStatus
-                                    ? ORCHESTRATION_STATUS_LABELS[item.orchestrationStatus] ?? item.orchestrationStatus
-                                    : "Not started"
-                                }`
-                              : "Manual"}
-                          </Badge>
+                          (() => {
+                            const execution = buildExecutionBadge(
+                              item.executionMode,
+                              item.orchestrationStatus
+                            );
+                            return (
+                              <Badge color={execution.color} radius="full" variant="soft">
+                                {execution.label}
+                              </Badge>
+                            );
+                          })()
                         )}
                         {item.freshness && (
                           <Badge

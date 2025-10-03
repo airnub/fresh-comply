@@ -356,7 +356,7 @@ export type Database = {
           title: string;
           status: "todo" | "in_progress" | "waiting" | "blocked" | "done";
           orchestration_run_id: string | null;
-          execution_mode: "manual" | "temporal";
+          execution_mode: "manual" | "temporal" | "external:webhook" | "external:websocket";
           due_date: string | null;
           assignee_user_id: string | null;
           step_type_version_id: string | null;
@@ -369,7 +369,7 @@ export type Database = {
           title: string;
           status?: "todo" | "in_progress" | "waiting" | "blocked" | "done";
           orchestration_run_id?: string | null;
-          execution_mode?: "manual" | "temporal";
+          execution_mode?: "manual" | "temporal" | "external:webhook" | "external:websocket";
           due_date?: string | null;
           assignee_user_id?: string | null;
           step_type_version_id?: string | null;
@@ -382,7 +382,7 @@ export type Database = {
           title?: string;
           status?: "todo" | "in_progress" | "waiting" | "blocked" | "done";
           orchestration_run_id?: string | null;
-          execution_mode?: "manual" | "temporal";
+          execution_mode?: "manual" | "temporal" | "external:webhook" | "external:websocket";
           due_date?: string | null;
           assignee_user_id?: string | null;
           step_type_version_id?: string | null;

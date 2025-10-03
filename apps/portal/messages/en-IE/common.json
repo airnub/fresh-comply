@@ -99,12 +99,16 @@
     "orchestrationDescription": "Launch Temporal workflows, send signals, or capture manual updates for each step.",
     "orchestrationTemporalHint": "Temporal worker handles retries and polling.",
     "orchestrationManualHint": "Manual execution tracked via calendar reminders and evidence uploads.",
+    "orchestrationWebhookHint": "Invoke signed tenant webhooks and review response hashes.",
     "orchestrationStart": "Start",
     "orchestrationRetry": "Retry",
     "orchestrationSignal": "Send signal",
     "orchestrationSignalSuccess": "Signal delivered to Temporal workflow.",
     "orchestrationManualButton": "Mark done / upload proof",
     "orchestrationManualComplete": "Marked complete — upload evidence via the panel above.",
+    "orchestrationWebhookButton": "Send webhook",
+    "orchestrationWebhookSuccess": "Webhook dispatched (status {status}).",
+    "orchestrationWebhookError": "Unable to invoke tenant webhook.",
     "orchestrationReceiptPlaceholder": "Receipt URL (optional)",
     "orchestrationReceiptLabel": "Receipt URL",
     "orchestrationStartSuccess": "Workflow started (ID: {workflowId})",
@@ -143,7 +147,22 @@
       "input": "Input JSON",
       "inputPlaceholder": "{ } // JSON payload for the step",
       "secret": "Secret alias",
-      "secretPlaceholder": "Select alias (optional)"
+      "secretPlaceholder": "Select alias (optional)",
+      "executionLabel": "Execution config",
+      "executionHint": "Configure runtime metadata for the selected step.",
+      "executionWebhookMethod": "HTTP method",
+      "executionWebhookUrlAlias": "Webhook URL alias",
+      "executionWebhookTokenAlias": "Auth token alias",
+      "executionWebhookPath": "Path (optional)",
+      "executionWebhookSigningAlias": "Signing secret alias",
+      "executionTemporalWorkflow": "Temporal workflow (override)",
+      "executionTemporalTaskQueue": "Task queue",
+      "executionTemporalDefaultTaskQueue": "Default task queue",
+      "executionWebsocketUrlAlias": "WebSocket URL alias",
+      "executionWebsocketTokenAlias": "Bearer token alias",
+      "executionWebsocketMessageSchema": "Message schema ID",
+      "executionWebsocketWorkflow": "Temporal workflow",
+      "executionWebsocketQueue": "Default task queue"
     },
     "actions": {
       "insert": "Insert step",
@@ -165,7 +184,11 @@
       "persistError": "Unable to persist overlay snapshot.",
       "mergeError": "Overlay merge failed",
       "secretRequired": "Select a secret alias before inserting this step.",
-      "secretUnavailable": "No eligible secret bindings are available for this step type."
+      "secretUnavailable": "No eligible secret bindings are available for this step type.",
+      "executionWebhookUrlAliasRequired": "Select a webhook URL alias before inserting this step.",
+      "executionWebsocketUrlAliasRequired": "Select a websocket URL alias before inserting this step.",
+      "executionAliasInvalid": "Alias values must reference secret bindings, not literal URLs.",
+      "executionAliasUnavailable": "No eligible secret aliases are available for this execution configuration."
     },
     "stepTypes": {
       "manualReview": {
@@ -175,11 +198,24 @@
       "temporalWebhook": {
         "title": "Temporal webhook bridge",
         "summary": "Trigger a tenant-specific Temporal workflow via signed webhook requests."
+      },
+      "externalWebhook": {
+        "title": "Tenant webhook call",
+        "summary": "Invoke an external webhook with alias-resolved credentials and signing." 
+      },
+      "externalWebsocket": {
+        "title": "WebSocket listener bridge",
+        "summary": "Listen to tenant event streams and route messages via Temporal workflows."
       }
     },
     "secrets": {
       "crmApiToken": "CRM API token resolved at runtime.",
-      "temporalQueue": "Temporal task queue signing key stored in vault."
+      "temporalQueue": "Temporal task queue signing key stored in vault.",
+      "webhookBaseUrl": "Tenant webhook base URL alias.",
+      "webhookToken": "Bearer token alias resolved per tenant.",
+      "webhookSignature": "Webhook signature secret alias resolved per tenant.",
+      "websocketUrl": "Tenant websocket endpoint alias.",
+      "websocketToken": "Websocket bearer token alias."
     }
   },
   "funding": {

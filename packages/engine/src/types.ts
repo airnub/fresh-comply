@@ -1,11 +1,61 @@
 export type NodeKind = "question" | "info" | "action" | "upload" | "doc.generate" | "tool.call" | "verify" | "schedule" | "review";
 export type RuleRef = { id: string };
-export type StepExecution = {
-  mode: "manual" | "temporal";
+export type ManualStepExecution = {
+  mode: "manual";
+};
+
+export type TemporalExecutionConfig = {
   workflow?: string;
   taskQueue?: string;
-  config?: Record<string, unknown>;
+  defaultTaskQueue?: string;
 };
+
+export type TemporalStepExecution = {
+  mode: "temporal";
+  workflow?: string;
+  taskQueue?: string;
+  defaultTaskQueue?: string;
+  config?: TemporalExecutionConfig;
+};
+
+export type WebhookSigningConfig = {
+  algo: "hmac-sha256";
+  secretAlias: string;
+};
+
+export type WebhookExecutionConfig = {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  urlAlias: string;
+  tokenAlias?: string;
+  path?: string;
+  headers?: Record<string, string>;
+  signing?: WebhookSigningConfig;
+};
+
+export type WebhookStepExecution = {
+  mode: "external:webhook";
+  config: WebhookExecutionConfig;
+};
+
+export type WebsocketExecutionConfig = {
+  urlAlias: string;
+  tokenAlias?: string;
+  messageSchema?: string;
+  temporalWorkflow?: string;
+  defaultTaskQueue?: string;
+  taskQueueOverride?: string;
+};
+
+export type WebsocketStepExecution = {
+  mode: "external:websocket";
+  config: WebsocketExecutionConfig;
+};
+
+export type StepExecution =
+  | ManualStepExecution
+  | TemporalStepExecution
+  | WebhookStepExecution
+  | WebsocketStepExecution;
 
 export type StepSecretBinding = {
   alias: string;
