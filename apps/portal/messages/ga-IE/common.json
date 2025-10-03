@@ -181,5 +181,25 @@
       "crmApiToken": "Comhartha API CRM réitithe ag am rith.",
       "temporalQueue": "Eochair scuaine tasc Temporal stóráilte sa stór rúin."
     }
+  },
+  "funding": {
+    "heading": "Radar Maoinithe",
+    "description": "Coinnigh súil ar dhámhachtainí agus ar ghlaonna deontais phoiblí chun an chéad dheis eile a ghabháil.",
+    "totalResults": "{count, plural, one {Fuarthas # deis} other {Fuarthas # deiseanna}}",
+    "searchPlaceholder": "Cuardaigh teideal nó achoimre",
+    "filters": {
+      "domain": "Clár / réimse",
+      "county": "Contae",
+      "year": "Bliain dhámhachtana",
+      "submit": "Cuir na scagairí i bhfeidhm",
+      "reset": "Athshocraigh"
+    },
+    "calendarExport": "Íoslódáil an féilire",
+    "noResults": "Níl aon deiseanna maoinithe ag teacht leis na scagairí reatha.",
+    "lead": "Príomhinstitiúid",
+    "amount": "Deontas",
+    "callType": "Cineál glao",
+    "metadata": "{domain, select, other {{domain}}} {county, select, other {· {county}}}",
+    "loadError": "Níl sonraí maoinithe ar fáil faoi láthair. Déan iarracht arís ar ball."
   }
 }

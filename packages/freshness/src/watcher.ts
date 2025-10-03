@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchCharitiesDataset } from "@airnub/connectors/charities";
 import { lookupCompanyByName } from "@airnub/connectors/cro";
+import { harvestFundingRadar } from "@airnub/connectors/funding";
 import { fetchRevenueCharityRegistrations } from "@airnub/connectors/revenue";
 import type { Database, Json } from "@airnub/types/supabase";
 import { SOURCES } from "./sources.js";
@@ -30,6 +31,7 @@ export type SnapshotInfo = {
   fingerprint: string;
   payload: SourceRecord[];
   snapshotId?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type PollSourceOptions = {
@@ -39,18 +41,58 @@ export type PollSourceOptions = {
   abortSignal?: AbortSignal;
 };
 
-type SourcePoller = (options?: { abortSignal?: AbortSignal }) => Promise<SourceRecord[]>;
+type SourcePollerResult = {
+  records: SourceRecord[];
+  metadata?: Record<string, unknown>;
+};
+
+type SourcePoller = (options?: { abortSignal?: AbortSignal }) => Promise<SourcePollerResult>;
 
 const SOURCE_POLLERS: Record<SourceKey, SourcePoller> = {
-  cro_open_services: async () => {
-    // Poll most recent CRO name reservation sample
-    return lookupCompanyByName("Fresh Example CLG");
+  cro_open_services: async ({ abortSignal } = {}) => {
+    const result = await lookupCompanyByName("Fresh Example", { limit: 25, abortSignal });
+    return {
+      records: result.records,
+      metadata: {
+        resourceId: result.resourceId,
+        total: result.total,
+        issuedAt: result.issuedAt,
+        query: "Fresh Example"
+      }
+    };
   },
-  charities_ckan: async () => {
-    return fetchCharitiesDataset("company limited by guarantee");
+  charities_ckan: async ({ abortSignal } = {}) => {
+    const result = await fetchCharitiesDataset("registration", { abortSignal, limit: 50 });
+    return {
+      records: result.records,
+      metadata: {
+        resourceId: result.resourceId,
+        total: result.total,
+        issuedAt: result.issuedAt
+      }
+    };
   },
-  revenue_charities: async () => {
-    return fetchRevenueCharityRegistrations();
+  revenue_charities: async ({ abortSignal } = {}) => {
+    const result = await fetchRevenueCharityRegistrations({ abortSignal, limit: 250 });
+    return {
+      records: result.records,
+      metadata: {
+        resourceId: result.resourceId,
+        total: result.total,
+        issuedAt: result.issuedAt
+      }
+    };
+  },
+  funding_radar: async ({ abortSignal } = {}) => {
+    const result = await harvestFundingRadar({ abortSignal, limit: 40 });
+    return {
+      records: result.records,
+      metadata: {
+        resourceId: result.resourceId,
+        total: result.total,
+        issuedAt: result.issuedAt
+      }
+    };
   }
 };
 
@@ -59,11 +101,17 @@ export async function fetchSourceRecords(sourceKey: SourceKey, options?: { abort
   if (!poller) {
     throw new Error(`No poller registered for freshness source ${sourceKey}`);
   }
-  return poller({ abortSignal: options?.abortSignal });
+  const result = await poller({ abortSignal: options?.abortSignal });
+  return result.records;
 }
 
 export async function pollSource(sourceKey: SourceKey, options: PollSourceOptions = {}): Promise<WatchEvent | null> {
-  const records = await fetchSourceRecords(sourceKey, { abortSignal: options.abortSignal });
+  const poller = SOURCE_POLLERS[sourceKey];
+  if (!poller) {
+    throw new Error(`No poller registered for freshness source ${sourceKey}`);
+  }
+
+  const { records, metadata } = await poller({ abortSignal: options.abortSignal });
   const fingerprint = buildFingerprint(records);
   const detectedAt = new Date().toISOString();
   const supabase = options.supabase;
@@ -75,8 +123,10 @@ export async function pollSource(sourceKey: SourceKey, options: PollSourceOption
 
   const diff = diffRecords(previous?.payload ?? [], records);
   const summary = buildSummary(diff, records.length);
+  const mergedMetadata = { ...(options.metadata ?? {}), ...(metadata ?? {}) };
+
   const currentSnapshot = supabase
-    ? await saveSnapshot(supabase, sourceKey, fingerprint, records, options.metadata)
+    ? await saveSnapshot(supabase, sourceKey, fingerprint, records, mergedMetadata)
     : { fingerprint, payload: records };
 
   if (supabase) {
@@ -126,7 +176,8 @@ async function loadPreviousSnapshot(client: SupabaseClient<Database>, sourceKey:
   return {
     fingerprint: data.fingerprint,
     payload: (data.payload as SourceRecord[]) ?? [],
-    snapshotId: data.id
+    snapshotId: data.id,
+    metadata: (data.metadata as Record<string, unknown> | null) ?? undefined
   } satisfies PreviousSnapshot;
 }
 
@@ -146,7 +197,7 @@ async function saveSnapshot(
       metadata: metadata ? (metadata as unknown as Json) : null,
       polled_at: new Date().toISOString()
     })
-    .select("id, fingerprint, payload")
+    .select("id, fingerprint, payload, metadata")
     .single();
 
   if (error) {
@@ -156,7 +207,8 @@ async function saveSnapshot(
   return {
     fingerprint: data.fingerprint,
     payload: (data.payload as SourceRecord[]) ?? [],
-    snapshotId: data.id
+    snapshotId: data.id,
+    metadata: (data.metadata as Record<string, unknown> | null) ?? undefined
   } satisfies SnapshotInfo;
 }
 

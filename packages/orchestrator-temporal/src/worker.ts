@@ -3,6 +3,7 @@ import * as croActivities from "./activities/cro.js";
 import * as revenueActivities from "./activities/revenue.js";
 import * as fileActivities from "./activities/files.js";
 import * as utilActivities from "./activities/util.js";
+import * as freshnessActivities from "./activities/freshness.js";
 import * as externalJobActivities from "./activities/externalJob.js";
 import { createTemporalConnection, getTaskQueue, getTemporalNamespace } from "./client.js";
 
@@ -17,7 +18,8 @@ async function runWorker() {
       ...revenueActivities,
       ...fileActivities,
       ...utilActivities,
-      ...externalJobActivities
+      ...externalJobActivities,
+      ...freshnessActivities
     },
     taskQueue: getTaskQueue()
   });
