@@ -1,0 +1,67 @@
+{
+  "name": "airnub-site codespace",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24",
+      "installPnpm": true,
+      "pnpmVersion": "10.17.1"
+    }
+  },
+  "hostRequirements": { "cpus": 2, "memory": "4gb", "storage": "16gb" },
+
+  "containerEnv": {
+    "PNPM_HOME": "/home/node/.pnpm",
+    "PATH": "${containerEnv:PATH}:/home/node/.pnpm",
+    "AUTO_START_SUPABASE": "false",
+    "SUPABASE_VERSION": "latest",
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+
+  "mounts": [
+    "type=cache,source=pnpm-store,target=/home/node/.pnpm-store",
+    "type=cache,source=next-cache,target=${containerWorkspaceFolder}/.next/cache"
+  ],
+
+  "remoteUser": "vscode",
+  "userEnvProbe": "loginInteractiveShell",
+
+  "updateContentCommand": "pnpm -w fetch && pnpm -w install --frozen-lockfile",
+  "postCreateCommand": ".devcontainer/scripts/post-create.sh",
+  "postStartCommand": ".devcontainer/scripts/post-start.sh",
+
+  "forwardPorts": [3000, 3001, 54321, 54322, 54323],
+  "portsAttributes": {
+    "3000": { "label": "Airnub app (Next.js)", "onAutoForward": "openBrowser" },
+    "3001": { "label": "Speckit app (Next.js)", "onAutoForward": "openBrowser" },
+    "54321": { "label": "Supabase API" },
+    "54322": { "label": "Supabase Postgres" },
+    "54323": { "label": "Supabase Studio" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "editor.formatOnSave": true,
+        "eslint.useFlatConfig": true,
+        "editor.codeActionsOnSave": { "source.fixAll.eslint": true }
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "streetsidesoftware.code-spell-checker",
+        "bradlc.vscode-tailwindcss",
+        "Supabase.vscode-supabase-extension",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
+        "EditorConfig.EditorConfig",
+        "ms-azuretools.vscode-docker",
+        "mikestead.dotenv",
+        "Prisma.prisma"
+      ]
+    }
+  }
+}
