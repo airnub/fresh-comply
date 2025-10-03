@@ -863,9 +863,177 @@ export type Database = {
             columns: ["step_id"];
             isOneToOne: false;
             referencedRelation: "steps";
-          referencedColumns: ["id"];
-        }
-      ];
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      dsr_requests: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          subject_org_id: string | null;
+          assignee_user_id: string | null;
+          assignee_email: string | null;
+          requester_email: string | null;
+          requester_name: string | null;
+          request_payload: Json | null;
+          type:
+            | "access"
+            | "export"
+            | "rectification"
+            | "erasure"
+            | "restriction"
+            | "objection"
+            | "portability";
+          status:
+            | "received"
+            | "acknowledged"
+            | "in_progress"
+            | "paused"
+            | "completed"
+            | "escalated";
+          received_at: string;
+          ack_sent_at: string | null;
+          due_at: string;
+          resolved_at: string | null;
+          paused_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          subject_org_id?: string | null;
+          assignee_user_id?: string | null;
+          assignee_email?: string | null;
+          requester_email?: string | null;
+          requester_name?: string | null;
+          request_payload?: Json | null;
+          type:
+            | "access"
+            | "export"
+            | "rectification"
+            | "erasure"
+            | "restriction"
+            | "objection"
+            | "portability";
+          status?:
+            | "received"
+            | "acknowledged"
+            | "in_progress"
+            | "paused"
+            | "completed"
+            | "escalated";
+          received_at?: string;
+          ack_sent_at?: string | null;
+          due_at: string;
+          resolved_at?: string | null;
+          paused_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          subject_org_id?: string | null;
+          assignee_user_id?: string | null;
+          assignee_email?: string | null;
+          requester_email?: string | null;
+          requester_name?: string | null;
+          request_payload?: Json | null;
+          type?:
+            | "access"
+            | "export"
+            | "rectification"
+            | "erasure"
+            | "restriction"
+            | "objection"
+            | "portability";
+          status?:
+            | "received"
+            | "acknowledged"
+            | "in_progress"
+            | "paused"
+            | "completed"
+            | "escalated";
+          received_at?: string;
+          ack_sent_at?: string | null;
+          due_at?: string;
+          resolved_at?: string | null;
+          paused_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dsr_requests_assignee_user_id_fkey";
+            columns: ["assignee_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dsr_requests_subject_org_id_fkey";
+            columns: ["subject_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dsr_requests_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      dsr_request_jobs: {
+        Row: {
+          id: string;
+          request_id: string;
+          job_type: "ack_deadline" | "resolution_deadline" | "escalation_notice";
+          run_after: string;
+          payload: Json | null;
+          attempts: number;
+          locked_at: string | null;
+          processed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          job_type: "ack_deadline" | "resolution_deadline" | "escalation_notice";
+          run_after: string;
+          payload?: Json | null;
+          attempts?: number;
+          locked_at?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          request_id?: string;
+          job_type?: "ack_deadline" | "resolution_deadline" | "escalation_notice";
+          run_after?: string;
+          payload?: Json | null;
+          attempts?: number;
+          locked_at?: string | null;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dsr_request_jobs_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "dsr_requests";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       cro_companies: {
         Row: {
