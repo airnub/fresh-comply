@@ -1,4 +1,4 @@
-# FreshComply Admin App — Back Office Spec
+# FreshComply — Admin App Spec (v2025-10-03)
 
 **Version:** 2025-10-03  \
 **Owner:** Platform Admin Team  \
