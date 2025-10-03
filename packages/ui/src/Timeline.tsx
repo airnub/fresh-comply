@@ -26,6 +26,11 @@ export type TimelineItem = {
   executionMode?: "manual" | "temporal";
   orchestrationStatus?: keyof typeof ORCHESTRATION_STATUS_LABELS;
   orchestrationResult?: string;
+  freshness?: {
+    status: "verified" | "stale" | "pending";
+    verifiedAt?: string;
+    annotation?: string;
+  };
 };
 
 export function Timeline({ items }: { items: TimelineItem[] }) {
@@ -58,6 +63,25 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
                                     : "Not started"
                                 }`
                               : "Manual"}
+                          </Badge>
+                        )}
+                        {item.freshness && (
+                          <Badge
+                            color={
+                              item.freshness.status === "verified"
+                                ? "green"
+                                : item.freshness.status === "pending"
+                                  ? "amber"
+                                  : "red"
+                            }
+                            radius="full"
+                            variant="soft"
+                          >
+                            {item.freshness.annotation
+                              ? item.freshness.annotation
+                              : item.freshness.verifiedAt
+                                ? `Freshness · ${new Date(item.freshness.verifiedAt).toLocaleDateString()}`
+                                : `Freshness · ${item.freshness.status}`}
                           </Badge>
                         )}
                       </Flex>

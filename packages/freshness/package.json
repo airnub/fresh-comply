@@ -9,5 +9,10 @@
     "./sources": "./src/sources.ts",
     "./verify": "./src/verify.ts",
     "./watcher": "./src/watcher.ts"
+  },
+  "dependencies": {
+    "@airnub/connectors": "workspace:*",
+    "@airnub/types": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0"
   }
 }

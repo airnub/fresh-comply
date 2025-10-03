@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Card, Flex, Link, Text } from "@radix-ui/themes";
+import { Badge, Button, Card, Flex, Link, Text, type BadgeProps } from "@radix-ui/themes";
 import { ExternalLinkIcon } from "@radix-ui/react-icons";
 
 export type EvidenceItem = {
@@ -7,6 +7,9 @@ export type EvidenceItem = {
   title: string;
   sources: { label: string; url: string }[];
   lastVerifiedAt?: string;
+  annotation?: string;
+  badge?: { label: string; color?: BadgeProps["color"]; variant?: BadgeProps["variant"] };
+  metadata?: { label: string; value: string }[];
 };
 
 type EvidenceDrawerProps = {
@@ -32,6 +35,16 @@ export function EvidenceDrawer({ items, onReverify, reverifyLabel = "Re-verify",
                     ? formatTimestamp(item.lastVerifiedAt)
                     : `Verified on ${item.lastVerifiedAt ? new Date(item.lastVerifiedAt).toLocaleString() : "—"}`}
                 </Text>
+                {item.annotation ? (
+                  <Text as="span" size="2" color="gray">
+                    {item.annotation}
+                  </Text>
+                ) : null}
+                {item.badge ? (
+                  <Badge color={item.badge.color ?? "green"} radius="full" variant={item.badge.variant ?? "soft"}>
+                    {item.badge.label}
+                  </Badge>
+                ) : null}
               </Flex>
               {onReverify && (
                 <Button onClick={() => onReverify(item.id)} variant="soft">
@@ -55,6 +68,19 @@ export function EvidenceDrawer({ items, onReverify, reverifyLabel = "Re-verify",
                 ))}
               </ul>
             </Flex>
+            {item.metadata?.length ? (
+              <Flex asChild direction="column" gap="1">
+                <ul>
+                  {item.metadata.map((meta) => (
+                    <Text asChild key={`${item.id}-${meta.label}`} size="1" color="gray">
+                      <li>
+                        <strong>{meta.label}:</strong> {meta.value}
+                      </li>
+                    </Text>
+                  ))}
+                </ul>
+              </Flex>
+            ) : null}
           </Flex>
         </Card>
       ))}

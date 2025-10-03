@@ -10,9 +10,10 @@ export interface ReasonDialogProps {
   onSubmit: SubmitHandler;
   triggerLabel: string;
   busyLabel?: string;
+  disabled?: boolean;
 }
 
-export function ReasonDialog({ title, description, onSubmit, triggerLabel, busyLabel }: ReasonDialogProps) {
+export function ReasonDialog({ title, description, onSubmit, triggerLabel, busyLabel, disabled }: ReasonDialogProps) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -34,8 +35,9 @@ export function ReasonDialog({ title, description, onSubmit, triggerLabel, busyL
     <>
       <button
         type="button"
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
         onClick={() => setOpen(true)}
+        disabled={disabled}
       >
         {triggerLabel}
       </button>

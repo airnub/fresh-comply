@@ -100,7 +100,9 @@
     "subheading": "Review watcher diffs before publishing updates.",
     "columns": {
       "watcher": "Watcher",
-      "impact": "Impact"
+      "status": "Status",
+      "detected": "Detected",
+      "workflows": "Workflows"
     },
     "tableCaption": "Pending watcher updates",
     "empty": "No pending watcher updates.",
@@ -114,6 +116,22 @@
     "reject": "Reject",
     "reason": {
       "submitting": "Submitting\u2026"
+    },
+    "noWorkflows": "No linked workflows",
+    "selectedSource": "Reviewing {source} diff",
+    "verifiedOn": "Verified on {date}",
+    "locked": "Update is {status}.",
+    "diffAdded": "{count, plural, one {# addition} other {# additions}}",
+    "diffRemoved": "{count, plural, one {# removal} other {# removals}}",
+    "diffUpdated": "{count, plural, one {# update} other {# updates}}",
+    "diffNoop": "Structure changed",
+    "statuses": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "error": {
+      "generic": "Something went wrong"
     }
   },
   "orgs": {
