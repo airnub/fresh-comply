@@ -10,6 +10,8 @@
 - **ADR-0003: White-Label Multi-Tenant Architecture** — `../adr/0003-white-label-multi-tenant-architecture.md`
 - **ADR-0002: Stripe Billing Scaffold** — `../adr/0002-billing-stripe.md`
 
+> **SOC 2 Compliance:** FreshComply must maintain SOC 2 Type II readiness. See `specs/fresh-comply-spec.md` §11.1 for the platform control library and `specs/admin-app-spec.md` §9 for admin surface obligations. Reference these sections when adding or modifying security/audit functionality.
+
 ## Getting Started
 - **Local Development** — `getting-started/local-development.md`
 - **Codespaces** — `getting-started/codespaces.md`

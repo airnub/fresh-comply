@@ -16,7 +16,7 @@
 - **Auth:** Supabase Auth via `@supabase/ssr`. Middleware negotiates locale, enforces authentication, and redirects non-admins to login.
 - **RBAC Utilities:** `src/lib/rbac.ts` exposes helpers for step editing and second-approval checks.
 - **Audit Layer:** Every API mutation records `admin_action_id`, reason codes, diff snapshots, and actor metadata.
-- **Security:** CSRF protection, per-admin rate limits on high-risk routes, redaction of PII in logs.
+- **Security:** CSRF protection, per-admin rate limits on high-risk routes, redaction of PII in logs; adheres to [Product Spec §11.1 SOC 2 controls](./fresh-comply-spec.md#soc-2-compliance-requirements).
 
 ## 3. App Structure
 ```
@@ -84,3 +84,14 @@ pnpm run dev:worker  # Temporal worker bundle
 pnpm run dev:admin   # Admin app on http://localhost:3100
 ```
 Keep admin tooling isolated from customer portal; do not link to Temporal Web UI from customer surfaces.
+
+## 9. SOC 2 Control Coverage
+
+The admin app is a primary surface for SOC 2 evidence collection. It must:
+
+- **Enforce Controlled Changes:** All privileged actions require authenticated admins, role checks, reason codes, and (where specified) two-person approval to satisfy change-management controls.
+- **Guarantee Audit Integrity:** Persist `admin_actions` and related log entries in append-only stores with hashes/diffs so auditors can trace sample selections back to immutable evidence.
+- **Surface Access Reviews:** Provide exports/reporting for quarterly access reviews (users, roles, step type editors, Temporal operators) aligned with the joiner/mover/leaver workflow defined in [Product Spec §11.1](./fresh-comply-spec.md#soc-2-compliance-requirements).
+- **Track Monitoring Events:** Bubble queue health, watcher drift, and incident annotations into admin dashboards so monitoring/incident-response evidence is reviewable.
+- **Link Vendor Decisions:** Store subprocessor approvals/attestations and make them discoverable for SOC 2 vendor-management samples.
+- **Support Evidence Packaging:** Offer filtered exports (CSV/JSON) tagged with control IDs to streamline quarterly readiness packets.

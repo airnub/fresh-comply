@@ -87,7 +87,7 @@ Stripe Connect + Billing recommended; invoices, tax/VAT handling, and payouts ar
 
 ## 6) Security, Privacy, Observability
 
-- **RLS** everywhere; server‑side guards on all admin operations.
+- **RLS** everywhere; server‑side guards on all admin operations (aligned with [SOC 2 controls](./fresh-comply-spec.md#soc-2-compliance-requirements)).
 - **Secrets**: overlays may only reference **aliases**; real credentials stay in vault and are resolved server/worker side.
 - **Webhook hardening**: HMAC, nonce replay protection, strict time windows.
 - **OTel tracing**: every span/log has `{ tenant_id, partner_org_id, subject_org_id, run_id, step_id, ticket_id }`.
@@ -98,7 +98,7 @@ Stripe Connect + Billing recommended; invoices, tax/VAT handling, and payouts ar
 
 ## 7) Audit Trail & DSR
 
-- **Append-only ledgers**: `audit_log` (tenant event stream) and `admin_actions` (platform-admin mutations) capture `{ id, tenant_org_id, subject_org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, action, payload jsonb, created_at, prev_hash, curr_hash }` with immutable retention windows.
+- **Append-only ledgers**: `audit_log` (tenant event stream) and `admin_actions` (platform-admin mutations) capture `{ id, tenant_org_id, subject_org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, action, payload jsonb, created_at, prev_hash, curr_hash }` with immutable retention windows that satisfy [SOC 2 audit evidence requirements](./fresh-comply-spec.md#soc-2-compliance-requirements).
 - **Hash-chain enforcement**: Postgres `BEFORE INSERT` trigger sets `curr_hash = sha256(prev_hash || row_digest)` and verifies `prev_hash` equals the latest committed hash per `(tenant_org_id, stream_key)`; `UPDATE`/`DELETE` are blocked via RLS and constraint triggers so the chain cannot be rewritten.
 - **RLS views**: expose tenant-safe `audit_log_view` / `admin_actions_view` filtering by `tenant_org_id` and enriching actor metadata; platform-only variants can traverse cross-tenant `subject_org_id` for DSR and incident response. The [Admin App Spec](./admin-app-spec.md) consumes the platform view for moderation tooling.
 - **RPC write-through pattern**: all admin surfaces and automated workflows call `rpc_append_audit_entry(actor, action, payload)` which writes to `admin_actions`, returns the hash link, and emits NOTIFY for workers that append to `audit_log` so UI latency stays low.

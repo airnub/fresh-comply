@@ -198,9 +198,22 @@ These are integrated as:
 * **Retention & Deletion:** soft‑delete → scheduled hard‑delete; policy tables per entity; user‑initiated exports (ZIP/JSON/CSV).
 * **DPA:** standard processor DPA with annexes; **Subprocessors registry** & change‑notice policy; SCC annex placeholders.
 * **Records:** `docs/LEGAL/ROPA.yaml` maintained; admin UI read‑only later.
-* **Security:** TLS; encryption at rest; least‑privilege RBAC; admin action audit; secrets in vault; Temporal workers read via service credentials; workflow code never touches raw secrets; session via `@supabase/ssr`.
+* **Security:** TLS; encryption at rest; least‑privilege RBAC; admin action audit; secrets in vault; Temporal workers read via service credentials; workflow code never touches raw secrets; session via `@supabase/ssr`. (See [§11.1 SOC 2 Compliance Requirements](./fresh-comply-spec.md#soc-2-compliance-requirements) for the canonical control set.)
 * **Breach Response:** defined in `INCIDENT‑RESPONSE.md` (72‑hour notification flow).
 * **Consent:** Cookie banner with categories; server‑gated scripts; consent stored in cookie + DB.
+
+### SOC 2 Compliance Requirements
+
+FreshComply must maintain **SOC 2 Type II** readiness across the Trust Services Criteria in scope (Security, Availability, Confidentiality). The platform team owns the control library and evidence plan.
+
+* **Control Ownership:** Map every policy/technical control to a control ID with owner, automation status, and evidence cadence; publish in `docs/LEGAL/soc2-control-matrix.md` (or successor) and keep it versioned.
+* **Change Management:** All production-impacting changes flow through Git-based review with two-person approval on protected branches; emergency fixes require documented post-mortem within 24 hours.
+* **Access Management:** Quarterly access reviews for Supabase, Temporal, CI/CD, and third-party SaaS; enforce SSO/MFA for admins; document joiner/mover/leaver workflows with timestamps and approvers.
+* **Audit Logging & Retention:** Centralise structured logs for admin/API actions, Temporal events, and infrastructure via append-only storage retained ≥ 1 year; ensure logs are immutable and queryable for auditors.
+* **Monitoring & Incident Response:** Continuous monitoring for control failures (authentication anomalies, job queue health, watcher drift) with PagerDuty or equivalent alerts; incident runbooks include evidence capture for audits.
+* **Vendor & Subprocessor Oversight:** Maintain current subprocessor inventory with SOC 2/ISO certificates or risk assessments; document annual review outcomes and remediation plans.
+* **Evidence Management:** Store audit evidence (screenshots, exports, reports) in an access-controlled repository with tagging by control ID; prepare quarterly readiness packets.
+* **Cross-Team Alignment:** Coordinate with Admin App requirements in [Admin Spec §11](./admin-app-spec.md#11-security-logging-and-audit) to ensure UI workflows capture approvals, justifications, and log integrity needed for SOC 2 sampling.
 
 ---
 
@@ -253,7 +266,7 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 * **A11y:** Pa11y + axe on home, run, board; keyboard e2e.
 * **Contrast:** token checker script for WCAG AA thresholds.
 * **Build:** ensure i18n message code‑split; bundle size guard.
-* **Security:** basic auth route tests; RLS verification queries in CI.
+* **Security:** basic auth route tests; RLS verification queries in CI. (Align with [SOC 2 Compliance Requirements](./fresh-comply-spec.md#soc-2-compliance-requirements) when extending coverage.)
 
 ---
 
