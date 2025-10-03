@@ -68,6 +68,7 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          tenantId: orgId,
           orgId,
           runId,
           stepKey: step.id,
@@ -128,6 +129,7 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          tenantId: orgId,
           workflowId: `demo-${step.id}`,
           signal: "confirmManualFiling",
           payload: { receiptUrl: receiptUrl || undefined }

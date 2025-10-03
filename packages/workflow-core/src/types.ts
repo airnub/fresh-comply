@@ -13,10 +13,12 @@ export interface TemporalStepExecution {
   workflow?: string;
   taskQueue?: string;
   defaultTaskQueue?: string;
+  tenantId?: string;
   config?: {
     workflow?: string;
     taskQueue?: string;
     defaultTaskQueue?: string;
+    tenantId?: string;
   };
 }
 
@@ -46,6 +48,7 @@ export interface WebsocketExecutionConfig {
   temporalWorkflow?: string;
   defaultTaskQueue?: string;
   taskQueueOverride?: string;
+  tenantId?: string;
 }
 
 export interface WebsocketStepExecution {

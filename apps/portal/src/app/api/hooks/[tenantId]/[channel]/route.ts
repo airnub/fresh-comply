@@ -158,6 +158,7 @@ export async function POST(
 
     try {
       const signalResult = await signalWorkflow({
+        tenantId,
         workflowId,
         signal: signalName,
         payload: {

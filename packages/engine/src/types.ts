@@ -8,6 +8,7 @@ export type TemporalExecutionConfig = {
   workflow?: string;
   taskQueue?: string;
   defaultTaskQueue?: string;
+  tenantId?: string;
 };
 
 export type TemporalStepExecution = {
@@ -15,6 +16,7 @@ export type TemporalStepExecution = {
   workflow?: string;
   taskQueue?: string;
   defaultTaskQueue?: string;
+  tenantId?: string;
   config?: TemporalExecutionConfig;
 };
 
@@ -44,6 +46,7 @@ export type WebsocketExecutionConfig = {
   temporalWorkflow?: string;
   defaultTaskQueue?: string;
   taskQueueOverride?: string;
+  tenantId?: string;
 };
 
 export type WebsocketStepExecution = {

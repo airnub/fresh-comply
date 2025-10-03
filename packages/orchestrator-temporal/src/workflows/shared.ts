@@ -1,6 +1,7 @@
 import { defineQuery, defineSignal } from "@temporalio/workflow";
 
 export type StepWorkflowInput<TInput = unknown> = {
+  tenantId: string;
   orgId: string;
   runId: string;
   stepKey: string;
