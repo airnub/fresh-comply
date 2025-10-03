@@ -23,6 +23,7 @@ export type StartWorkflowOptions<TPayload = unknown> = {
   runId: string;
   stepKey: string;
   payload: TPayload;
+  partnerOrgId?: string | null;
   searchAttributes?: Partial<{
     subjectOrg: string;
     environment: string;
@@ -43,10 +44,11 @@ export async function startStepWorkflow<TPayload>(
     stepId: options.stepKey,
     workflow: options.workflow,
     orgId: options.orgId,
+    tenantId: options.tenantId,
+    partnerOrgId: options.partnerOrgId ?? null,
     attributes: {
       "freshcomply.temporal.operation": "start",
-      "freshcomply.temporal.task_queue": taskQueue,
-      "freshcomply.tenant_id": options.tenantId
+      "freshcomply.temporal.task_queue": taskQueue
     }
   }, async (span) => {
     const client = await createTemporalClient();
@@ -64,7 +66,8 @@ export async function startStepWorkflow<TPayload>(
           orgId: options.orgId,
           runId: options.runId,
           stepKey: options.stepKey,
-          payload: options.payload
+          payload: options.payload,
+          partnerOrgId: options.partnerOrgId ?? null
         }
       ];
       const searchAttributes = buildSearchAttributes({
@@ -81,6 +84,8 @@ export async function startStepWorkflow<TPayload>(
         searchAttributes
       });
       annotateSpan(span, {
+        tenantId: options.tenantId,
+        partnerOrgId: options.partnerOrgId ?? null,
         attributes: {
           "freshcomply.temporal.workflow_id": handle.workflowId
         }
@@ -109,13 +114,14 @@ export async function signalWorkflow(
   options: SignalWorkflowOptions
 ): Promise<{ status: unknown; result: unknown }> {
   return withTelemetrySpan("temporal.workflow.signal", {
+    tenantId: options.tenantId,
     attributes: {
       "freshcomply.temporal.operation": "signal",
       "freshcomply.temporal.workflow_id": options.workflowId,
-      "freshcomply.signal": options.signal,
-      "freshcomply.tenant_id": options.tenantId
+      "freshcomply.signal": options.signal
     }
   }, async (span) => {
+    annotateSpan(span, { tenantId: options.tenantId });
     const client = await createTemporalClient();
     try {
       const handle = client.getHandle(options.workflowId);
@@ -140,12 +146,13 @@ export type QueryWorkflowOptions = {
 
 export async function queryWorkflowStatus(options: QueryWorkflowOptions) {
   return withTelemetrySpan("temporal.workflow.query", {
+    tenantId: options.tenantId,
     attributes: {
       "freshcomply.temporal.operation": "query",
-      "freshcomply.temporal.workflow_id": options.workflowId,
-      "freshcomply.tenant_id": options.tenantId
+      "freshcomply.temporal.workflow_id": options.workflowId
     }
-  }, async () => {
+  }, async (span) => {
+    annotateSpan(span, { tenantId: options.tenantId });
     const client = await createTemporalClient();
     try {
       const handle = client.getHandle(options.workflowId);

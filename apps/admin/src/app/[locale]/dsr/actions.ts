@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient, getSupabaseUser, SupabaseConfigurationError } from "../../../lib/auth/supabase-ssr";
 import {
   getServiceSupabaseClient,
@@ -23,6 +24,11 @@ async function resolveContext() {
     console.error("Unexpected Supabase error during DSR action", error);
     return null;
   }
+}
+
+function readOrgId(user: User | null | undefined, key: string): string | null {
+  const value = user?.app_metadata?.[key] ?? user?.user_metadata?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 type ServiceClient = ReturnType<typeof getServiceSupabaseClient> | null;
@@ -108,6 +114,10 @@ export async function reassignDsrRequest(id: string, email: string, reason: stri
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: false, error: "supabase_unavailable" };
     }
+
+    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const partnerOrgId = readOrgId(context.user, "partner_org_id");
+    annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail.includes("@")) {
@@ -197,6 +207,9 @@ export async function completeDsrRequest(id: string, reason: string): Promise<Ds
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: false, error: "supabase_unavailable" };
     }
+    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const partnerOrgId = readOrgId(context.user, "partner_org_id");
+    annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
     const { client, user } = context;
     const request = await loadRequest(client, id);
     if (!request) {
@@ -242,6 +255,9 @@ export async function togglePauseDsrRequest(id: string, reason: string): Promise
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: false, error: "supabase_unavailable" };
     }
+    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const partnerOrgId = readOrgId(context.user, "partner_org_id");
+    annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
     const request = await loadRequest(client, id);

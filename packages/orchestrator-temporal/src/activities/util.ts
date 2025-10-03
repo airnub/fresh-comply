@@ -1,9 +1,11 @@
 import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
 
 export type StepActivityContext = {
+  tenantId: string;
   orgId: string;
   runId: string;
   stepKey: string;
+  partnerOrgId?: string | null;
 };
 
 export type PersistStepPayload<T = unknown> = StepActivityContext & {
@@ -27,6 +29,8 @@ export async function persistStepProgress<T = unknown>(
     runId: payload.runId,
     stepId: payload.stepKey,
     orgId: payload.orgId,
+    tenantId: payload.tenantId,
+    partnerOrgId: payload.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "persistStepProgress",
       "freshcomply.step.status": payload.status
@@ -53,6 +57,8 @@ export async function recordAuditEvent(input: AuditLogInput): Promise<{ recorded
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "recordAuditEvent",
       "freshcomply.audit.action": input.action

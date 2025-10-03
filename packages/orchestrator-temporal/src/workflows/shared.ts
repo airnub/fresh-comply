@@ -6,6 +6,7 @@ export type StepWorkflowInput<TInput = unknown> = {
   runId: string;
   stepKey: string;
   payload: TInput;
+  partnerOrgId?: string | null;
 };
 
 export type StepWorkflowStatus =

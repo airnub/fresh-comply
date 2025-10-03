@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   return withTelemetrySpan(`GET ${ROUTE}`, {
     runId: headerMetadata.runId,
     stepId: headerMetadata.stepId,
+    tenantId: headerMetadata.tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId,
     attributes: {
       "http.request.method": "GET",
       "http.route": ROUTE
@@ -29,9 +31,9 @@ export async function GET(request: Request) {
     }
 
     annotateSpan(span, {
+      tenantId,
       attributes: {
-        "freshcomply.workflow_id": workflowId,
-        "freshcomply.tenant_id": tenantId
+        "freshcomply.workflow_id": workflowId
       }
     });
 

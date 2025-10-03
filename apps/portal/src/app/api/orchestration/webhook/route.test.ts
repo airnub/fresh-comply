@@ -31,7 +31,7 @@ async function withRoute<T>(callback: (route: typeof import("./route")) => Promi
       exports: { "./telemetry": "./telemetry.js" }
     } as const;
     writeFileSync(join(utilsRoot, "package.json"), JSON.stringify(utilsPackage));
-    writeFileSync(join(utilsRoot, "telemetry.js"), 'export function annotateSpan() {}\n\nexport function setHttpAttributes() {}\n\nexport function extractRunMetadataFromHeaders(headers) {\n  if (!headers) {\n    return {};\n  }\n  const get = (name) => {\n    if (headers instanceof Headers) {\n      return headers.get(name) ?? undefined;\n    }\n    return headers[name] ?? undefined;\n  };\n  const runId = get("x-fc-run-id") ?? get("x-run-id") ?? get("x-temporal-run-id");\n  const stepId = get("x-fc-step-key") ?? get("x-step-id") ?? get("x-temporal-step-id");\n  return { runId: runId ?? undefined, stepId: stepId ?? undefined };\n}\n\nexport async function withTelemetrySpan(_name, _options, handler) {\n  const span = {\n    setAttribute() {},\n    recordException() {},\n    setStatus() {},\n    addEvent() {}\n  };\n  return await handler(span);\n}');
+    writeFileSync(join(utilsRoot, "telemetry.js"), 'export function annotateSpan() {}\n\nexport function setHttpAttributes() {}\n\nexport function extractRunMetadataFromHeaders(headers) {\n  if (!headers) {\n    return {};\n  }\n  const get = (name) => {\n    if (headers instanceof Headers) {\n      return headers.get(name) ?? undefined;\n    }\n    return headers[name] ?? undefined;\n  };\n  const runId = get("x-fc-run-id") ?? get("x-run-id") ?? get("x-temporal-run-id");\n  const stepId = get("x-fc-step-key") ?? get("x-step-id") ?? get("x-temporal-step-id");\n  const tenantId = get("x-tenant-id") ?? get("x-fc-tenant-id") ?? get("x-temporal-tenant-id") ?? get("x-tenant-org-id");\n  const partnerOrgId = get("x-partner-org-id") ?? get("x-fc-partner-org-id") ?? get("x-temporal-partner-org-id");\n  return { runId: runId ?? undefined, stepId: stepId ?? undefined, tenantId: tenantId ?? undefined, partnerOrgId: partnerOrgId ?? undefined };\n}\n\nexport async function withTelemetrySpan(_name, _options, handler) {\n  const span = {\n    setAttribute() {},\n    recordException() {},\n    setStatus() {},\n    addEvent() {}\n  };\n  return await handler(span);\n}');
 
     process.env.NODE_PATH = tempRoot + (previousNodePath ? `${delimiter}${previousNodePath}` : "");
     Module._initPaths();
@@ -104,6 +104,7 @@ test("POST resolves secret aliases and forwards webhook requests", async () => {
         : new Headers(forwarded.init.headers);
       assert.equal(headers.get("authorization"), "Bearer token-value");
       assert.equal(headers.get("x-custom"), "value");
+      assert.equal(headers.get("x-fc-tenant-id"), payload.tenantId);
       assert.ok(headers.get("x-fc-idempotency-key"));
 
       const expectedSignature = createHmac("sha256", "signing-secret")

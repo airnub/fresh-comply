@@ -17,6 +17,8 @@ export async function submitTr2ViaBridge(
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "submitTr2ViaBridge"
     }
@@ -48,6 +50,8 @@ export async function pollTr2Status(
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "pollTr2Status"
     }
@@ -79,6 +83,8 @@ export async function checkEtaxClearance(
     runId: input.runId,
     stepId: input.stepKey,
     orgId: input.orgId,
+    tenantId: input.tenantId,
+    partnerOrgId: input.partnerOrgId,
     attributes: {
       "freshcomply.temporal.activity": "checkEtaxClearance"
     }

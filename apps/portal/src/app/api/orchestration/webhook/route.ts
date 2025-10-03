@@ -65,6 +65,8 @@ export async function POST(request: Request) {
   return withTelemetrySpan(`POST ${ROUTE}`, {
     runId: headerMetadata.runId,
     stepId: headerMetadata.stepId,
+    tenantId: headerMetadata.tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId,
     attributes: {
       "http.request.method": "POST",
       "http.route": ROUTE
@@ -85,7 +87,19 @@ export async function POST(request: Request) {
       return response;
     }
 
-    const { tenantId, runId, stepKey, orgId, request: webhookRequest } = payload as Record<string, unknown>;
+    const {
+      tenantId,
+      runId,
+      stepKey,
+      orgId,
+      partnerOrgId,
+      request: webhookRequest
+    } = payload as Record<string, unknown>;
+
+    const resolvedPartnerOrgId =
+      typeof partnerOrgId === "string" && partnerOrgId.length > 0
+        ? partnerOrgId
+        : headerMetadata.partnerOrgId ?? null;
 
     if (typeof tenantId !== "string" || tenantId.length === 0) {
       const response = jsonResponse({ ok: false, error: "tenantId is required" }, { status: 400 });
@@ -136,6 +150,8 @@ export async function POST(request: Request) {
       runId: typeof runId === "string" ? runId : undefined,
       stepId: typeof stepKey === "string" ? stepKey : undefined,
       orgId: typeof orgId === "string" ? orgId : tenantId,
+      tenantId,
+      partnerOrgId: resolvedPartnerOrgId,
       attributes: {
         "freshcomply.webhook.url_alias": urlAlias
       }
@@ -169,6 +185,10 @@ export async function POST(request: Request) {
     }
     if (typeof stepKey === "string") {
       requestHeaders.set("X-FC-Step-Key", stepKey);
+    }
+    requestHeaders.set("X-FC-Tenant-Id", tenantId);
+    if (resolvedPartnerOrgId) {
+      requestHeaders.set("X-FC-Partner-Org-Id", resolvedPartnerOrgId);
     }
 
     if (headers) {

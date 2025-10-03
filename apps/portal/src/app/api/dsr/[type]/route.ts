@@ -77,6 +77,8 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
   return withTelemetrySpan(`POST ${ROUTE}`, {
     runId: headerMetadata.runId,
     stepId: headerMetadata.stepId,
+    tenantId: headerMetadata.tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId,
     attributes: {
       "http.request.method": "POST",
       "http.route": ROUTE
@@ -100,6 +102,7 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
 
     annotateSpan(span, {
       orgId: input.tenantOrgId,
+      tenantId: input.tenantOrgId,
       attributes: {
         "freshcomply.dsr.type": type,
         "freshcomply.dsr.subject_org": input.subjectOrgId ?? "unknown"

@@ -13,6 +13,8 @@ export async function POST(request: Request) {
   return withTelemetrySpan(`POST ${ROUTE}`, {
     runId: headerMetadata.runId,
     stepId: headerMetadata.stepId,
+    tenantId: headerMetadata.tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId,
     attributes: {
       "http.request.method": "POST",
       "http.route": ROUTE
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
 
     annotateSpan(span, {
       orgId: tenantId,
+      tenantId,
       attributes: {
         "freshcomply.workflow_id": workflowId
       }

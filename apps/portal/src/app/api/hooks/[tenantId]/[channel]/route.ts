@@ -53,7 +53,9 @@ export async function POST(
       "http.request.method": "POST",
       "http.route": ROUTE
     },
-    orgId: tenantId
+    orgId: tenantId,
+    tenantId: headerMetadata.tenantId ?? tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId
   }, async (span) => {
     const config = resolveChannelConfig(tenantId, channel);
 
@@ -67,6 +69,7 @@ export async function POST(
     }
 
     annotateSpan(span, {
+      tenantId,
       attributes: {
         "freshcomply.channel": channel
       }
@@ -96,6 +99,7 @@ export async function POST(
     }
 
     annotateSpan(span, {
+      tenantId,
       attributes: {
         "freshcomply.workflow_id": workflowId,
         "freshcomply.signal": config.signal ?? "receivedCallback"

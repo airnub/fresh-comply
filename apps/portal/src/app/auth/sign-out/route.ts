@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
   return withTelemetrySpan(`POST ${ROUTE}`, {
     runId: headerMetadata.runId,
     stepId: headerMetadata.stepId,
+    tenantId: headerMetadata.tenantId,
+    partnerOrgId: headerMetadata.partnerOrgId,
     attributes: {
       "http.request.method": "POST",
       "http.route": ROUTE

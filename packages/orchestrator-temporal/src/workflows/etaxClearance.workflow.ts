@@ -21,9 +21,11 @@ export async function etaxClearanceWorkflow(
 
   status = "running";
   result = await revenue.checkEtaxClearance({
+    tenantId: input.tenantId,
     orgId: input.orgId,
     runId: input.runId,
     stepKey: input.stepKey,
+    partnerOrgId: input.partnerOrgId ?? null,
     taxReference: input.payload.taxReference
   });
   status = "completed";
