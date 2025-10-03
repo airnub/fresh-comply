@@ -1,11 +1,11 @@
-# FreshComply — Consolidated Requirements & Spec (Full Update)
+# FreshComply — Consolidated Requirements & Spec
 
 **Repo:** `@airnub/fresh-comply`
-**Version:** 2025‑10‑03 (Full Update)
+**Version:** 2025‑10‑03
 **Owner:** @airnub
-**Status:** Source of truth for engineering, agents, compliance, and UX
+**Purpose:** Canonical specification that unifies **all requirements and docs** produced in this conversation and defines authoritative build standards for the FreshComply platform.
 
-> Supersedes all prior specs and blends every requirement agreed in this thread, plus high‑value non‑functional standards and operational guardrails. Links back to:
+> This spec supersedes and references prior docs:
 >
 > * *Ireland Non‑Profit (CLG) A→Z Handbook — Setup & Operations (v2025‑10‑02)*
 > * *Irish Non‑Profit Structures & Charity Registration — Quick Guide (v2025‑10‑02)*
@@ -17,54 +17,53 @@
 
 ## 0) Mission & Outcomes
 
-**Mission:** A self‑service, always‑current workflow platform that guides any Irish organisation (non‑profit and for‑profit) from **formation → operations → compliance**, powered by live verification (the **Freshness & Compliance Engine**), generated documents, and **shared visibility** between **Company A (advisor)** and **Company X (client)**.
+* **Mission:** Deliver a self‑service, always‑current workflow platform that guides any Irish organisation (non‑profit and for‑profit) from **formation to compliance**, with live verification (“Freshness & Compliance Engine”), generated documents, and shared visibility between **Company A (advisor)** and **Company X (client)**.
+* **Outcomes:**
 
-**Outcomes:**
-
-* A novice completes a CRO‑ready pack in **< 60 minutes**.
-* Real‑time **status, assignments, deadlines** visible to both sides.
-* Every legal assertion shows **source** + **Verified on {date}**.
-* GDPR‑compliant handling with **DSR** flows (export, delete, etc.).
+  * A novice can complete a CRO‑ready pack in **< 60 minutes**.
+  * Real‑time **status, assignments, deadlines** shared across organisations.
+  * Every legal assertion shows a **source** and a **Verified on {date}** badge.
+  * GDPR‑compliant data handling with **DSR** (data subject rights) flows.
 
 ---
 
 ## 1) Scope & Non‑Goals
 
-**Scope (Ireland, initial):** CLG (charity), CLG (non‑charity), LTD; guided filings + document packs; CRO/RBO/Charities/Revenue lookups; funding radar; adaptive policy pack.
+**In‑scope (initial):** Ireland jurisdiction (CLG charity / CLG non‑charity / LTD).  Guided filings + document packs; CRO/RBO/Charities/Revenue lookups; funding radar.
 
-**Non‑Goals (initial):** Direct e‑filing to CRO/RBO/Charities; multi‑jurisdiction; full grant authoring. (Future.)
+**Non‑goals (initial):** Direct e‑filing to CRO/RBO/Charities; universal grant authoring; multi‑jurisdiction (to follow).
 
 ---
 
-## 2) Architecture (Authoritative)
+## 2) Architecture (authoritative)
 
-* **Frontend:** Next.js 15 (App Router), **next‑intl** (i18n), Tailwind, **Radix UI primitives** + **shadcn/ui** components, Tiptap for doc previews.
+* **Frontend:** Next.js 15 (App Router), **next‑intl** (i18n), **Tailwind**, **Radix UI primitives** + **shadcn/ui components** (see §9), **Tiptap** for doc previews.
 * **Auth:** **Supabase Auth** with `@supabase/ssr` for SSR/session hydration; RLS‑backed multi‑tenant access; optional OAuth later.
 * **Backend:** **Supabase Postgres** (+ RLS), **Supabase Storage** (docs), **Redis** (jobs/queues).
 * **LLM:** OpenAI Responses API + tool calls (connectors, doc generation, rule checks).
-* **Connectors:** CRO Open Services (read), data.gov.ie (Charities CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
+* **Connectors:** CRO Open Services (read), data.gov.ie (Charities Register CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
 * **Freshness & Compliance Engine:** Source registry, watchers, moderation queue, versioned rules, **Re‑verify** endpoint.
 * **Document Factory:** Handlebars/MDX → Markdown/PDF with signature blocks + checksums.
-* **Notifications:** In‑app realtime + Email; digests & escalations; uniform UX.
+* **Notifications:** In‑app realtime + Email; digests & escalations; uniform UX (see §10).
 * **Calendar:** ICS feed per organisation & per workflow run.
 
 ---
 
 ## 3) Multi‑Tenant & Engagement Model
 
-**Use‑case:** **Company A (accountant)** sets up a non‑profit for **Company X (client)**. Both see the **same run** (status, steps, assignees, deadlines, docs, evidence, audit).
+**Use‑case:** **Company A (accountant)** sets up a non‑profit for **Company X (client)**. Both sides see **the same run**: status, steps, assignees, deadlines, docs, evidence, audit.
 
 * **Entities:** User, Organisation, Membership, **Engagement** (Org A↔Org X), WorkflowDef, WorkflowRun, Step/Task, Document, Rule, Verification, Notification, AuditLog, CalendarEvent.
-* **RLS:** A **WorkflowRun** belongs to **subject_org_id** (Company X) and is visible to its members and to members of **engager_org_id** (Company A) via an active **Engagement** scoped to that run.
-* **Audit:** Log `{ actor_user_id, actor_org_id, on_behalf_of_org_id }` on every action.
+* **RLS policy:** A **WorkflowRun** is owned by **subject_org_id** (Company X) and is visible to its members and to Engagement members of **engager_org_id** (Company A) when Engagement is **active** and scoped to the run.
+* **Audit:** All actions record `{ actor_user_id, actor_org_id, on_behalf_of_org_id }`.
 
 ---
 
 ## 4) Workflow DSL & Runtime
 
 * **DSL:** YAML/JSON describing Questions → Branches → Steps (`question | info | action | upload | doc.generate | tool.call | verify | schedule | review`).
-* **Rules:** Versioned objects with `logic`, `sources[]`, `last_verified_at`.
-* **Runtime:** Materialises steps, enforces `requires`, emits Assignments, schedules CalendarEvents, renders Evidence badges.
+* **Rules:** Versioned objects with logic, sources[], `last_verified_at`.
+* **Runtime:** Materialise steps, enforce `requires`, emit Assignments, schedule CalendarEvents, render Evidence badges.
 
 **Example (abridged):**
 
@@ -86,32 +85,32 @@ steps:
 
 ## 5) Legal & Operational Content (from prior docs)
 
-* **Handbook & Quick Guide** bundled as user help.
-* **Product Spec** defines flows, connectors, funding radar.
-* **Coding Agent Prompt** defines monorepo & stubs.
-* **Follow‑on Prompt** mandates i18n, theme, a11y, GDPR kit.
+* **Handbook & Quick Guide** shipped as user‑facing references.
+* **Product Spec** (live workflow) drives engine features, connectors, and funding radar.
+* **Coding Agent Prompt & Scaffolding** defines monorepo structure and initial stubs.
+* **Follow‑on Prompt** mandates i18n, theme, accessibility, GDPR kit.
 
-Integrated as:
+These are integrated as:
 
 * `packages/workflows/…` (flow definitions)
-* `packages/doc-templates/…` (constitutions, minutes, policies)
-* `docs/specs/fresh-comply-spec.md` (detailed)
+* `packages/doc-templates/…` (constitution seeds, minutes, policy stubs)
+* `docs/specs/fresh-comply-spec.md` (expanded per §7–§12)
 
 ---
 
-## 6) Functional Requirements (Canonical)
+## 6) Functional Requirements (canonical)
 
-1. **Onboarding** routes to correct path with minimal Q&A (charity/non‑charity/LTD; domain; funding; ops; directors).
+1. **Onboarding** asks minimal questions to route to the correct path (charity/non‑charity/LTD; domain; funding; operations; directors).
 2. **Timeline** & **Task Board** show phases, status, due dates, assignees; block steps until prerequisites verified.
-3. **Evidence Drawer** shows rules with sources & **Re‑verify**.
+3. **Evidence Drawer** displays rules with sources & **Re‑verify**.
 4. **Doc Generation** outputs Markdown/PDF with signature blocks & checksums.
-5. **Calendar** emits ICS feeds; reminders & escalations via Notifications.
-6. **Act‑on‑behalf** flows let Company A progress tasks for Company X with audit.
-7. **Funding Radar** surfaces relevant programmes/deadlines.
-8. **i18n** (en‑IE, ga‑IE) with switcher and message fallbacks.
-9. **Theme** Light/Dark/High‑Contrast without flicker; reduced motion.
-10. **A11y** WCAG 2.2 AA baseline.
-11. **GDPR kit** & DSR endpoints.
+5. **Calendar** issues ICS feeds; reminders & escalations via Notifications.
+6. **Act‑on‑behalf** flows enable Company A to progress tasks for Company X with full audit.
+7. **Funding Radar** surfaces relevant programmes and deadlines.
+8. **i18n** routes & translations (en‑IE, ga‑IE) with switcher.
+9. **Theme** toggle (Light/Dark/High‑Contrast) SSR‑safe; reduced‑motion respect.
+10. **A11y** WCAG 2.2 AA baseline (see §9).
+11. **GDPR kit** & DSR endpoints (see §11).
 
 ---
 
@@ -119,12 +118,10 @@ Integrated as:
 
 * **Locales:** `en‑IE`, `ga‑IE` (extensible).
 * **Routing:** `/(locale)/…` via middleware negotiation (Accept‑Language → cookie → default `en‑IE`).
-* **Messages:** ICU JSON per route segment stored at `apps/portal/messages/<locale>/…`; **code‑split**; fallback to default; **telemetry** fires on missing keys.
+* **Messages:** ICU JSON per route; code‑split; fallback to default.
 * **Locale Switcher:** accessible `<select>`; updates URL & cookie; persists per user.
-* **Server locale:** use `unstable_setRequestLocale` to avoid hydration mismatches.
-* **Formatting:** helpers for currency/dates/lists respecting locale/timezone.
-* **Translation workflow:** Nightly **XLIFF v2** exports; Lokalise‑style review; **CI rejects** incomplete keys. Content Design owns tone/terminology glossary.
-* **Translatable DSL:** workflow labels/notes expose `*_i18n` dictionaries.
+* **Formatting:** helpers for currency, dates, and lists respecting locale/timezone.
+* **Translatable DSL:** workflow labels/notes allow per‑locale strings.
 
 **Acceptance:** critical screens operate in both locales with tests (unit + snapshot) and no layout shift.
 
@@ -133,114 +130,101 @@ Integrated as:
 ## 8) Theme System — Definitive
 
 * **Tokens:** CSS variables for color/space/radius/shadow in `packages/ui/tokens.css`; mapped to Tailwind theme.
-* **Modes:** Light, Dark, **High‑Contrast**; server‑computed `data-theme` to prevent flicker; persist to **`fc_theme`** cookie + user profile.
+* **Modes:** Light, Dark, **High‑Contrast**; server‑computed `data-theme` to prevent flicker; persist to cookie + user profile.
 * **Reduced motion:** respect `prefers-reduced-motion`.
-* **Contrast:** body text ≥ **4.5:1**; High‑Contrast targets: surfaces ≥ **7:1**; accent text ≥ **4.5:1**.
-* **Visual regression:** theme snapshots (Light/Dark/High‑Contrast) gate PRs.
+* **Contrast:** minimum AA (4.5:1) on body text; lint & CI contrast check.
 
 ---
 
 ## 9) UI Components & UX Baseline (Radix + shadcn/ui)
 
-* **Primitives:** **Radix UI** for Dialog, Popover, Menu, Tabs, Toggle, Tooltip, Toast (ARIA patterns, focus trap, Esc handling).
-* **Composites:** **shadcn/ui** wrappers; custom: *EvidenceDrawer*, *Timeline*, *TaskBoard*, *LocaleSwitcher*, *ThemeToggle*, *SkipLink*.
-* **Focus & keyboard:** visible focus rings; logical tab order; `Skip to content`; semantic landmarks.
+* **Primitives:** **Radix UI** for Dialog, Popover, Menu, Tabs, Toggle, Tooltip, Toast (with ARIA patterns, focus trap, Esc handling).
+* **Composites:** **shadcn/ui** wrappers for speed and consistency; extended to include *EvidenceDrawer*, *Timeline*, *TaskBoard*, *LocaleSwitcher*, *ThemeToggle*, *SkipLink*.
+* **Focus & keyboard:** visible focus rings; logical tab order; `Skip to content` link; semantic landmarks.
 * **Forms:** label/description association; inline errors; live region for status.
-
-**Accessibility (WCAG 2.2 AA) — operational details**
-
-* **Testing:** `eslint-plugin-jsx-a11y`; automated checks with **axe** (Cypress/Playwright) and **Pa11y** in CI for home/run/board (both locales).
-* **Manual audits:** once per release; **NVDA** + **VoiceOver** smoke tests.
-* **Remediation SLAs:** P0 ≤ **48h**, P1 ≤ **7d**.
-* **PDFs:** Tag PDFs with language/title/headings where feasible; **Accessible HTML** fallback.
 
 ---
 
 ## 10) Notifications — Consistent UX
 
-**Channels:** In‑app (Radix Toast/Alert), Email; (optional Slack/Teams later).
+**Channels:** In‑app (Radix Toast/Alert), Email; (optional Slack/Teams webhooks later).
 
 **Patterns:**
 
-* **Transactional toasts**: success/failure; auto‑dismiss; undo where safe.
-* **Sticky banners**: run‑level warnings (e.g., “RBO deadline approaching”).
-* **Inbox panel**: per‑user due/overdue list with quick‑assign.
+* **Transactional toasts** for quick success/failed actions; auto‑dismiss, with undo where safe.
+* **Sticky banners** for run‑level warnings (e.g., “RBO deadline approaching”).
+* **Inbox panel** (per user) listing due/overdue tasks with quick‑assign.
 * **Digests:** morning summary (today + next 7 days).
-* **Escalations:** overdue → ping assignee + org admin; SLA per workflow version.
-* **Copy style:** concise, action‑first; include subject org; link to task; minimal PII.
-* **A11y:** polite live region; keyboard actionable; color not sole cue.
+* **Escalations:** overdue → ping assignee + org admin; configurable SLA per workflow version.
+* **Copy style:** concise, action‑first; include subject org; link to task; no PII beyond necessity.
+* **A11y:** toasts announce via polite live region; actionable via keyboard; color not sole carrier of meaning.
 
 ---
 
 ## 11) GDPR/EU Legal & Data Governance — Canonical
 
-* **Roles:** Platform is **processor** for client content; may be **controller** for telemetry/support.
-* **Lawful Bases:** Contract, Legal obligation, Legitimate interest, Consent (for non‑essential cookies/analytics).
+* **Roles:** Platform acts as **processor** for client content; may be **controller** for product analytics & service operations (documented in Privacy Notice).
+* **Lawful Bases:** Contract (service delivery), Legal obligation (compliance), Legitimate interest (security/fraud), Consent (non‑essential cookies/analytics).
 * **Data Subject Rights (DSR):** `/api/dsr/*` intake for access/export/rectification/erasure/restriction/objection/portability; queue + SLA; confirmation emails.
-* **DSR SLAs:** Acknowledge within **72h**; resolve within **30 days** (lawful extension possible).
 * **Retention & Deletion:** soft‑delete → scheduled hard‑delete; policy tables per entity; user‑initiated exports (ZIP/JSON/CSV).
 * **DPA:** standard processor DPA with annexes; **Subprocessors registry** & change‑notice policy; SCC annex placeholders.
 * **Records:** `docs/LEGAL/ROPA.yaml` maintained; admin UI read‑only later.
 * **Security:** TLS; encryption at rest; least‑privilege RBAC; admin action audit; secrets in vault; session via `@supabase/ssr`.
-* **Breach Response:** `INCIDENT‑RESPONSE.md` (72‑hour flow).
+* **Breach Response:** defined in `INCIDENT‑RESPONSE.md` (72‑hour notification flow).
 * **Consent:** Cookie banner with categories; server‑gated scripts; consent stored in cookie + DB.
-* **Public legal routes:** `/[locale]/privacy`, `/[locale]/terms`, `/[locale]/dpa` (downloadable), `/[locale]/subprocessors`, `/[locale]/cookies`.
-* **Audit scope:** record admin actions **and** each DSR lifecycle event with actor + org context.
 
 ---
 
 ## 12) Supabase Auth with `@supabase/ssr` — Authoritative
 
-* **Why:** SSR‑friendly sessions, seamless RLS, first‑class App Router.
+* **Why:** SSR‑friendly sessions, seamless RLS, and first‑class Next.js App Router integration.
 * **Implementation:**
 
-  * Server components: `createServerClient` from `@supabase/ssr`.
-  * Middleware: read/write auth cookies; refresh tokens on server.
+  * Create client in server components using `createServerClient` from `@supabase/ssr`.
+  * Read/write auth cookies in middleware; refresh tokens on server.
   * Map session → memberships → **effective permissions** (subject_org vs engager_org via Engagements).
-  * Route guards server‑side; `withOrg` helper resolves acting org context.
-  * **Impersonation prohibition:** no silent impersonation; explicit context switch banner.
+  * Guard routes server‑side; add `withOrg` helper to resolve acting org context.
+  * **Impersonation prohibition:** no silent impersonation; require explicit context switch with banner.
 
 ---
 
-## 13) Data Model (Summary)
+## 13) Data Model (summary)
 
-Tables: organisations, users, memberships, engagements, workflow_defs, workflow_runs, steps, documents, rules, verifications, notifications, audit_log, calendar_events. (Drizzle/Kysely generate; see scaffolding SQL.)
+Tables: organisations, users, memberships, engagements, workflow_defs, workflow_runs, steps, documents, rules, verifications, notifications, audit_log, calendar_events. (See scaffolding SQL; generated via Drizzle/Kysely later.)
 
 ---
 
-## 14) Freshness & Compliance Engine (Detailed)
+## 14) Freshness & Compliance Engine (detailed)
 
 * **Source Registry:** canonical URLs/APIs (CRO Open Services; Revenue/ROS pages; Charities CKAN; Pobal/LCDC/LAG).
-* **Watchers:** cron fetch → diff → **Impact Map** (rules/steps/templates affected) → human review → publish **workflow_def.version+1**.
-* **UI:** every rule shows **Verified on {date}** + **Re‑verify**.
-* **Audit:** verification events store source snapshot hashes.
+* **Watchers:** cron jobs fetch → diff; on change produce **Impact Map** (rules/steps/templates affected); human review; publish **workflow_def.version+1**.
+* **UI:** Every rule shows **Verified on {date}** + **Re‑verify** button.
+* **Audit:** store verification events with source snapshot hashes.
 
 ---
 
-## 15) Connectors (MVP Reality)
+## 15) Connectors (MVP reality)
 
-* **CRO Open Services (read):** name/status lookup; step helpers.
-* **RBO:** guided filing; deadline calc; evidence capture.
-* **Charities Register (CKAN):** dataset ingest; enrich steps; peer discovery.
-* **Revenue/ROS:** cert‑based where feasible; else guided TR2 & eTax Clearance.
-* **Funding Radar:** Pobal + county LCDC/LAG + sector bodies.
+* **CRO Open Services (read)** — name/status lookup; incorporate into step helpers.
+* **RBO** — guided filing, deadline calc, evidence capture.
+* **Charities Register (CKAN)** — ingest dataset; enrich charity steps; peer discovery.
+* **Revenue/ROS** — cert‑based where feasible; else guided TR2 & eTax Clearance.
+* **Funding Radar** — Pobal + county LCDC/LAG + sector bodies.
 
 ---
 
 ## 16) Testing & CI Gates
 
 * **Type & lint:** strict TS; `eslint-plugin-jsx-a11y`.
-* **i18n:** tests for negotiation & fallbacks; snapshots per locale.
-* **A11y:** Pa11y + axe on home/run/board; keyboard e2e.
-* **Contrast:** token checker for WCAG AA thresholds.
-* **Build:** verify i18n code‑split; bundle size guard.
+* **i18n:** unit tests for negotiation & fallbacks; snapshot major screens per locale.
+* **A11y:** Pa11y + axe on home, run, board; keyboard e2e.
+* **Contrast:** token checker script for WCAG AA thresholds.
+* **Build:** ensure i18n message code‑split; bundle size guard.
 * **Security:** basic auth route tests; RLS verification queries in CI.
-* **i18n completeness:** CI validates translation coverage; rejects missing or unreviewed keys; validates XLIFF exports.
-* **Visual regression:** per‑theme snapshots (Light/Dark/High‑Contrast) on Timeline, TaskBoard, EvidenceDrawer.
 
 ---
 
-## 17) Acceptance Criteria (Go‑Live)
+## 17) Acceptance Criteria (go‑live)
 
 * `pnpm dev` runs portal with demo **charity CLG** run; timeline + board + evidence visible.
 * **Act on behalf** banner & audit entries when Company A advances tasks for Company X.
@@ -253,15 +237,15 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 
 ---
 
-## 18) Roadmap (Delta over prior)
+## 18) Roadmap (delta over prior)
 
-* **M1:** i18n, theme, A11y, Supabase SSR auth, notifications v1.
-* **M2:** Freshness Engine v1 (watchers + moderation), Funding Radar v1, CKAN ingest.
-* **M3:** ROS integrations (where possible), admin DSR queue UI, accessible HTML alt for PDFs, public read‑only progress pages.
+* **M1**: i18n, theme, A11y, Supabase SSR auth, notifications v1.
+* **M2**: Freshness Engine v1 (watchers + moderation), Funding Radar v1, CKAN ingest.
+* **M3**: ROS integrations (where possible), admin DSR queue UI, accessible HTML alt for PDFs, public read‑only progress pages.
 
 ---
 
-## 19) Traceability Matrix (Prior docs → Spec sections)
+## 19) Traceability Matrix (prior docs → spec sections)
 
 | Prior Document                    | Incorporated Into                           |
 | --------------------------------- | ------------------------------------------- |
@@ -273,92 +257,123 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 
 ---
 
-# High‑Value Non‑Functional Standards (New)
-
-## 20) Operational SLOs & Environments
-
-* **Environments:** `dev`, `staging`, `prod` with separate Supabase projects and storage buckets.
-* **SLOs:** Availability 99.9% (prod), P95 page TTI < 2.5s (EU), P95 API latency < 300ms on cached reads.
-* **Data residency:** All primary data in **EU region**; backups remain in EU.
-
-## 21) Observability & Logging
-
-* **Tracing:** OpenTelemetry; trace IDs across API → engine → DB.
-* **Logs:** Structured JSON; redact PII; correlate with user/run IDs.
-* **Metrics:** RPS, latency, error rates; workflow progression funnel; rule verification cadence.
-* **Alerts:** On error spikes, failed watcher jobs, missed SLA (DSR, notifications).
-
-## 22) Security & Threat Model
-
-* **Standards:** OWASP ASVS L2 baseline; supply‑chain scanning (Snyk/GHAS), SAST/Dependabot.
-* **Secrets:** Managed via environment vault; no secrets in git.
-* **Rate limiting:** Per IP + per user; exponential backoff on auth & API.
-* **Abuse prevention:** CAPTCHA challenge on suspicious patterns; email verification.
-* **Pen‑tests:** Annual external + ad‑hoc for high‑risk changes.
-
-## 23) Data Protection & Classification
-
-* **Classes:** Public, Internal, Confidential (Client), Special Category (avoid storing; if unavoidable, DPIA required).
-* **Backups:** Daily full, 7‑day point‑in‑time; **RPO 24h**, **RTO 8h**.
-* **Data minimisation:** Collect only fields required for each filing/document.
-
-## 24) Delivery & CI/CD
-
-* **Branching:** trunk‑based with short‑lived PRs; conventional commits; semantic release for packages.
-* **Pipelines:** lint → typecheck → unit → e2e → a11y → build → deploy (staging) → smoke → promote to prod.
-* **Feature flags:** Configurable per environment; safe rollbacks.
-
-## 25) Config & Feature Management
-
-* **Config:** Twelve‑Factor; `.env` per env; runtime config surfaced via server components only.
-* **Flags:** Gate early/incomplete features (e.g., ROS integration) and run A/B tests while respecting consent.
-
-## 26) Browser & Device Support
-
-* **Browsers:** Evergreen (Chrome/Edge/Firefox/Safari last 2); **no IE**.
-* **Devices:** Responsive from 360px; target mobile PWA later.
-
-## 27) API Surface (Internal)
-
-* **REST endpoints:** `/api/reverify`, `/api/ics`, `/api/dsr/*`, `/api/consent`.
-* **Engine APIs:** server‑only helpers to load DSL, materialise steps, run verifications.
-* **Idempotency:** Require `Idempotency-Key` on mutating endpoints.
-
-## 28) AI Safety & Guardrails
-
-* **System prompts:** constrain output to structured JSON for engine actions.
-* **PII controls:** never echo secrets; mask in logs; classify content; block uploads that violate policy.
-* **Citations:** include source links for legal assertions; re‑verify button triggers fresh lookup.
-* **Cost control:** token budgets per request; fallbacks to cached answers with visible timestamp.
-
-## 29) OSS & Licensing
-
-* **Licences:** Track all third‑party licences; avoid copyleft where incompatible; notice file included.
-* **Attribution:** UI footer credits icons/fonts where required.
-
-## 30) Design Governance
-
-* **Design tokens:** single source in `packages/ui/tokens.css`.
-* **Component audits:** quarterly a11y & contrast reviews; deprecate non‑compliant components.
-
-## 31) Change Management for Workflows
-
-* **Versioning:** `workflow_def.version` increments on any rule/step/template change.
-* **Migration:** Existing runs retain old version; offer upgrade wizard when safe.
-* **Changelog:** auto‑generated from moderation queue approvals.
+**End of Consolidated Spec (v2025‑10‑03).**
+*This is the single source of truth for engineering, agents, and compliance reviewers.*
 
 ---
 
-## 32) KPIs (Operational)
+## 20) Operational A→Z Workflow (Implementation‑Ready)
 
-* **Time to CRO‑ready pack:** < **60 minutes**.
-* **RBO compliance:** % filing within **5 months**.
-* **Tax readiness:** % achieving **eTax Clearance** within **30 days**.
-* **Charity enablement:** % eligible charities granted **CHY** within **90 days** of Regulator approval.
-* **Funding discovery:** Matched opportunities per org; grant success‑rate uplift.
-* **Compliance hygiene:** Reduction in overdue filings/tasks QoQ.
+**Status:** Canonical, implementation‑ready version of the end‑to‑end **Irish non‑profit** workflow you provided. This section converts the narrative checklist into **explicit steps with IDs**, required inputs, outputs, verification rules, deadlines, and connectors. Builders should treat this as the *source of truth* for the initial non‑profit flows in `packages/workflows/`.
+
+> **Currency note:** Authored for Ireland as of **02 Oct 2025 (Europe/Dublin)**. The **Freshness & Compliance Engine** must re‑verify rules and links.
+
+### 20.1 Phases & Steps (Do‑This‑Then‑That)
+
+**Phase A — Form the company**
+
+1. **choose‑legal‑form** — Decide legal structure (default: **CLG without share capital**).
+   *Inputs:* org intent, activity domain(s).  *Outputs:* form type.  *Verify:* charity intent → use charity‑friendly clauses.  *Sources:* Citizens Information.
+2. **name‑and‑constitution** — Check name availability on CRO CORE; draft **CLG constitution** with charity‑friendly clauses (objects; income & property; winding‑up).
+   *Inputs:* candidate name; objects; clauses.  *Outputs:* constitution file.  *Verify:* charity‑compliant wording present.  *Sources:* Arts Council model; Law Society note.
+3. **cro‑incorporation** — Create CORE account; file **Form A1** + constitution. Ensure **director PPSN** or **VIN (VIF)** and **EEA‑resident director** or **S137 bond**.
+   *Inputs:* directors/secretary, PPSN/VIN, bond if needed.  *Outputs:* CRO number; ARD.  *Verify:* `eea_director_present_or_s137_bond`; `director_identity_ok`.  *Deadline:* ARD tracking begins.  *Sources:* CRO; PPSN/VIN notice.
+4. **rbo‑initial‑filing** — Register **beneficial owners** with **RBO** within **5 months** of incorporation.
+   *Inputs:* beneficial owner data.  *Outputs:* RBO submission receipt.  *Verify:* `rbo_deadline_5_months`.  *Sources:* RBO.
+
+**Phase B — Revenue & banking**
+
+5. **open‑bank‑account** — Board minute + IDs; open community/non‑profit account.
+   *Outputs:* account details; mandate.  *Sources:* sector guidance.
+6. **revenue‑registrations‑tr2** — Submit **TR2** (CT mandatory; PAYE if hiring; VAT if required).
+   *Outputs:* tax reg numbers.  *Verify:* CT present; PAYE/VAT per answers.  *Sources:* Revenue.
+7. **ros‑access‑and‑etax** — Acquire **RAN**, install **ROS digital certificate**, obtain **eTax Clearance** when eligible.
+   *Outputs:* ROS cert; Tax Clearance.  *Verify:* business tax registration exists.  *Sources:* Revenue/ROS.
+
+**Phase C — Charity status & reliefs (if applicable)**
+
+8. **charity‑registration** — Apply on **Charities Regulator** portal (exclusively charitable purposes; public benefit). Use **Regulator‑approved constitution**.
+   *Outputs:* Charity Reg. Number.  *Verify:* purposes/public benefit; objects match.  *Sources:* Citizens Information; Regulator.
+9. **revenue‑chy‑exemption** — Apply for **charitable tax exemption (CHY)** once registered.
+   *Outputs:* CHY number.  *Verify:* approved constitution on file.  *Sources:* Revenue.
+10. **donation‑scheme‑enablement** — Implement **CHY3/CHY4**; 31% specified rate gross‑up on €250+ annual individual gifts; **2‑year waiting period removed from 01 Jan 2025**.
+    *Outputs:* donor flow docs; forms.  *Verify:* CHY active.  *Sources:* Revenue.
+11. **vat‑compensation‑scheme** — Claim eligible VAT **Jan–Jun** each year for prior calendar year; overall **€10m** State cap (pro‑rata).
+    *Outputs:* ROS claim pack.  *Verify:* non‑public funding proportion; deadlines.  *Sources:* Revenue.
+
+**Phase D — Always‑on compliance**
+
+12. **governance‑policies** — Adopt **Charities Governance Code** practices; Financial Controls; Conflicts; GDPR; Safeguarding (if relevant); Fundraising policy.
+    *Outputs:* approved policy pack.  *Verify:* safeguarding only if relevant services; GDPR DPIA where needed.  *Sources:* Regulator; DPC; Tusla.
+13. **accounting‑and‑reporting** — Maintain minutes; registers; accounts; CRO financial statements obligations; audit where required.
+    *Outputs:* accounts; directors’ report.  *Verify:* exemptions; ARD schedule.  *Sources:* CRO guidance.
+14. **payroll‑rtí** — If employing, register PAYE; run RTI payroll via **ROS**.
+    *Outputs:* payroll submissions.  *Sources:* Revenue.
+15. **calendar‑and‑notifications** — Track CRO B1 by ARD; RBO changes; Charities annual return; VAT Comp window; grant deadlines.
+    *Outputs:* ICS + reminders + escalations.  *Verify:* SLAs configured.
+16. **lobbying‑register** — If communicating with DPOs about policy/law/funding, register and file returns on **lobbying.ie**.
+    *Outputs:* lobbying returns.  *Sources:* Standards in Public Office.
+
+### 20.2 Printable Minimal Checklist (mirrors steps)
+
+* Decide CLG; draft constitution (charity‑ready).
+* Line up 2+ directors + secretary; ensure EEA director or S137 bond; confirm PPSN/VIN.
+* Incorporate on CORE (A1 + constitution) → get CRO number; note ARD.
+* Within **5 months**, file **RBO**.
+* Open bank account (constitution + CRO docs + IDs + minute).
+* Register taxes via **TR2** (CT mandatory; PAYE/VAT as needed).
+* Get **ROS** access (RAN → cert) and **eTax Clearance** (if eligible).
+* If charity path: apply to **Charities Regulator** → then **CHY** with Revenue.
+* Enable **CHY3/CHY4** donations at 31%; claim **VAT Compensation** Jan–Jun for prior year.
+* Adopt policies; track filings; keep minutes/registers/accounts.
+* Register/report lobbying if in scope.
+
+### 20.3 DSL Mapping (initial IDs)
+
+```
+setup-nonprofit-ie-charity (or -noncharity)
+  - choose-legal-form (question/info)
+  - name-and-constitution (doc.generate | verify)
+  - cro-incorporation (action | verify)
+  - rbo-initial-filing (action | schedule)
+  - open-bank-account (action | doc.generate)
+  - revenue-registrations-tr2 (action)
+  - ros-access-and-etax (action | verify)
+  - charity-registration (branch: charity==true)
+  - revenue-chy-exemption (branch: charity==true)
+  - donation-scheme-enablement (branch: charity==true)
+  - vat-compensation-scheme (branch: charity==true)
+  - governance-policies (doc.generate)
+  - accounting-and-reporting (info | schedule)
+  - payroll-rti (branch: employs_staff==true)
+  - calendar-and-notifications (schedule)
+  - lobbying-register (branch: lobbying==true)
+```
+
+### 20.4 Inputs, Outputs, Verify & Deadlines (snapshot)
+
+| Step ID                    | Required Inputs                                           | Output/Artifact         | Verify Rules                                                 | Deadline                        |
+| -------------------------- | --------------------------------------------------------- | ----------------------- | ------------------------------------------------------------ | ------------------------------- |
+| cro-incorporation          | Directors, Secretary, PPSN/VIN, EEA director or S137 bond | CRO no., ARD            | `eea_director_present_or_s137_bond`, `director_identity_ok`  | ARD set                         |
+| rbo-initial-filing         | Beneficial owners                                         | RBO receipt             | `rbo_deadline_5_months`                                      | **5 months** post‑incorporation |
+| revenue-registrations-tr2  | Trading intent, employees, VAT thresholds                 | TR2 submitted           | `ct_registered`, conditional `paye_registered`, `vat_needed` | Asap after CRO                  |
+| ros-access-and-etax        | Tax reg active                                            | ROS cert, Tax Clearance | `business_tax_present`                                       | Before grant apps               |
+| donation-scheme-enablement | CHY active                                                | CHY3/CHY4 process live  | `chy_active`, `donation_forms_ready`                         | Ongoing                         |
+| vat-compensation-scheme    | Non‑public income %, VAT invoices                         | ROS claim               | `vat_comp_eligibility`, `claim_window_open`                  | **Jan–Jun** each year           |
+
+### 20.5 Appendices Mapping
+
+* **Funding & grants:** seed **Funding Radar** with Pobal, DRCD LEP, CSP, LEADER (LAGs), Rethink Ireland, sector bodies (Arts Council, Sport Ireland, local authorities).
+* **Compliance calendar:** pre‑seed ICS with ARD/B1, RBO, ROS payroll, Charities annual return, VAT Comp Jan–Jun, grant milestones.
+* **Templates:** CLG constitution (charity‑ready), board minutes (A1, bank), policy pack (Financial Controls, GDPR, Safeguarding), CHY3/CHY4.
 
 ---
 
-**End of Consolidated Requirements & Spec (Full Update, 2025‑10‑03)**
-*This is the single source of truth for engineering, agents, compliance, and UX.*
+## 21) KPIs (Operational)
+
+* **Time to CRO‑ready pack**: < **60 minutes** (novice baseline).
+* **RBO compliance**: % of new companies filing within **5 months**.
+* **Tax readiness**: % achieving **eTax Clearance** within **30 days** of incorporation.
+* **Charity enablement**: % eligible charities granted **CHY** within **90 days** of Regulator approval.
+* **Funding discovery**: matched opportunities per org; grant success rate uplift.
+* **Compliance hygiene**: reduction in overdue filings/tasks quarter‑over‑quarter.
