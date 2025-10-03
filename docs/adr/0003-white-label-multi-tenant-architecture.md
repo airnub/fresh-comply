@@ -1,4 +1,4 @@
-# ADR-0002: White-Label Multi-Tenant Architecture
+# ADR-0003: White-Label Multi-Tenant Architecture
 
 - **Status:** Accepted
 - **Date:** 2025-10-03

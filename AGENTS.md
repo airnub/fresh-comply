@@ -45,8 +45,8 @@ docs/adr/0001-temporal-orchestration.md
 ADR-0002: Stripe Billing Scaffold (White-Label Tenants)
 docs/adr/0002-billing-stripe.md
 
-ADR-0002: White-Label Multi-Tenant Architecture
-docs/adr/0002-white-label-multi-tenant-architecture.md
+ADR-0003: White-Label Multi-Tenant Architecture
+docs/adr/0003-white-label-multi-tenant-architecture.md
 
 Superseded / Archive
 
