@@ -94,7 +94,21 @@
     "evidenceDescription": "Review source links and refresh freshness checks as required.",
     "documentsHeading": "Documents",
     "downloadMarkdown": "Download {title}",
-    "downloadPdf": "Download accessible PDF"
+    "downloadPdf": "Download accessible PDF",
+    "orchestrationHeading": "Execution & orchestration",
+    "orchestrationDescription": "Launch Temporal workflows, send signals, or capture manual updates for each step.",
+    "orchestrationTemporalHint": "Temporal worker handles retries and polling.",
+    "orchestrationManualHint": "Manual execution tracked via calendar reminders and evidence uploads.",
+    "orchestrationStart": "Start",
+    "orchestrationRetry": "Retry",
+    "orchestrationSignal": "Send signal",
+    "orchestrationSignalSuccess": "Signal delivered to Temporal workflow.",
+    "orchestrationManualButton": "Mark done / upload proof",
+    "orchestrationManualComplete": "Marked complete — upload evidence via the panel above.",
+    "orchestrationReceiptPlaceholder": "Receipt URL (optional)",
+    "orchestrationReceiptLabel": "Receipt URL",
+    "orchestrationStartSuccess": "Workflow started (ID: {workflowId})",
+    "orchestrationUnknownError": "Unexpected orchestration error"
   },
   "board": {
     "title": "Task board",

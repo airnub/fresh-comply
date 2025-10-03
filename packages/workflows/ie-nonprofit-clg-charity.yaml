@@ -1,31 +1,69 @@
 id: setup-nonprofit-ie-charity
-version: 2025-10-02
+version: 2025-10-03
 steps:
-  - id: cro-incorporation
+  - id: cro-name-check
     kind: action
-    title: "Incorporate a CLG on CRO CORE"
+    title: "Check CRO name availability"
     title_i18n:
-      en-IE: "Incorporate a CLG on CRO CORE"
-      ga-IE: "Bunaigh CLG ar CRO CORE"
-    requires: [two_directors, secretary, ppsn_or_vin, eea_director_or_s137_bond]
-    verify:
-      - id: eea_director_present_or_s137_bond
-      - id: rbo_deadline_5_months
+      en-IE: "Check CRO name availability"
+      ga-IE: "Seiceáil infhaighteacht an ainm CRO"
+    execution:
+      mode: temporal
+      workflow: "croNameCheckWorkflow"
+  - id: cro-a1-pack
+    kind: doc.generate
+    title: "Build A1 board minute and pack"
+    title_i18n:
+      en-IE: "Build A1 board minute and pack"
+      ga-IE: "Cruthaigh miontuairiscí agus pacáiste A1"
+    requires: [cro-name-check]
+    execution:
+      mode: temporal
+      workflow: "a1PackBuildWorkflow"
+  - id: cro-a1-submit
+    kind: action
+    title: "Submit A1 via CORE (manual portal)"
+    title_i18n:
+      en-IE: "Submit A1 via CORE (manual portal)"
+      ga-IE: "Seol A1 trí CORE (lámhleabhar)"
+    requires: [cro-a1-pack]
+    execution:
+      mode: manual
+  - id: revenue-tr2
+    kind: action
+    title: "Submit TR2 via advisor bridge"
+    title_i18n:
+      en-IE: "Submit TR2 via advisor bridge"
+      ga-IE: "Seol TR2 trí droichead an chomhairleora"
+    requires: [cro-a1-submit]
+    execution:
+      mode: temporal
+      workflow: "tr2SubmissionWorkflow"
+  - id: revenue-etax-clearance
+    kind: action
+    title: "Check eTax clearance status"
+    title_i18n:
+      en-IE: "Check eTax clearance status"
+      ga-IE: "Seiceáil stádas glanta cánach"
+    requires: [revenue-tr2]
+    execution:
+      mode: temporal
+      workflow: "etaxClearanceWorkflow"
   - id: rbo
     kind: action
     title: "File beneficial ownership (RBO) within 5 months"
     title_i18n:
       en-IE: "File beneficial ownership (RBO) within 5 months"
       ga-IE: "Comhdáil úinéireacht tairbhiúil (RBO) laistigh de 5 mhí"
-  - id: revenue
-    kind: action
-    title: "Register with Revenue (TR2) & set up ROS"
-    title_i18n:
-      en-IE: "Register with Revenue (TR2) & set up ROS"
-      ga-IE: "Cláraigh le Revenue (TR2) agus cumraigh ROS"
+    requires: [revenue-etax-clearance]
+    execution:
+      mode: manual
   - id: charity
     kind: action
     title: "Apply to Charities Regulator; then CHY with Revenue"
     title_i18n:
       en-IE: "Apply to Charities Regulator; then CHY with Revenue"
       ga-IE: "Cuir isteach chuig an Rialálaí Carthanas; ansin CHY le Revenue"
+    requires: [rbo]
+    execution:
+      mode: manual

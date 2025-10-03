@@ -43,6 +43,8 @@ create table workflow_runs(
   subject_org_id uuid references organisations(id),
   engager_org_id uuid references organisations(id),
   status text check (status in ('draft','active','done','archived')) default 'active',
+  orchestration_provider text not null default 'none',
+  orchestration_workflow_id text,
   created_by_user_id uuid references users(id),
   created_at timestamptz default now()
 );
@@ -53,6 +55,8 @@ create table steps(
   key text not null,
   title text not null,
   status text check (status in ('todo','in_progress','waiting','blocked','done')) default 'todo',
+  orchestration_run_id text,
+  execution_mode text check (execution_mode in ('manual','temporal')) not null default 'manual',
   due_date date,
   assignee_user_id uuid references users(id)
 );

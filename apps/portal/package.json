@@ -13,6 +13,7 @@
     "@airnub/doc-templates": "workspace:*",
     "@airnub/engine": "workspace:*",
     "@airnub/freshness": "workspace:*",
+    "@airnub/orchestrator-temporal": "workspace:*",
     "@airnub/types": "workspace:*",
     "@airnub/ui": "workspace:*",
     "@airnub/utils": "workspace:*",

@@ -94,7 +94,21 @@
     "evidenceDescription": "Athbhreithnigh foinsí agus athnuaigh seiceálacha úire nuair is gá.",
     "documentsHeading": "Cáipéisí",
     "downloadMarkdown": "Íoslódáil {title}",
-    "downloadPdf": "Íoslódáil PDF inrochtana"
+    "downloadPdf": "Íoslódáil PDF inrochtana",
+    "orchestrationHeading": "Forghníomhú agus orcastraíocht",
+    "orchestrationDescription": "Seol sreafaí oibre Temporal, seol comharthaí, nó taifead nuashonruithe láimhe do gach céim.",
+    "orchestrationTemporalHint": "Láimhseálann an t-oibrí Temporal athiarrachtaí agus póiliniú.",
+    "orchestrationManualHint": "Rianaítear forghníomhú láimhe trí mheabhrúcháin féilire agus uaslódálacha fianaise.",
+    "orchestrationStart": "Tosaigh",
+    "orchestrationRetry": "Athsheol",
+    "orchestrationSignal": "Seol comhartha",
+    "orchestrationSignalSuccess": "Seoladh an comhartha chuig Temporal.",
+    "orchestrationManualButton": "Marcáil críochnaithe / uaslódáil cruthúnas",
+    "orchestrationManualComplete": "Marcáilte críochnaithe — uaslódáil fianaise tríd an bpainéal thuas.",
+    "orchestrationReceiptPlaceholder": "URL admhála (roghnach)",
+    "orchestrationReceiptLabel": "URL admhála",
+    "orchestrationStartSuccess": "Tosaíodh an sreabhadh oibre (ID: {workflowId})",
+    "orchestrationUnknownError": "Earráid orcastraíochta gan choinne"
   },
   "board": {
     "title": "Bord tascanna",

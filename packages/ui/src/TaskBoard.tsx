@@ -7,6 +7,8 @@ export type Task = {
   status: "todo" | "in_progress" | "waiting" | "blocked" | "done";
   assignee?: string;
   dueDate?: string;
+  executionMode?: "manual" | "temporal";
+  orchestrationStatus?: string;
 };
 
 const STATUSES: Task["status"][] = ["todo", "in_progress", "waiting", "blocked", "done"];
@@ -58,11 +60,26 @@ export function TaskBoard({ tasks, statusLabels, formatDueDate }: TaskBoardProps
                           <Text as="p" weight="medium" size="2">
                             {task.title}
                           </Text>
-                          {task.assignee && (
-                            <Text as="span" size="2" color="gray">
-                              {task.assignee}
-                            </Text>
-                          )}
+                          <Flex gap="2" wrap="wrap">
+                            {task.assignee && (
+                              <Text as="span" size="2" color="gray">
+                                {task.assignee}
+                              </Text>
+                            )}
+                            {task.executionMode && (
+                              <Badge
+                                color={task.executionMode === "temporal" ? "blue" : "gray"}
+                                radius="full"
+                                variant="soft"
+                              >
+                                {task.executionMode === "temporal"
+                                  ? task.orchestrationStatus
+                                    ? `Temporal · ${task.orchestrationStatus.replace(/_/g, " ")}`
+                                    : "Temporal"
+                                  : "Manual"}
+                              </Badge>
+                            )}
+                          </Flex>
                           {task.dueDate && (
                             <Text as="span" size="1" color="gray">
                               {formatDueDate

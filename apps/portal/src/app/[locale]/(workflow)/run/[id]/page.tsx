@@ -5,6 +5,7 @@ import { Card, Flex, Grid, Heading, Link as ThemeLink, Text } from "@radix-ui/th
 import { getDemoRun } from "../../../../../lib/demo-data";
 import { EvidencePanel } from "../../../../../components/evidence-panel";
 import { AuditLog } from "../../../../../components/audit-log";
+import { StepOrchestrationPanel } from "../../../../../components/step-orchestration-panel";
 
 export default async function WorkflowRunPage({
   params
@@ -43,9 +44,30 @@ export default async function WorkflowRunPage({
                 title: step.title,
                 status: step.status,
                 dueDate: step.dueDate,
-                assignee: step.assignee
+                assignee: step.assignee,
+                executionMode: step.execution?.mode,
+                orchestrationStatus: step.orchestration?.status,
+                orchestrationResult: step.orchestration?.resultSummary
               }))}
             />
+          </Flex>
+        </section>
+      </Card>
+
+      <Card asChild variant="surface" size="3">
+        <section aria-labelledby="workflow-orchestration-heading">
+          <Flex direction="column" gap="3">
+            <Heading id="workflow-orchestration-heading" size="5">
+              {tWorkflow("orchestrationHeading")}
+            </Heading>
+            <Text size="2" color="gray">
+              {tWorkflow("orchestrationDescription")}
+            </Text>
+            <Flex direction="column" gap="4">
+              {run.timeline.map((step) => (
+                <StepOrchestrationPanel key={step.id} step={step} runId={run.id} orgId={run.client} />
+              ))}
+            </Flex>
           </Flex>
         </section>
       </Card>
