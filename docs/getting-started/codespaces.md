@@ -32,6 +32,7 @@ Our `.devcontainer` folder defines the GitHub Codespaces image for FreshComply. 
    cp apps/admin/.env.example apps/admin/.env.local 2>/dev/null || true
    ```
    Only populate the secrets you need; Supabase keys will be synced automatically.
+   If you plan to run the Temporal worker inside Codespaces, add `TEMPORAL_TENANT_QUEUE_ALLOW_LIST` to `.env.local` with the comma-separated tenant IDs whose queues you want to process (for example, `tenant-acme-main,tenant-umbrella-main`).
 3. Start the Supabase stack (the devcontainer keeps `AUTO_START_SUPABASE=false` so you control when Docker spins up):
    ```bash
    supabase start
