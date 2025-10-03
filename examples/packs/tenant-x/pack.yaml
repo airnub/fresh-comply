@@ -1,0 +1,11 @@
+name: Tenant X Compliance Pack
+version: 1.2.0
+compatibleWithWorkflow:
+  - setup-nonprofit-ie-charity@^2025.10
+scopes:
+  - tenant:tenant-x
+overlays:
+  - workflow: setup-nonprofit-ie-charity
+    patch: overlay.patch.json
+i18n:
+  en-IE: ./messages/en-IE.json

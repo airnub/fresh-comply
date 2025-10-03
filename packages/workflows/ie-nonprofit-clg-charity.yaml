@@ -1,4 +1,5 @@
 id: setup-nonprofit-ie-charity
+title: "Irish Charity CLG Setup"
 version: 2025-10-03
 steps:
   - id: cro-name-check
@@ -7,9 +8,11 @@ steps:
     title_i18n:
       en-IE: "Check CRO name availability"
       ga-IE: "Seiceáil infhaighteacht an ainm CRO"
+    required: true
     execution:
       mode: temporal
       workflow: "croNameCheckWorkflow"
+      taskQueue: "core-default"
   - id: cro-a1-pack
     kind: doc.generate
     title: "Build A1 board minute and pack"
@@ -17,9 +20,11 @@ steps:
       en-IE: "Build A1 board minute and pack"
       ga-IE: "Cruthaigh miontuairiscí agus pacáiste A1"
     requires: [cro-name-check]
+    required: true
     execution:
       mode: temporal
       workflow: "a1PackBuildWorkflow"
+      taskQueue: "core-default"
   - id: cro-a1-submit
     kind: action
     title: "Submit A1 via CORE (manual portal)"
@@ -27,6 +32,7 @@ steps:
       en-IE: "Submit A1 via CORE (manual portal)"
       ga-IE: "Seol A1 trí CORE (lámhleabhar)"
     requires: [cro-a1-pack]
+    required: true
     execution:
       mode: manual
   - id: revenue-tr2
@@ -36,9 +42,11 @@ steps:
       en-IE: "Submit TR2 via advisor bridge"
       ga-IE: "Seol TR2 trí droichead an chomhairleora"
     requires: [cro-a1-submit]
+    required: true
     execution:
       mode: temporal
       workflow: "tr2SubmissionWorkflow"
+      taskQueue: "core-default"
   - id: revenue-etax-clearance
     kind: action
     title: "Check eTax clearance status"
@@ -49,6 +57,7 @@ steps:
     execution:
       mode: temporal
       workflow: "etaxClearanceWorkflow"
+      taskQueue: "core-default"
   - id: rbo
     kind: action
     title: "File beneficial ownership (RBO) within 5 months"
@@ -65,5 +74,6 @@ steps:
       en-IE: "Apply to Charities Regulator; then CHY with Revenue"
       ga-IE: "Cuir isteach chuig an Rialálaí Carthanas; ansin CHY le Revenue"
     requires: [rbo]
+    required: true
     execution:
       mode: manual

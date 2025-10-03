@@ -1,0 +1,18 @@
+{
+  "name": "@airnub/workflow-packs",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "fc-pack": "bin/fc-pack.mjs"
+  },
+  "files": ["src", "bin"],
+  "dependencies": {
+    "@airnub/workflow-core": "workspace:*",
+    "ajv": "^8.17.1",
+    "fast-json-patch": "^3.1.1",
+    "yaml": "^2.8.1",
+    "tsx": "^4.19.2"
+  }
+}
