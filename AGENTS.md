@@ -34,6 +34,9 @@ docs/specs/admin-app-spec.md
 Workflow-Agnostic Extension Model — Tenant Overlays (v2025-10-03)
 docs/specs/extensions-tenant-overlays.md
 
+White-Label Architecture (v2025-10-03)
+docs/specs/fresh_comply_white_label_multi_tenant_architecture_v_2025_10_03.md
+
 Secure Bidirectional Integration Architecture for Custom Steps (v2025-10-03)
 docs/specs/integration-architecture-bidirectional.md
 
@@ -41,6 +44,9 @@ ADR-0001: Temporal Orchestration (Custom UI, targeted use)
 docs/adr/0001-temporal-orchestration.md
 ADR-0002: Stripe Billing Scaffold (White-Label Tenants)
 docs/adr/0002-billing-stripe.md
+
+ADR-0002: White-Label Multi-Tenant Architecture
+docs/adr/0002-white-label-multi-tenant-architecture.md
 
 Superseded / Archive
 
