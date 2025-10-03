@@ -1,5 +1,7 @@
 import type { Connection } from "@temporalio/client";
 import type { SearchAttributes } from "@temporalio/common";
+import type { ServiceError } from "@grpc/grpc-js";
+import { status as grpcStatus } from "@grpc/grpc-js";
 import * as proto from "@temporalio/proto";
 
 export const SEARCH_ATTRIBUTES = {
@@ -31,15 +33,35 @@ export function buildSearchAttributes(values: SearchAttributeValues): SearchAttr
   return attrs;
 }
 
-export async function ensureSearchAttributes(connection: Connection, namespace: string) {
-  const keywordType =
-    proto.temporal.api.enums.v1.IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD;
+export async function ensureSearchAttributes(
+  connection: Connection,
+  namespace: string,
+  keywordType: number =
+    proto.temporal.api.enums.v1.IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD
+) {
   const searchAttributes = Object.fromEntries(
     Object.values(SEARCH_ATTRIBUTES).map((name) => [name, keywordType])
   );
 
-  await connection.operatorService.addSearchAttributes({
-    namespace,
-    searchAttributes
-  });
+  try {
+    await connection.operatorService.addSearchAttributes({
+      namespace,
+      searchAttributes
+    });
+  } catch (error) {
+    if (isAlreadyExistsError(error)) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function isAlreadyExistsError(error: unknown): error is ServiceError {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const serviceError = error as Partial<ServiceError>;
+
+  return serviceError.code === grpcStatus.ALREADY_EXISTS;
 }
