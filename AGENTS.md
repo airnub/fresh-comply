@@ -1,41 +1,57 @@
 # AGENTS — @airnub/fresh-comply
 
-**Purpose:** Orchestrate coding agents to keep this repo production-quality while generating workflows, connectors, and documents safely.
+**Purpose:** Orchestrate coding agents to keep this repo production-quality while generating workflows, connectors, documents, and admin tooling safely.
 
 ## Agents
-
-* **Repo Architect** — owns monorepo structure, Turbo/pnpm, CI, DX.
-* **Workflow Engineer** — authors DSL, engine logic, branching.
-* **Freshness Steward** — maintains sources registry, watchers, and rule versions.
-* **Connector Builder** — implements CRO/CKAN/Revenue/RBO/Funding adapters.
-* **Docs/Policy Writer** — maintains templates and specs.
-* **Compliance Doc Steward** — curates `docs/LEGAL/*`, ensures GDPR/i18n/a11y spec fidelity, and coordinates audits.
+- **Repo Architect** — monorepo/Turbo/pnpm, CI, DX.
+- **Workflow Engineer** — DSL, engine logic, branching, overlays.
+- **Freshness Steward** — sources registry, watchers, rule/version publishing.
+- **Connector Builder** — CRO/CKAN/Revenue/RBO/Funding adapters.
+- **Docs/Policy Writer** — templates and specs.
+- **Compliance Doc Steward** — `docs/LEGAL/*`, GDPR/i18n/a11y, audits.
 
 ## Tools & Conventions
-
-* Language: TypeScript (Node 20+), Next.js 15, pnpm + Turborepo.
-* Store workflows under `packages/workflows/`. Engine under `packages/engine/`.
-* Every legal assertion must have a **source link**; use `packages/freshness`.
-* Supabase RLS for multi-tenant security.
+- TypeScript, Next.js 15, pnpm + Turborepo.
+- Workflows under `packages/workflows/`; engine under `packages/engine/`.
+- Every legal assertion must have a **source link**; use `packages/freshness`.
+- Supabase RLS for multi-tenant security.
 
 ## Runbook
-
 ```bash
 pnpm i
-pnpm dev      # start portal
+pnpm dev       # start portal
 pnpm build
+
+Documentation (Source of Truth)
+Current (Canonical)
+
+Consolidated Product Spec (v2025-10-03)
+docs/specs/fresh-comply-spec.md
+
+Admin App Spec (v2025-10-03)
+docs/specs/admin-app-spec.md
+
+Workflow-Agnostic Extension Model — Tenant Overlays (v2025-10-03)
+docs/specs/extensions-tenant-overlays.md
+
+Secure Bidirectional Integration Architecture for Custom Steps (v2025-10-03)
+docs/specs/integration-architecture-bidirectional.md
+
+ADR-0001: Temporal Orchestration (Custom UI, targeted use)
+docs/adr/0001-temporal-orchestration.md
+
+Superseded / Archive
+
+Live Workflow — Irish Non-Profit Setup (Product Spec) (v2025-10-02) — superseded by Consolidated Product Spec
+docs/archive/2025-10-02-live-workflow-nonprofit-ie.md
+
+See the full docs index at docs/README.md.
 ```
 
-### Temporal Orchestration (dev)
+## Change Policy for Agents
 
-```bash
-pnpm run dev:stack   # start Temporal + Postgres + optional UI (ops only)
-pnpm run dev:worker  # launch Temporal worker bundle
-pnpm dev             # start portal
-```
+Propose edits in the relevant spec first (PR with rationale).
 
-> Temporal Web UI runs on http://localhost:8080 and is restricted to operations staff; do not surface links in customer-facing flows.
+If a spec materially replaces another, move the old one to docs/archive/ and update links here.
 
-## Specs
-
-See **[Fresh-Comply Product Spec](docs/specs/fresh-comply-spec.md)** and **[Admin Back Office Spec](docs/specs/admin-app-spec.md)** for architecture, data model, DSL, i18n/theme/a11y/GDPR plans, and roadmap. Legal templates live in **[`docs/LEGAL/`](docs/LEGAL/)**.
+Code changes must point to the current canonical docs above.

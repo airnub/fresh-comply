@@ -1,4 +1,4 @@
-# FreshComply — Consolidated Requirements & Spec
+# FreshComply — Consolidated Requirements & Spec (v2025-10-03 • Full Update)
 
 **Repo:** `@airnub/fresh-comply`
 **Version:** 2025‑10‑03

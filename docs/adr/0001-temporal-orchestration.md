@@ -1,4 +1,4 @@
-# ADR 0001 — Temporal Orchestration
+# ADR-0001: Temporal Orchestration (Custom UI, targeted use)
 
 - **Status:** Accepted
 - **Date:** 2025-10-03
