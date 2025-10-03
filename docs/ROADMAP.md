@@ -9,6 +9,7 @@
 ## Milestone 2 (Weeks 4–7)
 - Freshness Engine v1: sources registry, manual re-verify, CKAN watcher
 - Connectors: CRO Open Services (read), Charities CKAN, Funding Radar v1
+- CRO company import & sync: search CRO by name/number, ingest latest profile + ARD
 - Document factory (minutes, TR2 helper, policy stubs)
 
 ## Milestone 3 (Weeks 8–11)
