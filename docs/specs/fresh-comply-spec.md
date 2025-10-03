@@ -43,7 +43,7 @@
 * **Auth:** **Supabase Auth** with `@supabase/ssr` for SSR/session hydration; RLS‑backed multi‑tenant access; optional OAuth later.
 * **Backend:** **Supabase Postgres** (+ RLS), **Supabase Storage** (docs), **Redis** (jobs/queues).
 * **LLM:** OpenAI Responses API + tool calls (connectors, doc generation, rule checks).
-* **Connectors:** CRO Open Services (read), data.gov.ie (Charities Register CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
+* **Connectors:** CRO Open Services (read — company search by name/number, import latest profile + next ARD with continuous sync), data.gov.ie (Charities Register CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
 * **Temporal Orchestration:** Temporal workers drive short-lived, retryable actions (connect/submit/poll) with Signals/Queries for human checkpoints; long compliance windows remain in the calendar engine. Tenant task queues are resolved from workflow execution metadata (see `execution.taskQueue`).
 * **Step Type Registry:** Global, versioned catalog of reusable step types (manual, temporal, external:webhook, external:websocket) with schema-backed definitions, vetted in the Admin app, and installed per-tenant with secure secret aliases resolved from vault providers.
 * **Freshness & Compliance Engine:** Source registry, watchers, moderation queue, versioned rules, **Re‑verify** endpoint.
@@ -138,6 +138,7 @@ These are integrated as:
 9. **Theme** toggle (Light/Dark/High‑Contrast) SSR‑safe; reduced‑motion respect.
 10. **A11y** WCAG 2.2 AA baseline (see §9).
 11. **GDPR kit** & DSR endpoints (see §11).
+12. **CRO company import** lets users search the CRO by name or company number, import the entity with latest registry data, and keeps the profile plus next annual return date synced for deadlines/notifications.
 
 ---
 
@@ -182,6 +183,7 @@ These are integrated as:
 * **Sticky banners** for run‑level warnings (e.g., “RBO deadline approaching”).
 * **Inbox panel** (per user) listing due/overdue tasks with quick‑assign.
 * **Digests:** morning summary (today + next 7 days).
+* **Driver dates:** next annual return date synced from CRO drives annual return deadline reminders and escalations.
 * **Escalations:** overdue → ping assignee + org admin; configurable SLA per workflow version.
 * **Copy style:** concise, action‑first; include subject org; link to task; no PII beyond necessity.
 * **A11y:** toasts announce via polite live region; actionable via keyboard; color not sole carrier of meaning.
@@ -226,7 +228,7 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 ## 14) Freshness & Compliance Engine (detailed)
 
 * **Source Registry:** canonical URLs/APIs (CRO Open Services; Revenue/ROS pages; Charities CKAN; Pobal/LCDC/LAG).
-* **Watchers:** cron jobs fetch → diff; on change produce **Impact Map** (rules/steps/templates affected); human review; publish **workflow_def.version+1**.
+* **Watchers:** cron jobs fetch → diff (including CRO company profiles + next ARD); on change produce **Impact Map** (rules/steps/templates affected); human review; publish **workflow_def.version+1**.
 * **UI:** Every rule shows **Verified on {date}** + **Re‑verify** button.
 * **Audit:** store verification events with source snapshot hashes.
 
@@ -234,7 +236,7 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 
 ## 15) Connectors (MVP reality)
 
-* **CRO Open Services (read)** — name/status lookup; incorporate into step helpers.
+* **CRO Open Services (read)** — full-text company search (name/number), import profile snapshot (officers, status, address) and next annual return date; background sync keeps FreshComply entities current.
 * **RBO** — guided filing, deadline calc, evidence capture.
 * **Charities Register (CKAN)** — ingest dataset; enrich charity steps; peer discovery.
 * **Revenue/ROS** — cert‑based where feasible; else guided TR2 & eTax Clearance.
