@@ -45,6 +45,7 @@
 * **LLM:** OpenAI Responses API + tool calls (connectors, doc generation, rule checks).
 * **Connectors:** CRO Open Services (read), data.gov.ie (Charities Register CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
 * **Temporal Orchestration:** Temporal workers drive short-lived, retryable actions (connect/submit/poll) with Signals/Queries for human checkpoints; long compliance windows remain in the calendar engine. Tenant task queues are resolved from workflow execution metadata (see `execution.taskQueue`).
+* **Step Type Registry:** Global, versioned catalog of reusable step types (manual, temporal, external:webhook, external:websocket) with schema-backed definitions, vetted in the Admin app, and installed per-tenant with secure secret aliases resolved from vault providers.
 * **Freshness & Compliance Engine:** Source registry, watchers, moderation queue, versioned rules, **Re‑verify** endpoint.
 * **Document Factory:** Handlebars/MDX → Markdown/PDF with signature blocks + checksums.
 * **Notifications:** In‑app realtime + Email; digests & escalations; uniform UX (see §10).
@@ -68,7 +69,7 @@
 * **Rules:** Versioned objects with logic, sources[], `last_verified_at`.
 * **Runtime:** Materialise steps, enforce `requires`, emit Assignments, schedule CalendarEvents, render Evidence badges.
 
-* **Execution modes:** Each step declares `execution.mode` (`manual` | `temporal` | `external`) and optional workflow metadata; manual steps rely on the calendar/notification layer for long waits, Temporal orchestrates short-lived actions with Signals/Queries for human checkpoints, and `external` steps call tenant-hosted automations through signed webhooks.
+* **Execution modes:** Each step declares `execution.mode` (`manual` | `temporal` | `external:webhook` | `external:websocket`) with mode-specific config. Manual steps render portal forms from JSON Schema; Temporal steps launch orchestrator workflows/task queues; `external:webhook` invokes tenant endpoints via vault-resolved aliases and signed headers; `external:websocket` streams via Temporal-managed workers listening on tenant websockets.
 
 **Example (abridged):**
 
@@ -95,6 +96,16 @@ steps:
       mode: manual
 ```
 Default: CRO/ROS submissions, bridge polls, and TR2 helpers run in `temporal` mode where APIs exist; long compliance waits (RBO 5 months, VAT windows, ARD+B1) stay `manual` with calendar reminders.
+
+
+### 4.1 Step Types & Tenant Overlays (authoritative)
+
+* **Registry:** `step_types` store immutable slugs (e.g., `external-webhook-basic`) with `latest_version`; `step_type_versions` persist semver-tagged definitions validated against `packages/workflow-core/src/step-type.schema.json`.
+* **Definition Schema:** Each version declares name/description/i18n, execution union (`manual`, `temporal`, `external:webhook`, `external:websocket`), input/output schema refs, permissions, and policy (required, lawful basis, retention). Execution metadata aligns with runtime handlers (Temporal workflow name, webhook method + aliases, websocket message schema and Temporal wrapper).
+* **Tenant Enablement:** `tenant_step_type_installs` pins a tenant to a specific version (or tracks `latest` server-side). Portal overlay builder only lists enabled types.
+* **Secret Aliases:** `tenant_secret_bindings` map `secrets.*` aliases to vault providers (`hashicorp`, `aws-sm`, `env`, `supabase-kv`). Overlays store aliases only; runtime resolves actual credentials server-side.
+* **Overlay Composition:** Tenant overlays remain JSON Patch. Step instances reference types via `stepType: "slug@version"`, supply non-secret inputs per schema, and push mode-specific overrides under `execution.config` (e.g., webhook headers, Temporal taskQueue override). Base workflows may continue to embed direct execution metadata for core steps.
+* **Validation:** Admin + CLI use Ajv to validate workflow definitions and step types; overlay publish runs policy lints (required steps intact, no inline secrets) before persisting. Runtime merges base + overlays, records merged snapshot, and executes steps according to resolved type/version.
 
 
 ---
@@ -206,9 +217,9 @@ These are integrated as:
 
 ## 13) Data Model (summary)
 
-Tables: organisations, users, memberships, engagements, workflow_defs, workflow_runs, steps, documents, rules, verifications, notifications, audit_log, calendar_events. (See scaffolding SQL; generated via Drizzle/Kysely later.)
+Tables: organisations, users, memberships, engagements, workflow_defs, workflow_runs, steps, documents, rules, verifications, notifications, audit_log, calendar_events, **step_types**, **step_type_versions**, **tenant_step_type_installs**, **tenant_secret_bindings**, **json_schemas**. (See scaffolding SQL; generated via Drizzle/Kysely later.)
 
-`workflow_runs` store `orchestration_provider` (default `none`) and `orchestration_workflow_id`; `steps` track `execution_mode` (`manual`|`temporal`) plus optional `orchestration_run_id` for Temporal linkage.
+`workflow_runs` store `orchestration_provider` (default `none`) and `orchestration_workflow_id`; `steps` track `execution_mode` (`manual` | `temporal` | `external:webhook` | `external:websocket`), optional `step_type_id`, `step_type_version`, and `orchestration_run_id` for Temporal linkage.
 
 ---
 
@@ -235,6 +246,7 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 
 * **Type & lint:** strict TS; `eslint-plugin-jsx-a11y`.
 * **Temporal workers:** unit tests for activity idempotency, workflow determinism, and a smoke workflow executed in CI.
+* **Step Types:** Ajv-based validation for step type definitions and overlay merges (required steps, secret alias enforcement, webhook/websocket executor harness).
 * **i18n:** unit tests for negotiation & fallbacks; snapshot major screens per locale.
 * **A11y:** Pa11y + axe on home, run, board; keyboard e2e.
 * **Contrast:** token checker script for WCAG AA thresholds.
@@ -396,3 +408,12 @@ setup-nonprofit-ie-charity (or -noncharity)
 * **Charity enablement**: % eligible charities granted **CHY** within **90 days** of Regulator approval.
 * **Funding discovery**: matched opportunities per org; grant success rate uplift.
 * **Compliance hygiene**: reduction in overdue filings/tasks quarter‑over‑quarter.
+
+---
+
+## 22) Tooling & CLI (engineering contract)
+
+* **fc step-type validate <file>** — Validate a step type definition against `packages/workflow-core/src/step-type.schema.json`; prints Ajv errors with instance paths.
+* **fc step-type publish** — Publish/update `step_types` and `step_type_versions` via authenticated API; enforces semver, changelog note, and audit logging hooks.
+* **fc overlay dev** — Launch local overlay builder with sample workflow, enabling impact map preview, policy lint results, and JSON Patch export without touching production data.
+* CI wiring ensures CLI commands run in smoke tests for marketplace packs and internal registries before merging to main.
