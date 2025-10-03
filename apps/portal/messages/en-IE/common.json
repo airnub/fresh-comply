@@ -125,6 +125,7 @@
     "submitting": "Sending…",
     "success": "Check your inbox for a sign-in link. The link expires in 5 minutes.",
     "redirect": "After sign-in you'll be sent to {destination}.",
-    "error": "We couldn't send the link. Please try again."
+    "error": "We couldn't send the link. Please try again.",
+    "supabaseUnavailable": "Supabase configuration is missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable sign-in."
   }
 }

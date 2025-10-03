@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Box, Button, Callout, Flex, Text } from "@radix-ui/themes";
 import { getSupabaseBrowserClient } from "../lib/supabase/browser-client";
@@ -13,13 +13,30 @@ type SignInFormProps = {
 type RequestStatus = "idle" | "loading" | "success";
 
 export function SignInForm({ redirectTo, destinationLabel }: SignInFormProps) {
-  const [status, setStatus] = useState<RequestStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const t = useTranslations("auth");
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const [{ client: supabase, error: supabaseError }] = useState(() => {
+    try {
+      return { client: getSupabaseBrowserClient(), error: null as Error | null };
+    } catch (error) {
+      console.error("Supabase browser client unavailable", error);
+      return { client: null, error: error instanceof Error ? error : new Error("Supabase unavailable") };
+    }
+  });
+  const [status, setStatus] = useState<RequestStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(() =>
+    supabaseError ? t("supabaseUnavailable") : null
+  );
+  const isSubmitting = status === "loading";
+  const isSuccess = status === "success";
+  const isDisabled = !supabase || isSubmitting || isSuccess;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!supabase) {
+      setErrorMessage(t("supabaseUnavailable"));
+      return;
+    }
+
     setErrorMessage(null);
     setStatus("loading");
 
@@ -75,6 +92,7 @@ export function SignInForm({ redirectTo, destinationLabel }: SignInFormProps) {
                     required
                     aria-invalid={errorMessage ? "true" : "false"}
                     aria-describedby={errorMessage ? "sign-in-error" : undefined}
+                    disabled={isDisabled}
                     style={{
                       width: "100%",
                       padding: "var(--space-3)",
@@ -105,8 +123,8 @@ export function SignInForm({ redirectTo, destinationLabel }: SignInFormProps) {
               </Callout.Root>
             ) : null}
           </Flex>
-          <Button type="submit" size="3" disabled={status === "loading" || status === "success"}>
-            {status === "loading" ? t("submitting") : t("submit")}
+          <Button type="submit" size="3" disabled={isDisabled}>
+            {isSubmitting ? t("submitting") : t("submit")}
           </Button>
         </Flex>
       </form>
