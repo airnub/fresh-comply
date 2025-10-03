@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuleVerificationEvidence } from "@airnub/engine/types";
 import type { Database, Json } from "@airnub/types/supabase";
 import type { SourceKey, SourceRecord } from "./watcher.js";
 import { buildFingerprint, fetchSourceRecords } from "./watcher.js";
@@ -9,6 +10,8 @@ export type RuleEvidence = {
   recordCount: number;
   sample: SourceRecord[];
   fingerprint: string;
+  expectedFingerprint?: string;
+  matches?: boolean;
 };
 
 export type RuleStatus = "verified" | "stale";
@@ -24,9 +27,14 @@ export type Rule = {
 
 export type VerifyRuleOptions = {
   supabase?: SupabaseClient<Database>;
+  verification?: RuleVerificationEvidence;
 };
 
 export async function verifyRule(rule: Rule, options: VerifyRuleOptions = {}): Promise<Rule> {
+  if (options.verification) {
+    return await applyVerification(rule, options.verification, options.supabase);
+  }
+
   const now = new Date().toISOString();
   const evidence = await Promise.all(
     rule.sources.map(async (sourceKey) => {
@@ -37,7 +45,9 @@ export async function verifyRule(rule: Rule, options: VerifyRuleOptions = {}): P
         fetchedAt: now,
         recordCount: records.length,
         sample: records.slice(0, 5),
-        fingerprint
+        fingerprint,
+        expectedFingerprint: fingerprint,
+        matches: true
       } satisfies RuleEvidence;
     })
   );
@@ -50,6 +60,34 @@ export async function verifyRule(rule: Rule, options: VerifyRuleOptions = {}): P
     ...rule,
     lastVerifiedAt: now,
     status: "verified",
+    evidence
+  } satisfies Rule;
+}
+
+async function applyVerification(
+  rule: Rule,
+  verification: RuleVerificationEvidence,
+  client?: SupabaseClient<Database>
+): Promise<Rule> {
+  const evidence = verification.sources.map((source) => ({
+    sourceKey: source.sourceKey as SourceKey,
+    fetchedAt: source.fetchedAt,
+    recordCount: source.recordCount,
+    sample: source.sample,
+    fingerprint: source.observedFingerprint,
+    expectedFingerprint: source.expectedFingerprint,
+    matches: source.matches
+  } satisfies RuleEvidence));
+
+  if (client) {
+    await persistVerification(client, rule.id, evidence, verification.verifiedAt);
+  }
+
+  return {
+    ...rule,
+    sources: evidence.map((item) => item.sourceKey),
+    lastVerifiedAt: verification.verifiedAt,
+    status: verification.status,
     evidence
   } satisfies Rule;
 }
