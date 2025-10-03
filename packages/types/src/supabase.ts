@@ -1827,7 +1827,7 @@ export type Database = {
         Args: {
           p_domain_id: string;
         };
-        Returns: boolean;
+        Returns: Json;
       };
       rpc_get_tenant_branding: {
         Args: {
@@ -1892,7 +1892,7 @@ export type Database = {
           p_cert_status: string;
           p_verified_at?: string;
         };
-        Returns: Database["public"]["Tables"]["tenant_domains"]["Row"] | null;
+        Returns: Json;
       };
       rpc_upsert_tenant_branding: {
         Args: {
@@ -1904,7 +1904,7 @@ export type Database = {
           p_pdf_header: Json;
           p_pdf_footer: Json;
         };
-        Returns: Database["public"]["Tables"]["tenant_branding"]["Row"];
+        Returns: Json;
       };
       rpc_upsert_tenant_domain: {
         Args: {
@@ -1912,7 +1912,7 @@ export type Database = {
           p_domain: string;
           p_is_primary?: boolean;
         };
-        Returns: Database["public"]["Tables"]["tenant_domains"]["Row"];
+        Returns: Json;
       };
     };
     Enums: {
