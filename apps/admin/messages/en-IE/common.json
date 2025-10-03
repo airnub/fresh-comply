@@ -151,28 +151,85 @@
   },
   "dsr": {
     "heading": "DSR console",
-    "subheading": "Track privacy requests and SLA timers.",
+    "subheading": "Track acknowledgements, assignments, and 30-day due dates.",
+    "filters": {
+      "status": "Status",
+      "type": "Type",
+      "search": "Search",
+      "searchPlaceholder": "Reference ID or requester email",
+      "apply": "Apply",
+      "reset": "Reset",
+      "any": "Any"
+    },
     "columns": {
-      "subject": "Data subject",
+      "reference": "Reference",
+      "type": "Type",
+      "status": "Status",
       "received": "Received",
-      "status": "Status"
+      "acknowledged": "Acknowledged",
+      "due": "Due",
+      "requester": "Requester",
+      "assignee": "Assignment"
     },
-    "tableCaption": "Open requests",
-    "empty": "No DSRs awaiting action.",
-    "ackTitle": "Acknowledge request",
-    "ackDescription": "Explain how the request was acknowledged.",
-    "exportTitle": "Export data",
-    "exportDescription": "Describe the exported bundle.",
-    "eraseTitle": "Erase data",
-    "eraseDescription": "Capture erasure rationale before proceeding.",
-    "actions": {
-      "acknowledge": "Acknowledge",
+    "types": {
+      "access": "Access",
       "export": "Export",
-      "erase": "Erase"
+      "rectification": "Rectification",
+      "erasure": "Erasure",
+      "restriction": "Restriction",
+      "objection": "Objection",
+      "portability": "Portability"
     },
-    "reason": {
+    "status": {
+      "received": "Received",
+      "acknowledged": "Acknowledged",
+      "in_progress": "In progress",
+      "paused": "Paused",
+      "completed": "Completed",
+      "escalated": "Escalated"
+    },
+    "actions": {
+      "reassign": "Reassign",
+      "complete": "Mark complete",
+      "pause": "Pause",
+      "resume": "Resume"
+    },
+    "dialogs": {
+      "reassign": {
+        "title": "Reassign request",
+        "description": "Send the request to another handler for follow-up.",
+        "emailLabel": "Assignee email",
+        "reasonLabel": "Reason",
+        "submit": "Confirm reassignment"
+      },
+      "complete": {
+        "title": "Mark request complete",
+        "description": "Document the fulfilment for audit purposes."
+      },
+      "pause": {
+        "title": "Pause processing",
+        "description": "Explain why processing is paused (e.g., awaiting ID verification)."
+      },
+      "resume": {
+        "title": "Resume processing",
+        "description": "Confirm why the request is ready to resume."
+      },
+      "cancel": "Cancel",
       "submitting": "Submitting\u2026"
-    }
+    },
+    "assignee": "Assigned to {email}",
+    "assigneeUnassigned": "No assignee",
+    "messages": {
+      "updated": "Request updated",
+      "error": "Unable to update request.",
+      "invalidEmail": "Enter a valid assignee email.",
+      "notMember": "Assignee must belong to this organisation.",
+      "notFound": "Request could not be found.",
+      "alreadyCompleted": "Completed requests cannot be paused.",
+      "supabaseUnavailable": "Supabase configuration is missing for this environment."
+    },
+    "tableCaption": "Current data subject requests",
+    "empty": "No DSRs match the current filters."
   },
   "cases": {
     "heading": "Support cases",

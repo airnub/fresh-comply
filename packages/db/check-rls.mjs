@@ -15,7 +15,9 @@ const tablesWithRls = [
   "workflow_runs",
   "steps",
   "documents",
-  "audit_log"
+  "audit_log",
+  "dsr_requests",
+  "dsr_request_jobs"
 ];
 
 const missingRls = tablesWithRls.filter((table) => {
@@ -44,7 +46,9 @@ const requiredPolicies = {
   workflow_runs: ["Members access workflow runs", "Service role manages workflow runs"],
   steps: ["Members read steps", "Service role manages steps"],
   documents: ["Members read documents", "Service role manages documents"],
-  audit_log: ["Members read audit log", "Service role manages audit log"]
+  audit_log: ["Members read audit log", "Service role manages audit log"],
+  dsr_requests: ["Members view DSR requests", "Members manage DSR requests"],
+  dsr_request_jobs: ["Service role manages DSR jobs"]
 };
 
 const missingPolicies = Object.entries(requiredPolicies).flatMap(([table, policies]) =>

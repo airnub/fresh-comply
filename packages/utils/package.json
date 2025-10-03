@@ -6,7 +6,9 @@
   "main": "src/index.ts",
   "exports": {
     "./date": "./src/date.ts",
+    "./dsr": "./src/dsr.ts",
     "./ics": "./src/ics.ts",
+    "./supabase-service": "./src/supabase-service.ts",
     "./index": "./src/index.ts"
   }
 }

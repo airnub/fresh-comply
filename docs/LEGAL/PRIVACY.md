@@ -35,7 +35,13 @@ Retention policies are defined in `docs/LEGAL/DATA-RETENTION.md`. We apply soft 
 Our subprocessors, their services, and hosting regions are listed in `docs/LEGAL/SUBPROCESSORS.md`. For transfers outside the EEA/UK we rely on Standard Contractual Clauses (SCCs) with supplementary measures.
 
 ## 6. Data Subject Rights
-Data subjects may exercise access, rectification, erasure, restriction, objection, and portability rights by visiting `/api/dsr/<type>` or contacting privacy@freshcomply.eu. Requests receive acknowledgement within 72 hours and fulfilment within 30 days (extendable per Art. 12(3)). Identity verification is performed prior to disclosure.
+Data subjects may exercise access, rectification, erasure, restriction, objection, and portability rights by visiting `/api/dsr/<type>` or contacting privacy@freshcomply.eu. Requests receive acknowledgement within 72 hours and fulfilment within 30 days (extendable per Art. 12(3)). Identity verification is performed prior to disclosure. All requests enter the DSR console where authorised administrators can:
+
+- View queue status (`received`, `acknowledged`, `in_progress`, `paused`, `completed`, `escalated`) with received, acknowledgement, and due timestamps.
+- Reassign handlers or pause processing with documented reasons while preserving legal-hold requirements.
+- Trigger completion workflows that mark the request resolved and produce audit evidence.
+
+Each state transition writes to the audit log (actor, timestamp, reason), and automated jobs escalate overdue requests to the privacy team daily until completion.
 
 ## 7. Security
 - Encryption in transit (TLS 1.3) and at rest (AES-256)

@@ -151,28 +151,85 @@
   },
   "dsr": {
     "heading": "Consól DSR",
-    "subheading": "Rianaigh iarrataí príobháideachais agus amadóirí SLA.",
+    "subheading": "Rianaigh admhálacha, sannadh agus spriocdhátaí 30 lá.",
+    "filters": {
+      "status": "Stádas",
+      "type": "Cineál",
+      "search": "Cuardach",
+      "searchPlaceholder": "Tagairt nó ríomhphost an iarratasóra",
+      "apply": "Cuir i bhfeidhm",
+      "reset": "Athshocraigh",
+      "any": "Ar bith"
+    },
     "columns": {
-      "subject": "Ábhar sonraí",
+      "reference": "Tagairt",
+      "type": "Cineál",
+      "status": "Stádas",
       "received": "Faighte",
-      "status": "Stádas"
+      "acknowledged": "Aithnithe",
+      "due": "Dáta dlite",
+      "requester": "Iarratasóir",
+      "assignee": "Sannadh"
     },
-    "tableCaption": "Iarratais oscailte",
-    "empty": "Níl aon DSRanna ag feitheamh le gníomh.",
-    "ackTitle": "Aithin an t-iarratas",
-    "ackDescription": "Mínigh conas a aithníodh an t-iarratas.",
-    "exportTitle": "Easpórtáil sonraí",
-    "exportDescription": "Déan cur síos ar an bpacáiste easpórtáilte.",
-    "eraseTitle": "Scrios sonraí",
-    "eraseDescription": "Taifead an chúis leis an scriosadh sula leanfar ar aghaidh.",
-    "actions": {
-      "acknowledge": "Aithin",
+    "types": {
+      "access": "Rochtain",
       "export": "Easpórtáil",
-      "erase": "Scrios"
+      "rectification": "Ceartú",
+      "erasure": "Scriosadh",
+      "restriction": "Srianadh",
+      "objection": "Agóid",
+      "portability": "Iniomparthacht"
     },
-    "reason": {
+    "status": {
+      "received": "Faighte",
+      "acknowledged": "Aithnithe",
+      "in_progress": "Ar siúl",
+      "paused": "Curtha ar sos",
+      "completed": "Críochnaithe",
+      "escalated": "Ardaithe"
+    },
+    "actions": {
+      "reassign": "Athshann",
+      "complete": "Marcáil mar chríochnaithe",
+      "pause": "Cuir ar sos",
+      "resume": "Atosaigh"
+    },
+    "dialogs": {
+      "reassign": {
+        "title": "Athshann an t-iarratas",
+        "description": "Seol chuig láimhseálaí eile le haghaidh leanúna.",
+        "emailLabel": "Ríomhphost an fhaighteora",
+        "reasonLabel": "Cúis",
+        "submit": "Deimhnigh athshannadh"
+      },
+      "complete": {
+        "title": "Marcáil an t-iarratas mar chríochnaithe",
+        "description": "Doiciméadaigh an chomhlíonadh ar mhaithe leis an iniúchadh."
+      },
+      "pause": {
+        "title": "Cuir próiseáil ar sos",
+        "description": "Mínigh cén fáth atá sé ar sos (m.sh. fíordheimhniú aitheantais)."
+      },
+      "resume": {
+        "title": "Atosaigh próiseáil",
+        "description": "Daingnigh go bhfuil an t-iarratas réidh chun leanúint ar aghaidh."
+      },
+      "cancel": "Cealaigh",
       "submitting": "Á chur isteach…"
-    }
+    },
+    "assignee": "Sannaithe do {email}",
+    "assigneeUnassigned": "Gan sannadh",
+    "messages": {
+      "updated": "Nuashonraíodh an t-iarratas",
+      "error": "Níorbh fhéidir an t-iarratas a nuashonrú.",
+      "invalidEmail": "Iontráil ríomhphost bailí don fhaighteoir.",
+      "notMember": "Ní mór don fhaighteoir a bheith san eagraíocht seo.",
+      "notFound": "Níor aimsíodh an t-iarratas.",
+      "alreadyCompleted": "Ní féidir iarratais chríochnaithe a chur ar sos.",
+      "supabaseUnavailable": "Tá cumraíocht Supabase in easnamh sa timpeallacht seo."
+    },
+    "tableCaption": "Iarratais reatha um chearta sonraí",
+    "empty": "Ní mheaitseálann aon DSR leis na scagairí seo."
   },
   "cases": {
     "heading": "Cásanna tacaíochta",

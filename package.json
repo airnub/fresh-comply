@@ -17,6 +17,7 @@
     "start:admin": "next start -p 3100 apps/admin",
     "test": "turbo run test",
     "audit": "tsx scripts/audit.ts",
+    "dsr:jobs": "tsx scripts/dsr-jobs.ts",
     "dev:docs": "pnpm --filter @airnub/docs-site start",
     "build:docs": "pnpm --filter @airnub/docs-site build",
     "deploy:docs": "pnpm --filter @airnub/docs-site deploy"
