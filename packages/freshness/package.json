@@ -8,11 +8,18 @@
   "exports": {
     "./sources": "./src/sources.ts",
     "./verify": "./src/verify.ts",
-    "./watcher": "./src/watcher.ts"
+    "./watcher": "./src/watcher.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
   },
   "dependencies": {
     "@airnub/connectors": "workspace:*",
     "@airnub/types": "workspace:*",
     "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.3"
   }
 }

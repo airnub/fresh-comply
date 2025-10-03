@@ -9,6 +9,8 @@ export type RefreshSourceInput = {
   sourceKey: SourceKey;
   workflows?: string[];
   metadata?: Record<string, unknown>;
+  tenantOrgId?: string;
+  sourceRegistryId?: string;
 };
 
 const DEFAULT_WORKFLOW_ROUTES: Partial<Record<SourceKey, string[]>> = {
@@ -25,6 +27,14 @@ function getSupabaseEnv() {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for freshness polling");
   }
   return { url, key };
+}
+
+function getFreshnessTenant() {
+  const tenant = process.env.FRESHNESS_TENANT_ORG_ID ?? process.env.PLATFORM_TENANT_ORG_ID;
+  if (!tenant) {
+    throw new Error("FRESHNESS_TENANT_ORG_ID (or PLATFORM_TENANT_ORG_ID) must be set for freshness polling");
+  }
+  return tenant;
 }
 
 function getSupabaseClient() {
@@ -46,7 +56,9 @@ export async function refreshFreshnessSource(input: RefreshSourceInput): Promise
     const event = await pollSource(input.sourceKey, {
       supabase: client,
       workflows,
-      metadata: input.metadata
+      metadata: input.metadata,
+      tenantOrgId: input.tenantOrgId ?? getFreshnessTenant(),
+      sourceRegistryId: input.sourceRegistryId
     });
     if (event?.current) {
       await persistMaterializedViews(client, input.sourceKey, event);
