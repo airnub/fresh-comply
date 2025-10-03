@@ -65,7 +65,17 @@ export async function middleware(request: NextRequest) {
   const currentSegment = segments[0];
 
   if (pathname.startsWith("/auth")) {
-    const response = NextResponse.next();
+    const locale = negotiateLocale(request);
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-next-intl-locale", locale);
+
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders
+      }
+    });
+
+    setLocaleCookie(response, locale);
     await getSupabaseSession(request, response);
     return response;
   }
@@ -81,7 +91,14 @@ export async function middleware(request: NextRequest) {
   }
 
   const locale = (currentSegment ?? defaultLocale) as AppLocale;
-  const response = NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-next-intl-locale", locale);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders
+    }
+  });
   const session = await getSupabaseSession(request, response);
 
   if (!session) {

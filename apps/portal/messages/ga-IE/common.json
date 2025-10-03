@@ -125,6 +125,7 @@
     "submitting": "Á sheoladh…",
     "success": "Seiceáil do bhosca isteach le haghaidh nasc logála isteach. Rachaidh an nasc as feidhm i gceann 5 nóiméad.",
     "redirect": "Tar éis duit síniú isteach seolfar tú go {destination}.",
-    "error": "Níor éirigh linn an nasc a sheoladh. Bain triail eile as."
+    "error": "Níor éirigh linn an nasc a sheoladh. Bain triail eile as.",
+    "supabaseUnavailable": "Tá cumraíocht Supabase ar iarraidh. Socraigh NEXT_PUBLIC_SUPABASE_URL agus NEXT_PUBLIC_SUPABASE_ANON_KEY chun an síniú isteach a chumasú."
   }
 }
