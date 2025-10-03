@@ -1,4 +1,5 @@
 import { persistStepProgress, type StepActivityContext } from "./util.js";
+import { withTelemetrySpan } from "@airnub/utils/telemetry";
 
 export type CroNameCheckInput = StepActivityContext & {
   proposedName: string;
@@ -12,27 +13,36 @@ export type CroNameCheckResult = {
 export async function lookupCroName(
   input: CroNameCheckInput
 ): Promise<CroNameCheckResult> {
-  const normalized = input.proposedName.trim();
-  const available = normalized.toLowerCase() !== "example clg";
-  const suggestions = available
-    ? []
-    : [
-        `${normalized} Services CLG`,
-        `${normalized} Foundation CLG`,
-        `${normalized} Trust CLG`
-      ];
-  await persistStepProgress({
-    ...input,
-    status: available ? "done" : "waiting",
-    output: {
+  return withTelemetrySpan("temporal.activity.lookupCroName", {
+    runId: input.runId,
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "lookupCroName"
+    }
+  }, async () => {
+    const normalized = input.proposedName.trim();
+    const available = normalized.toLowerCase() !== "example clg";
+    const suggestions = available
+      ? []
+      : [
+          `${normalized} Services CLG`,
+          `${normalized} Foundation CLG`,
+          `${normalized} Trust CLG`
+        ];
+    await persistStepProgress({
+      ...input,
+      status: available ? "done" : "waiting",
+      output: {
+        available,
+        suggestions
+      }
+    });
+    return {
       available,
       suggestions
-    }
+    };
   });
-  return {
-    available,
-    suggestions
-  };
 }
 
 export type CroPackInput = StepActivityContext & {
@@ -48,12 +58,22 @@ export type CroPackResult = {
 export async function uploadPackToStorage(
   input: CroPackInput
 ): Promise<CroPackResult> {
-  const checksum = Buffer.from(`${input.templateId}:${Date.now()}`).toString("hex");
-  const archivePath = `supabase://documents/${input.runId}/${input.stepKey}/${checksum}.zip`;
-  await persistStepProgress({
-    ...input,
-    status: "done",
-    output: { archivePath, checksum }
+  return withTelemetrySpan("temporal.activity.uploadPackToStorage", {
+    runId: input.runId,
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "uploadPackToStorage",
+      "freshcomply.template_id": input.templateId
+    }
+  }, async () => {
+    const checksum = Buffer.from(`${input.templateId}:${Date.now()}`).toString("hex");
+    const archivePath = `supabase://documents/${input.runId}/${input.stepKey}/${checksum}.zip`;
+    await persistStepProgress({
+      ...input,
+      status: "done",
+      output: { archivePath, checksum }
+    });
+    return { archivePath, checksum };
   });
-  return { archivePath, checksum };
 }

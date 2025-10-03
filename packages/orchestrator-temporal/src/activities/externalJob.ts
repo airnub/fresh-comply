@@ -1,5 +1,6 @@
 import { performSignedHttpRequest, type HttpRequestConfig } from "./http.js";
 import { persistStepProgress, recordAuditEvent, type StepActivityContext } from "./util.js";
+import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
 
 export interface ExternalJobStartInput extends StepActivityContext {
   tenantId: string;
@@ -66,58 +67,99 @@ function matchesCondition(target: unknown, condition?: { equals?: unknown; in?: 
 }
 
 export async function startExternalJob(input: ExternalJobStartInput): Promise<ExternalJobStartResult> {
-  const http = await performSignedHttpRequest({
-    tenantId: input.tenantId,
-    context: input,
-    request: input.request
-  });
-
-  await persistStepProgress({
-    orgId: input.orgId,
+  return withTelemetrySpan("temporal.activity.startExternalJob", {
     runId: input.runId,
-    stepKey: input.stepKey,
-    status: "waiting",
-    output: { http },
-    notes: "External job initiated; awaiting callback"
-  });
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "startExternalJob"
+    }
+  }, async (span) => {
+    const http = await performSignedHttpRequest({
+      tenantId: input.tenantId,
+      context: input,
+      request: input.request
+    });
 
-  return { http };
+    await persistStepProgress({
+      orgId: input.orgId,
+      runId: input.runId,
+      stepKey: input.stepKey,
+      status: "waiting",
+      output: { http },
+      notes: "External job initiated; awaiting callback"
+    });
+
+    annotateSpan(span, { attributes: { "freshcomply.http.status": http.status } });
+    return { http };
+  });
 }
 
 export async function pollExternalJob(input: ExternalJobPollInput): Promise<ExternalJobPollResult> {
-  const response = await performSignedHttpRequest({
-    tenantId: input.tenantId,
-    context: input,
-    request: input.request,
-    idempotencyKey: `${input.runId}:${input.stepKey}:poll:${input.attempt}`
+  return withTelemetrySpan("temporal.activity.pollExternalJob", {
+    runId: input.runId,
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "pollExternalJob",
+      "freshcomply.poll.attempt": input.attempt
+    }
+  }, async (span) => {
+    const response = await performSignedHttpRequest({
+      tenantId: input.tenantId,
+      context: input,
+      request: input.request,
+      idempotencyKey: `${input.runId}:${input.stepKey}:poll:${input.attempt}`
+    });
+
+    const successTarget = getByPath(response.body, input.success?.path);
+    if (matchesCondition(successTarget, input.success)) {
+      annotateSpan(span, { attributes: { "freshcomply.poll.outcome": "completed" } });
+      return { status: "completed", response };
+    }
+
+    const failureTarget = getByPath(response.body, input.failure?.path);
+    if (matchesCondition(failureTarget, input.failure)) {
+      annotateSpan(span, { attributes: { "freshcomply.poll.outcome": "failed" } });
+      return { status: "failed", response };
+    }
+
+    annotateSpan(span, { attributes: { "freshcomply.poll.outcome": "running" } });
+    return { status: "running", response };
   });
-
-  const successTarget = getByPath(response.body, input.success?.path);
-  if (matchesCondition(successTarget, input.success)) {
-    return { status: "completed", response };
-  }
-
-  const failureTarget = getByPath(response.body, input.failure?.path);
-  if (matchesCondition(failureTarget, input.failure)) {
-    return { status: "failed", response };
-  }
-
-  return { status: "running", response };
 }
 
 export async function persistExternalResult<T>(input: PersistExternalResultInput<T>) {
-  return await persistStepProgress(input);
+  return withTelemetrySpan("temporal.activity.persistExternalResult", {
+    runId: input.runId,
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "persistExternalResult",
+      "freshcomply.step.status": input.status
+    }
+  }, async () => persistStepProgress(input));
 }
 
 export async function escalateExternalJob(input: EscalationInput) {
-  await recordAuditEvent({
-    orgId: input.orgId,
+  return withTelemetrySpan("temporal.activity.escalateExternalJob", {
     runId: input.runId,
-    stepKey: input.stepKey,
-    action: "external_job_escalation",
-    metadata: {
-      reason: input.reason,
-      ...input.metadata
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "escalateExternalJob",
+      "freshcomply.escalation.reason": input.reason
     }
+  }, async () => {
+    await recordAuditEvent({
+      orgId: input.orgId,
+      runId: input.runId,
+      stepKey: input.stepKey,
+      action: "external_job_escalation",
+      metadata: {
+        reason: input.reason,
+        ...input.metadata
+      }
+    });
   });
 }

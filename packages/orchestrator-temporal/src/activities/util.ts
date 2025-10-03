@@ -1,3 +1,5 @@
+import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
+
 export type StepActivityContext = {
   orgId: string;
   runId: string;
@@ -21,11 +23,24 @@ export function createBusinessKey(context: StepActivityContext): string {
 export async function persistStepProgress<T = unknown>(
   payload: PersistStepPayload<T>
 ): Promise<PersistStepResult<T>> {
-  const timestamp = new Date().toISOString();
-  return {
-    ...payload,
-    updatedAt: timestamp
-  };
+  return withTelemetrySpan("temporal.activity.persistStepProgress", {
+    runId: payload.runId,
+    stepId: payload.stepKey,
+    orgId: payload.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "persistStepProgress",
+      "freshcomply.step.status": payload.status
+    }
+  }, async (span) => {
+    annotateSpan(span, { attributes: { "freshcomply.step.notes": payload.notes ?? "" } });
+    const timestamp = new Date().toISOString();
+    const result: PersistStepResult<T> = {
+      ...payload,
+      updatedAt: timestamp
+    };
+    span.setAttribute("freshcomply.step.updated_at", timestamp);
+    return result;
+  });
 }
 
 export type AuditLogInput = StepActivityContext & {
@@ -34,7 +49,20 @@ export type AuditLogInput = StepActivityContext & {
 };
 
 export async function recordAuditEvent(input: AuditLogInput): Promise<{ recordedAt: string }> {
-  return {
-    recordedAt: new Date().toISOString()
-  };
+  return withTelemetrySpan("temporal.activity.recordAuditEvent", {
+    runId: input.runId,
+    stepId: input.stepKey,
+    orgId: input.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "recordAuditEvent",
+      "freshcomply.audit.action": input.action
+    }
+  }, async (span) => {
+    annotateSpan(span, { attributes: { "freshcomply.audit.metadata": JSON.stringify(input.metadata ?? {}) } });
+    const recordedAt = new Date().toISOString();
+    span.setAttribute("freshcomply.audit.recorded_at", recordedAt);
+    return {
+      recordedAt
+    };
+  });
 }

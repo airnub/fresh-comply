@@ -1,14 +1,14 @@
-import { Worker } from "@temporalio/worker";
+import { NativeConnection, Worker } from "@temporalio/worker";
 import * as croActivities from "./activities/cro.js";
 import * as revenueActivities from "./activities/revenue.js";
 import * as fileActivities from "./activities/files.js";
 import * as utilActivities from "./activities/util.js";
 import * as freshnessActivities from "./activities/freshness.js";
 import * as externalJobActivities from "./activities/externalJob.js";
-import { createTemporalConnection, getTaskQueue, getTemporalNamespace } from "./client.js";
+import { getTaskQueue, getTemporalAddress, getTemporalNamespace } from "./client.js";
 
 async function runWorker() {
-  const connection = await createTemporalConnection();
+  const connection = await NativeConnection.connect({ address: getTemporalAddress() });
   const worker = await Worker.create({
     connection,
     namespace: getTemporalNamespace(),

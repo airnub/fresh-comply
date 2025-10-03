@@ -224,20 +224,31 @@ async function persistPendingUpdate(
     workflows?: string[];
   }
 ) {
-  const { error } = await client.from("freshness_pending_updates").insert({
-    source_key: payload.sourceKey,
-    status: "pending",
-    current_snapshot_id: payload.current.snapshotId,
-    previous_snapshot_id: payload.previous?.snapshotId ?? null,
-    diff_summary: payload.summary,
-    diff_payload: {
+  const currentSnapshotId = payload.current.snapshotId;
+  if (!currentSnapshotId) {
+    throw new Error(`Missing current snapshot id for ${payload.sourceKey}`);
+  }
+
+  const diffPayload = JSON.parse(
+    JSON.stringify({
       diff: payload.diff,
       current: payload.current.payload,
       previous: payload.previous?.payload ?? null
-    } as unknown as Json,
+    })
+  ) as Json;
+
+  const row: Database["public"]["Tables"]["freshness_pending_updates"]["Insert"] = {
+    source_key: payload.sourceKey,
+    status: "pending",
+    current_snapshot_id: currentSnapshotId,
+    previous_snapshot_id: payload.previous?.snapshotId ?? null,
+    diff_summary: payload.summary,
+    diff_payload: diffPayload,
     detected_at: payload.detectedAt,
     workflow_keys: payload.workflows ?? null
-  });
+  };
+
+  const { error } = await client.from("freshness_pending_updates").insert(row);
 
   if (error) {
     console.error(`[freshness] Unable to persist pending update for ${payload.sourceKey}`, error);

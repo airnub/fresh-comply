@@ -2,6 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import { fetch, Headers, Response } from "undici";
 import { resolveSecretAlias } from "../secrets.js";
 import type { StepActivityContext } from "./util.js";
+import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -72,76 +73,98 @@ async function parseBody(response: Response): Promise<{ bodyText?: string; body?
 }
 
 export async function performSignedHttpRequest(options: HttpExecutionContext): Promise<HttpExecutionResult> {
-  const { tenantId, context, request, idempotencyKey } = options;
-  const baseUrl = resolveSecretAlias(tenantId, request.urlAlias);
-  const token = request.tokenAlias ? resolveSecretAlias(tenantId, request.tokenAlias) : undefined;
-  const signingSecret = request.signingSecretAlias
-    ? resolveSecretAlias(tenantId, request.signingSecretAlias)
-    : undefined;
-
-  const url = buildUrl(baseUrl, request.path, request.query);
-  const headers = new Headers();
-  headers.set("User-Agent", "fresh-comply-temporal/1.0");
-  headers.set("X-FC-Idempotency-Key", idempotencyKey ?? `${context.runId}:${context.stepKey}`);
-  headers.set("X-FC-Run-Id", context.runId);
-  headers.set("X-FC-Step-Key", context.stepKey);
-
-  for (const [key, value] of Object.entries(request.headers ?? {})) {
-    headers.set(key, value);
-  }
-
-  let bodyString: string | undefined;
-  if (request.body !== undefined && request.body !== null) {
-    if (!headers.has("Content-Type")) {
-      headers.set("Content-Type", "application/json");
+  return withTelemetrySpan("temporal.activity.performSignedHttpRequest", {
+    runId: options.context.runId,
+    stepId: options.context.stepKey,
+    orgId: options.context.orgId,
+    attributes: {
+      "freshcomply.temporal.activity": "performSignedHttpRequest",
+      "freshcomply.http.method": options.request.method,
+      "freshcomply.http.url_alias": options.request.urlAlias,
+      "freshcomply.tenant_id": options.tenantId,
+      "http.request.method": options.request.method
     }
-    bodyString = typeof request.body === "string" ? request.body : JSON.stringify(request.body);
-  }
+  }, async (span) => {
+    const { tenantId, context, request, idempotencyKey } = options;
+    const baseUrl = resolveSecretAlias(tenantId, request.urlAlias);
+    const token = request.tokenAlias ? resolveSecretAlias(tenantId, request.tokenAlias) : undefined;
+    const signingSecret = request.signingSecretAlias
+      ? resolveSecretAlias(tenantId, request.signingSecretAlias)
+      : undefined;
 
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+    const url = buildUrl(baseUrl, request.path, request.query);
+    span.setAttribute("http.url", url);
+    const headers = new Headers();
+    headers.set("User-Agent", "fresh-comply-temporal/1.0");
+    headers.set("X-FC-Idempotency-Key", idempotencyKey ?? `${context.runId}:${context.stepKey}`);
+    headers.set("X-FC-Run-Id", context.runId);
+    headers.set("X-FC-Step-Key", context.stepKey);
 
-  if (signingSecret && bodyString) {
-    const signature = createHmac("sha256", signingSecret).update(bodyString).digest("hex");
-    headers.set("X-FC-Signature", signature);
-  }
+    for (const [key, value] of Object.entries(request.headers ?? {})) {
+      headers.set(key, value);
+    }
 
-  const response = await fetch(url, {
-    method: request.method,
-    headers,
-    body: bodyString
-  });
+    let bodyString: string | undefined;
+    if (request.body !== undefined && request.body !== null) {
+      if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+      bodyString = typeof request.body === "string" ? request.body : JSON.stringify(request.body);
+    }
 
-  const responseHeaders: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    responseHeaders[key.toLowerCase()] = value;
-  });
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
 
-  const { bodyText, body } = await parseBody(response);
+    if (signingSecret && bodyString) {
+      const signature = createHmac("sha256", signingSecret).update(bodyString).digest("hex");
+      headers.set("X-FC-Signature", signature);
+    }
 
-  const result: HttpExecutionResult = {
-    ok: response.ok,
-    status: response.status,
-    requestHash: hashPayload(bodyString),
-    responseHash: hashPayload(bodyText),
-    headers: responseHeaders,
-    bodyText,
-    body
-  };
+    const response = await fetch(url, {
+      method: request.method,
+      headers,
+      body: bodyString
+    });
 
-  if (!response.ok) {
-    const error = new Error(
-      `HTTP request failed with status ${response.status}: ${bodyText ?? response.statusText}`
-    );
-    (error as Error & { metadata?: unknown }).metadata = {
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key.toLowerCase()] = value;
+    });
+
+    const { bodyText, body } = await parseBody(response);
+
+    const result: HttpExecutionResult = {
+      ok: response.ok,
       status: response.status,
-      url,
+      requestHash: hashPayload(bodyString),
+      responseHash: hashPayload(bodyText),
       headers: responseHeaders,
-      responseHash: result.responseHash
+      bodyText,
+      body
     };
-    throw error;
-  }
 
-  return result;
+    annotateSpan(span, {
+      attributes: {
+        "http.response.status_code": response.status,
+        "freshcomply.http.request_hash": result.requestHash,
+        "freshcomply.http.response_hash": result.responseHash ?? ""
+      }
+    });
+
+    if (!response.ok) {
+      const error = new Error(
+        `HTTP request failed with status ${response.status}: ${bodyText ?? response.statusText}`
+      );
+      (error as Error & { metadata?: unknown }).metadata = {
+        status: response.status,
+        url,
+        headers: responseHeaders,
+        responseHash: result.responseHash
+      };
+      throw error;
+    }
+
+    return result;
+  });
 }

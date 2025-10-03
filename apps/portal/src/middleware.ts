@@ -3,6 +3,7 @@ import type { Database } from "@airnub/types";
 import { NextRequest, NextResponse } from "next/server";
 import { type AppLocale, defaultLocale, isAppLocale } from "./i18n/config";
 import { ensureLeadingLocale, negotiateLocale, setLocaleCookie } from "./i18n/request";
+import { buildSecurityHeaders, generateNonce, SECURITY_NONCE_HEADER } from "@airnub/utils/security-headers";
 
 const PUBLIC_FILE = /\.(.*)$/;
 
@@ -50,6 +51,14 @@ async function getSupabaseSession(request: NextRequest, response: NextResponse) 
   }
 }
 
+function applySecurityHeaders(response: NextResponse, nonce: string) {
+  const securityHeaders = buildSecurityHeaders(nonce);
+  for (const [key, value] of Object.entries(securityHeaders)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -61,6 +70,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const nonce = generateNonce();
   const segments = pathname.split("/").filter(Boolean);
   const currentSegment = segments[0];
 
@@ -68,6 +78,7 @@ export async function middleware(request: NextRequest) {
     const locale = negotiateLocale(request);
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-next-intl-locale", locale);
+    requestHeaders.set(SECURITY_NONCE_HEADER, nonce);
 
     const response = NextResponse.next({
       request: {
@@ -77,7 +88,7 @@ export async function middleware(request: NextRequest) {
 
     setLocaleCookie(response, locale);
     await getSupabaseSession(request, response);
-    return response;
+    return applySecurityHeaders(response, nonce);
   }
 
   if (!isAppLocale(currentSegment)) {
@@ -87,12 +98,13 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.redirect(url);
     await getSupabaseSession(request, response);
     setLocaleCookie(response, locale);
-    return response;
+    return applySecurityHeaders(response, nonce);
   }
 
   const locale = (currentSegment ?? defaultLocale) as AppLocale;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-next-intl-locale", locale);
+  requestHeaders.set(SECURITY_NONCE_HEADER, nonce);
 
   const response = NextResponse.next({
     request: {
@@ -105,11 +117,12 @@ export async function middleware(request: NextRequest) {
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/auth/sign-in";
     signInUrl.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(signInUrl);
+    const redirectResponse = NextResponse.redirect(signInUrl);
+    return applySecurityHeaders(redirectResponse, nonce);
   }
 
   setLocaleCookie(response, locale);
-  return response;
+  return applySecurityHeaders(response, nonce);
 }
 
 export const config = {
