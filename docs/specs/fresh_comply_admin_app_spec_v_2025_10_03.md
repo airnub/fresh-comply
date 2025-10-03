@@ -129,10 +129,19 @@ legal_holds(id, subject_kind, subject_id, reason, created_at, released_at)
 
 ## 11) Security, Logging, and Audit
 
-- **AuthN:** Supabase with `@supabase/ssr`; optional SSO later.  
-- **AuthZ:** server-side guards; actions behind **POST** with CSRF protection; rate limiting.  
-- **Audit:** all admin actions write to `admin_actions` and `audit_log` (actor, target, diff preview).  
+- **AuthN:** Supabase with `@supabase/ssr`; optional SSO later; aligns with SOC 2 access controls in [Product Spec §11.1](./fresh-comply-spec.md#soc-2-compliance-requirements).
+- **AuthZ:** server-side guards; actions behind **POST** with CSRF protection; rate limiting; reason codes + two-person approval enforce change-management controls.
+- **Audit:** all admin actions write to `admin_actions` and `audit_log` (actor, target, diff preview) with append-only retention ≥ 1 year to satisfy SOC 2 audit sampling.
 - **PII Redaction:** logs use stable IDs; payload redaction in server logs.
+- **Evidence Exports:** provide CSV/JSON exports tagged with control IDs for quarterly readiness packets.
+
+### SOC 2 Control Coverage (Admin App)
+
+- **Access Reviews:** dashboards + exports for quarterly user/role review, including joiner/mover/leaver history.
+- **Monitoring Hooks:** expose queue health, watcher drift, and incident annotations so monitoring controls are reviewable.
+- **Vendor Oversight:** store subprocessor attestations and approval history for SOC 2 vendor-management evidence.
+- **Change Approvals:** ensure privileged workflows capture justification, approver, timestamp, and linked change tickets.
+- **Evidence Repository Integration:** API endpoints to push signed evidence bundles into the central repository referenced in Product Spec §11.1.
 
 ---
 

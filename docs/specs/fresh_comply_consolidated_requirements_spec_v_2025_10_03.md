@@ -53,7 +53,7 @@
 
 - **Entities:** User, Organisation, Membership, **Engagement** (Org A↔Org X), WorkflowDef, WorkflowRun, Step/Task, Document, Rule, Verification, Notification, AuditLog, CalendarEvent.
 - **RLS policy:** A **WorkflowRun** is owned by **subject_org_id** (Company X) and is visible to its members and to Engagement members of **engager_org_id** (Company A) when Engagement is **active** and scoped to the run.
-- **Audit:** All actions record `{ actor_user_id, actor_org_id, on_behalf_of_org_id }`.
+- **Audit:** All actions record `{ actor_user_id, actor_org_id, on_behalf_of_org_id }` (evidence retained per [SOC 2 requirements](./fresh-comply-spec.md#soc-2-compliance-requirements)).
 
 ---
 
