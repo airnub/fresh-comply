@@ -30,6 +30,70 @@
       "waiting": "Waiting",
       "blocked": "Blocked",
       "done": "Done"
+    },
+    "billingCardTitle": "Billing overview",
+    "billingCardDescription": "Check your plan, renewal date, and payment status at a glance.",
+    "billingCardCta": "View billing"
+  },
+  "billing": {
+    "title": "Subscription & billing",
+    "description": "Review your current Stripe subscription, billing mode, and renewal dates.",
+    "lastUpdated": "Last updated {date, date, medium}",
+    "status": {
+      "trialing": "Trialing",
+      "active": "Active",
+      "incomplete": "Incomplete",
+      "incomplete_expired": "Trial expired",
+      "past_due": "Past due",
+      "canceled": "Canceled",
+      "unpaid": "Unpaid",
+      "paused": "Paused",
+      "unknown": "Unknown"
+    },
+    "mode": {
+      "direct": "Direct billing",
+      "partner_managed": "Partner managed"
+    },
+    "collection": {
+      "charge_automatically": "Automatic charges",
+      "send_invoice": "Send invoice"
+    },
+    "subscription": {
+      "heading": "Subscription details",
+      "customerId": "Customer ID",
+      "subscriptionId": "Subscription ID",
+      "billingMode": "Billing mode",
+      "collection": "Collection method",
+      "nextRenewal": "Next renewal",
+      "cancelAtPeriodEnd": "Cancel at period end",
+      "noRenewal": "Not scheduled",
+      "missing": "Not available"
+    },
+    "plan": {
+      "heading": "Plan",
+      "name": "Product",
+      "nickname": "Price nickname",
+      "amount": "Amount",
+      "interval": "Interval",
+      "recurring": "Every {count, plural, one {{interval}} other {{count} {interval}}}",
+      "oneTime": "One-time",
+      "active": "Active",
+      "unknown": "Unknown",
+      "pending": "Pending",
+      "intervalLabels": {
+        "day": "day",
+        "week": "week",
+        "month": "month",
+        "year": "year"
+      }
+    },
+    "empty": {
+      "heading": "No subscription found",
+      "body": "Provision a plan via the billing API to see subscription status here."
+    },
+    "boolean": {
+      "yes": "Yes",
+      "no": "No"
     }
   },
   "actingFor": {

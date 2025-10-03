@@ -222,6 +222,209 @@ export type Database = {
           }
         ];
       };
+      billing_prices: {
+        Row: {
+          stripe_price_id: string;
+          product_name: string;
+          nickname: string | null;
+          unit_amount: number | null;
+          currency: string;
+          interval: string | null;
+          interval_count: number | null;
+          is_active: boolean;
+          metadata: Json;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          stripe_price_id: string;
+          product_name: string;
+          nickname?: string | null;
+          unit_amount?: number | null;
+          currency: string;
+          interval?: string | null;
+          interval_count?: number | null;
+          is_active?: boolean;
+          metadata?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          stripe_price_id?: string;
+          product_name?: string;
+          nickname?: string | null;
+          unit_amount?: number | null;
+          currency?: string;
+          interval?: string | null;
+          interval_count?: number | null;
+          is_active?: boolean;
+          metadata?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      billing_tenants: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          stripe_customer_id: string | null;
+          billing_mode: "direct" | "partner_managed";
+          partner_org_id: string | null;
+          default_price_id: string | null;
+          metadata: Json;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          stripe_customer_id?: string | null;
+          billing_mode?: "direct" | "partner_managed";
+          partner_org_id?: string | null;
+          default_price_id?: string | null;
+          metadata?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          stripe_customer_id?: string | null;
+          billing_mode?: "direct" | "partner_managed";
+          partner_org_id?: string | null;
+          default_price_id?: string | null;
+          metadata?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_tenants_default_price_id_fkey";
+            columns: ["default_price_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_prices";
+            referencedColumns: ["stripe_price_id"];
+          },
+          {
+            foreignKeyName: "billing_tenants_partner_org_id_fkey";
+            columns: ["partner_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_tenants_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      billing_subscriptions: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          billing_tenant_id: string | null;
+          stripe_subscription_id: string;
+          status:
+            | "trialing"
+            | "active"
+            | "incomplete"
+            | "incomplete_expired"
+            | "past_due"
+            | "canceled"
+            | "unpaid"
+            | "paused";
+          stripe_price_id: string | null;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          cancel_at: string | null;
+          canceled_at: string | null;
+          cancel_at_period_end: boolean;
+          collection_method: string | null;
+          latest_invoice_id: string | null;
+          metadata: Json;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          billing_tenant_id?: string | null;
+          stripe_subscription_id: string;
+          status?:
+            | "trialing"
+            | "active"
+            | "incomplete"
+            | "incomplete_expired"
+            | "past_due"
+            | "canceled"
+            | "unpaid"
+            | "paused";
+          stripe_price_id?: string | null;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          cancel_at?: string | null;
+          canceled_at?: string | null;
+          cancel_at_period_end?: boolean;
+          collection_method?: string | null;
+          latest_invoice_id?: string | null;
+          metadata?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          billing_tenant_id?: string | null;
+          stripe_subscription_id?: string;
+          status?:
+            | "trialing"
+            | "active"
+            | "incomplete"
+            | "incomplete_expired"
+            | "past_due"
+            | "canceled"
+            | "unpaid"
+            | "paused";
+          stripe_price_id?: string | null;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          cancel_at?: string | null;
+          canceled_at?: string | null;
+          cancel_at_period_end?: boolean;
+          collection_method?: string | null;
+          latest_invoice_id?: string | null;
+          metadata?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_subscriptions_billing_tenant_id_fkey";
+            columns: ["billing_tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_subscriptions_stripe_price_id_fkey";
+            columns: ["stripe_price_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_prices";
+            referencedColumns: ["stripe_price_id"];
+          },
+          {
+            foreignKeyName: "billing_subscriptions_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       engagements: {
         Row: {
           id: string;
@@ -1500,7 +1703,48 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      billing_subscription_overview: {
+        Row: {
+          tenant_org_id: string;
+          billing_mode: "direct" | "partner_managed";
+          stripe_customer_id: string | null;
+          partner_org_id: string | null;
+          default_price_id: string | null;
+          tenant_metadata: Json;
+          tenant_updated_at: string | null;
+          stripe_subscription_id: string | null;
+          status:
+            | "trialing"
+            | "active"
+            | "incomplete"
+            | "incomplete_expired"
+            | "past_due"
+            | "canceled"
+            | "unpaid"
+            | "paused"
+            | null;
+          stripe_price_id: string | null;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          cancel_at: string | null;
+          canceled_at: string | null;
+          cancel_at_period_end: boolean | null;
+          collection_method: string | null;
+          latest_invoice_id: string | null;
+          subscription_metadata: Json | null;
+          subscription_updated_at: string | null;
+          product_name: string | null;
+          nickname: string | null;
+          unit_amount: number | null;
+          currency: string | null;
+          interval: string | null;
+          interval_count: number | null;
+          price_active: boolean | null;
+          price_metadata: Json | null;
+          price_updated_at: string | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       assert_tenant_membership: {
@@ -1554,6 +1798,57 @@ export type Database = {
           p_tenant_org_id: string;
         };
         Returns: Database["public"]["Tables"]["tenant_branding"]["Row"] | null;
+      };
+      rpc_upsert_billing_price: {
+        Args: {
+          p_stripe_price_id: string;
+          p_product_name: string;
+          p_nickname?: string | null;
+          p_unit_amount?: number | null;
+          p_currency: string;
+          p_interval?: string | null;
+          p_interval_count?: number | null;
+          p_is_active?: boolean;
+          p_metadata?: Json;
+        };
+        Returns: Database["public"]["Tables"]["billing_prices"]["Row"];
+      };
+      rpc_upsert_billing_subscription: {
+        Args: {
+          p_tenant_org_id: string;
+          p_billing_tenant_id?: string | null;
+          p_stripe_subscription_id: string;
+          p_status:
+            | "trialing"
+            | "active"
+            | "incomplete"
+            | "incomplete_expired"
+            | "past_due"
+            | "canceled"
+            | "unpaid"
+            | "paused";
+          p_stripe_price_id?: string | null;
+          p_current_period_start?: string | null;
+          p_current_period_end?: string | null;
+          p_cancel_at?: string | null;
+          p_canceled_at?: string | null;
+          p_cancel_at_period_end?: boolean;
+          p_collection_method?: string | null;
+          p_latest_invoice_id?: string | null;
+          p_metadata?: Json;
+        };
+        Returns: Database["public"]["Tables"]["billing_subscriptions"]["Row"];
+      };
+      rpc_upsert_billing_tenant: {
+        Args: {
+          p_tenant_org_id: string;
+          p_stripe_customer_id?: string | null;
+          p_billing_mode?: "direct" | "partner_managed";
+          p_partner_org_id?: string | null;
+          p_default_price_id?: string | null;
+          p_metadata?: Json;
+        };
+        Returns: Database["public"]["Tables"]["billing_tenants"]["Row"];
       };
       rpc_mark_tenant_domain_verified: {
         Args: {

@@ -30,6 +30,70 @@
       "waiting": "Ag fanacht",
       "blocked": "Blocáilte",
       "done": "Críochnaithe"
+    },
+    "billingCardTitle": "Forbhreathnú billeála",
+    "billingCardDescription": "Seiceáil do phlean, dáta athnuachana agus stádas íocaíochta ar bhreathnú amháin.",
+    "billingCardCta": "Féach billeáil"
+  },
+  "billing": {
+    "title": "Síntiús agus billeáil",
+    "description": "Athbhreithnigh do shíntiús Stripe reatha, modh billeála agus dátaí athnuachana.",
+    "lastUpdated": "Nuashonraithe {date, date, medium}",
+    "status": {
+      "trialing": "Ar thriail",
+      "active": "Gníomhach",
+      "incomplete": "Neamhiomlán",
+      "incomplete_expired": "Triail imithe in éag",
+      "past_due": "As dáta",
+      "canceled": "Cealaithe",
+      "unpaid": "Gan íoc",
+      "paused": "Ar sos",
+      "unknown": "Anaithnid"
+    },
+    "mode": {
+      "direct": "Billeáil dhíreach",
+      "partner_managed": "Arna bhainistiú ag comhpháirtí"
+    },
+    "collection": {
+      "charge_automatically": "Muirearú uathoibríoch",
+      "send_invoice": "Seol sonrasc"
+    },
+    "subscription": {
+      "heading": "Sonraí síntiúis",
+      "customerId": "Aitheantas custaiméara",
+      "subscriptionId": "Aitheantas síntiúis",
+      "billingMode": "Modh billeála",
+      "collection": "Modh bailithe",
+      "nextRenewal": "Athnuachan eile",
+      "cancelAtPeriodEnd": "Cealaigh ag deireadh na tréimhse",
+      "noRenewal": "Gan sceideal",
+      "missing": "Níl ar fáil"
+    },
+    "plan": {
+      "heading": "Plean",
+      "name": "Táirge",
+      "nickname": "Leasainm praghais",
+      "amount": "Méid",
+      "interval": "Eatramh",
+      "recurring": "Gach {count, plural, one {{interval}} other {{count} {interval}}}",
+      "oneTime": "Aonuaire",
+      "active": "Gníomhach",
+      "unknown": "Anaithnid",
+      "pending": "Ar feitheamh",
+      "intervalLabels": {
+        "day": "lá",
+        "week": "seachtain",
+        "month": "mí",
+        "year": "bliain"
+      }
+    },
+    "empty": {
+      "heading": "Níor aimsíodh síntiús",
+      "body": "Soláthair plean tríd an API billeála chun stádas síntiúis a fheiceáil anseo."
+    },
+    "boolean": {
+      "yes": "Tá",
+      "no": "Níl"
     }
   },
   "actingFor": {
