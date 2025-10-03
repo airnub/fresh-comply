@@ -99,12 +99,16 @@
     "orchestrationDescription": "Seol sreafaí oibre Temporal, seol comharthaí, nó taifead nuashonruithe láimhe do gach céim.",
     "orchestrationTemporalHint": "Láimhseálann an t-oibrí Temporal athiarrachtaí agus póiliniú.",
     "orchestrationManualHint": "Rianaítear forghníomhú láimhe trí mheabhrúcháin féilire agus uaslódálacha fianaise.",
+    "orchestrationWebhookHint": "Seol webhook sínithe an tionanta agus féach ar hash na freagartha.",
     "orchestrationStart": "Tosaigh",
     "orchestrationRetry": "Athsheol",
     "orchestrationSignal": "Seol comhartha",
     "orchestrationSignalSuccess": "Seoladh an comhartha chuig Temporal.",
     "orchestrationManualButton": "Marcáil críochnaithe / uaslódáil cruthúnas",
     "orchestrationManualComplete": "Marcáilte críochnaithe — uaslódáil fianaise tríd an bpainéal thuas.",
+    "orchestrationWebhookButton": "Seol webhook",
+    "orchestrationWebhookSuccess": "Seoladh an webhook (stádas {status}).",
+    "orchestrationWebhookError": "Níor éirigh leis an webhook a sheoladh.",
     "orchestrationReceiptPlaceholder": "URL admhála (roghnach)",
     "orchestrationReceiptLabel": "URL admhála",
     "orchestrationStartSuccess": "Tosaíodh an sreabhadh oibre (ID: {workflowId})",
@@ -143,7 +147,22 @@
       "input": "JSON ionchuir",
       "inputPlaceholder": "{ } // Lódál JSON don chéim",
       "secret": "Ailias rúin",
-      "secretPlaceholder": "Roghnaigh ailias (roghnach)"
+      "secretPlaceholder": "Roghnaigh ailias (roghnach)",
+      "executionLabel": "Cumraíocht fhorghníomhaithe",
+      "executionHint": "Cumraigh meiteashonraí ama-rith don chéim roghnaithe.",
+      "executionWebhookMethod": "Modh HTTP",
+      "executionWebhookUrlAlias": "Ailias URL webhook",
+      "executionWebhookTokenAlias": "Ailias comhartha fíordheimhnithe",
+      "executionWebhookPath": "Cosán (roghnach)",
+      "executionWebhookSigningAlias": "Ailias rúin sínithe",
+      "executionTemporalWorkflow": "Sreabhadh Temporal (forscríobh)",
+      "executionTemporalTaskQueue": "Scuaine tasc",
+      "executionTemporalDefaultTaskQueue": "Réamhshocrú scuaine tasc",
+      "executionWebsocketUrlAlias": "Ailias URL WebSocket",
+      "executionWebsocketTokenAlias": "Ailias comhartha bearair",
+      "executionWebsocketMessageSchema": "ID scéime teachtaireachta",
+      "executionWebsocketWorkflow": "Sreabhadh Temporal",
+      "executionWebsocketQueue": "Réamhshocrú scuaine tasc"
     },
     "actions": {
       "insert": "Cuir céim isteach",
@@ -165,7 +184,11 @@
       "persistError": "Níor éirigh le snapshot forleagain a shábháil.",
       "mergeError": "Theip ar chumasc forleagain",
       "secretRequired": "Roghnaigh ailias rúin sula gcuirtear an chéim seo isteach.",
-      "secretUnavailable": "Níl aon cheangail rúin oiriúnacha ar fáil don chineál céime seo."
+      "secretUnavailable": "Níl aon cheangail rúin oiriúnacha ar fáil don chineál céime seo.",
+      "executionWebhookUrlAliasRequired": "Roghnaigh ailias URL webhook sula gcuirtear an chéim seo isteach.",
+      "executionWebsocketUrlAliasRequired": "Roghnaigh ailias URL WebSocket sula gcuirtear an chéim seo isteach.",
+      "executionAliasInvalid": "Ní mór ailiasanna tagairt a dhéanamh do cheangail rúin, ní URLanna litriúla.",
+      "executionAliasUnavailable": "Níl aon ailiasanna rúin oiriúnacha ar fáil don chumraíocht fhorghníomhaithe seo."
     },
     "stepTypes": {
       "manualReview": {
@@ -175,11 +198,24 @@
       "temporalWebhook": {
         "title": "Droichead webhook Temporal",
         "summary": "Cuir sreabhadh Temporal an tionant ar siúl trí iarrataí webhook sínithe."
+      },
+      "externalWebhook": {
+        "title": "Glao webhook tionant",
+        "summary": "Seol webhook seachtrach le haitheantas agus sínithe trí ailias."
+      },
+      "externalWebsocket": {
+        "title": "Droichead éisteachta WebSocket",
+        "summary": "Éist le sruthanna imeachtaí tionant agus atreoraigh teachtaireachtaí trí Temporal."
       }
     },
     "secrets": {
       "crmApiToken": "Comhartha API CRM réitithe ag am rith.",
-      "temporalQueue": "Eochair scuaine tasc Temporal stóráilte sa stór rúin."
+      "temporalQueue": "Eochair scuaine tasc Temporal stóráilte sa stór rúin.",
+      "webhookBaseUrl": "Ailias URL bunúsach webhook tionant.",
+      "webhookToken": "Ailias comhartha bearair tionant.",
+      "webhookSignature": "Ailias rúin sínithe webhook a réitítear do gach tionant.",
+      "websocketUrl": "Ailias deireadh WebSocket tionant.",
+      "websocketToken": "Ailias comhartha WebSocket."
     }
   },
   "funding": {

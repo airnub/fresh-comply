@@ -39,7 +39,25 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
   const [error, setError] = useState<string | null>(null);
   const [receiptUrl, setReceiptUrl] = useState("");
 
-  const isTemporal = step.execution?.mode === "temporal";
+  const executionMode = step.execution?.mode;
+  const isTemporal = executionMode === "temporal" || executionMode === "external:websocket";
+  const isWebhook = executionMode === "external:webhook";
+  const workflowName = (() => {
+    if (!step.execution) {
+      return "croNameCheckWorkflow";
+    }
+    if (step.execution.mode === "temporal") {
+      return (
+        step.execution.workflow ||
+        step.execution.config?.workflow ||
+        "croNameCheckWorkflow"
+      );
+    }
+    if (step.execution.mode === "external:websocket") {
+      return step.execution.config.temporalWorkflow || "externalJobWorkflow";
+    }
+    return "croNameCheckWorkflow";
+  })();
 
   async function handleStart() {
     setIsLoading(true);
@@ -53,7 +71,7 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
           orgId,
           runId,
           stepKey: step.id,
-          workflow: step.execution?.workflow ?? "croNameCheckWorkflow",
+          workflow: workflowName,
           input: buildPayload(step)
         })
       });
@@ -64,6 +82,38 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
       setMessage(t("orchestrationStartSuccess", { workflowId: json.workflowId }));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("orchestrationUnknownError"));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleInvokeWebhook() {
+    if (!isWebhook || !step.execution || step.execution.mode !== "external:webhook") {
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const response = await fetch("/api/orchestration/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenantId: orgId,
+          orgId,
+          runId,
+          stepKey: step.id,
+          request: step.execution.config,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.ok) {
+        throw new Error(json.error ?? t("orchestrationWebhookError"));
+      }
+      setMessage(t("orchestrationWebhookSuccess", { status: json.status }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("orchestrationWebhookError"));
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +158,9 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
         <Text as="p" size="2" color="gray">
           {isTemporal
             ? step.orchestration?.resultSummary ?? t("orchestrationTemporalHint")
-            : t("orchestrationManualHint")}
+            : isWebhook
+              ? step.orchestration?.resultSummary ?? t("orchestrationWebhookHint")
+              : t("orchestrationManualHint")}
         </Text>
       </Flex>
       {isTemporal ? (
@@ -136,6 +188,10 @@ export function StepOrchestrationPanel({ step, runId, orgId }: { step: DemoStep;
             aria-label={t("orchestrationReceiptLabel")}
           />
         </Flex>
+      ) : isWebhook ? (
+        <Button onClick={handleInvokeWebhook} loading={isLoading} disabled={isLoading}>
+          {t("orchestrationWebhookButton")}
+        </Button>
       ) : (
         <Button onClick={handleManualComplete} variant="surface" color="gray">
           {t("orchestrationManualButton")}

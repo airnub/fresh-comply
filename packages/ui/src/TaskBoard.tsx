@@ -1,13 +1,30 @@
 import React from "react";
 import { Badge, Card, Flex, Grid, Text, type BadgeProps } from "@radix-ui/themes";
 
+type ExecutionMode = "manual" | "temporal" | "external:webhook" | "external:websocket";
+
+function formatExecutionLabel(mode: ExecutionMode, orchestrationStatus?: string) {
+  switch (mode) {
+    case "temporal":
+      return orchestrationStatus ? `Temporal · ${orchestrationStatus.replace(/_/g, " ")}` : "Temporal";
+    case "external:webhook":
+      return "External · Webhook";
+    case "external:websocket":
+      return orchestrationStatus
+        ? `External · WebSocket · ${orchestrationStatus.replace(/_/g, " ")}`
+        : "External · WebSocket";
+    default:
+      return "Manual";
+  }
+}
+
 export type Task = {
   id: string;
   title: string;
   status: "todo" | "in_progress" | "waiting" | "blocked" | "done";
   assignee?: string;
   dueDate?: string;
-  executionMode?: "manual" | "temporal";
+  executionMode?: ExecutionMode;
   orchestrationStatus?: string;
 };
 
@@ -68,15 +85,19 @@ export function TaskBoard({ tasks, statusLabels, formatDueDate }: TaskBoardProps
                             )}
                             {task.executionMode && (
                               <Badge
-                                color={task.executionMode === "temporal" ? "blue" : "gray"}
+                                color={
+                                  task.executionMode === "temporal"
+                                    ? "blue"
+                                    : task.executionMode === "external:webhook"
+                                      ? "amber"
+                                      : task.executionMode === "external:websocket"
+                                        ? "teal"
+                                        : "gray"
+                                }
                                 radius="full"
                                 variant="soft"
                               >
-                                {task.executionMode === "temporal"
-                                  ? task.orchestrationStatus
-                                    ? `Temporal · ${task.orchestrationStatus.replace(/_/g, " ")}`
-                                    : "Temporal"
-                                  : "Manual"}
+                                {formatExecutionLabel(task.executionMode, task.orchestrationStatus)}
                               </Badge>
                             )}
                           </Flex>

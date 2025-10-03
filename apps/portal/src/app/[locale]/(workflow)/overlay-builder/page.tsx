@@ -41,7 +41,7 @@ export default async function OverlayBuilderPage({
       title: t("stepTypes.manualReview.title"),
       summary: t("stepTypes.manualReview.summary"),
       kind: "review",
-      executionMode: "manual" as const,
+      execution: { mode: "manual" as const },
       defaultInput: {
         checklist: ["evidence", "notes"],
       },
@@ -53,12 +53,67 @@ export default async function OverlayBuilderPage({
       title: t("stepTypes.temporalWebhook.title"),
       summary: t("stepTypes.temporalWebhook.summary"),
       kind: "tool.call",
-      executionMode: "temporal" as const,
+      execution: {
+        mode: "temporal" as const,
+        workflow: "croNameCheckWorkflow",
+        defaultTaskQueue: "fc-standard",
+        config: {
+          workflow: "croNameCheckWorkflow",
+          defaultTaskQueue: "fc-standard",
+        },
+      },
       defaultInput: {
-        urlAlias: "secrets.crm.apiToken",
         retryPolicy: { attempts: 3 },
       },
       secretAliases: ["secrets.crm.apiToken", "secrets.temporal.taskQueueKey"],
+    },
+    {
+      slug: "external.crm.webhook",
+      version: "1.0.0",
+      title: t("stepTypes.externalWebhook.title"),
+      summary: t("stepTypes.externalWebhook.summary"),
+      kind: "action",
+      execution: {
+        mode: "external:webhook" as const,
+        config: {
+          method: "POST",
+          urlAlias: "secrets.webhooks.baseUrl",
+          tokenAlias: "secrets.webhooks.token",
+          path: "/integrations/fresh-comply",
+        },
+      },
+      defaultInput: {
+        payloadTemplate: { status: "pending" },
+      },
+      secretAliases: ["secrets.webhooks.baseUrl", "secrets.webhooks.token", "secrets.webhooks.signature"],
+      executionAliasOptions: {
+        urlAlias: ["secrets.webhooks.baseUrl"],
+        tokenAlias: ["secrets.webhooks.token"],
+        "signing.secretAlias": ["secrets.webhooks.signature"],
+      },
+    },
+    {
+      slug: "external.stream.websocket",
+      version: "0.3.0",
+      title: t("stepTypes.externalWebsocket.title"),
+      summary: t("stepTypes.externalWebsocket.summary"),
+      kind: "tool.call",
+      execution: {
+        mode: "external:websocket" as const,
+        config: {
+          urlAlias: "secrets.websocket.baseUrl",
+          tokenAlias: "secrets.websocket.token",
+          messageSchema: "schemas/stream-message.json",
+          temporalWorkflow: "externalJobWorkflow",
+          defaultTaskQueue: "tenant-x-events",
+        },
+      },
+      defaultInput: {},
+      secretAliases: ["secrets.websocket.baseUrl", "secrets.websocket.token"],
+      executionAliasOptions: {
+        urlAlias: ["secrets.websocket.baseUrl"],
+        tokenAlias: ["secrets.websocket.token"],
+      },
     },
   ];
 
@@ -70,6 +125,26 @@ export default async function OverlayBuilderPage({
     {
       alias: "secrets.temporal.taskQueueKey",
       description: t("secrets.temporalQueue"),
+    },
+    {
+      alias: "secrets.webhooks.baseUrl",
+      description: t("secrets.webhookBaseUrl"),
+    },
+    {
+      alias: "secrets.webhooks.token",
+      description: t("secrets.webhookToken"),
+    },
+    {
+      alias: "secrets.webhooks.signature",
+      description: t("secrets.webhookSignature"),
+    },
+    {
+      alias: "secrets.websocket.baseUrl",
+      description: t("secrets.websocketUrl"),
+    },
+    {
+      alias: "secrets.websocket.token",
+      description: t("secrets.websocketToken"),
     },
   ];
 
@@ -85,6 +160,22 @@ export default async function OverlayBuilderPage({
     inputPlaceholder: t("add.inputPlaceholder"),
     secretLabel: t("add.secret"),
     secretPlaceholder: t("add.secretPlaceholder"),
+    executionLabel: t("add.executionLabel"),
+    executionHint: t("add.executionHint"),
+    executionWebhookMethod: t("add.executionWebhookMethod"),
+    executionWebhookUrlAlias: t("add.executionWebhookUrlAlias"),
+    executionWebhookTokenAlias: t("add.executionWebhookTokenAlias"),
+    executionWebhookPath: t("add.executionWebhookPath"),
+    executionWebhookSigningAlias: t("add.executionWebhookSigningAlias"),
+    executionTemporalWorkflow: t("add.executionTemporalWorkflow"),
+    executionTemporalTaskQueue: t("add.executionTemporalTaskQueue"),
+    executionTemporalDefaultTaskQueue: t("add.executionTemporalDefaultTaskQueue"),
+    executionWebsocketUrlAlias: t("add.executionWebsocketUrlAlias"),
+    executionWebsocketTokenAlias: t("add.executionWebsocketTokenAlias"),
+    executionWebsocketMessageSchema: t("add.executionWebsocketMessageSchema"),
+    executionWebsocketWorkflow: t("add.executionWebsocketWorkflow"),
+    executionWebsocketQueue: t("add.executionWebsocketQueue"),
+    executionAliasUnavailable: t("messages.executionAliasUnavailable"),
     insertButton: t("actions.insert"),
     resetButton: t("actions.reset"),
     operationsHeading: t("operations.heading"),
@@ -96,6 +187,9 @@ export default async function OverlayBuilderPage({
     mergeError: t("messages.mergeError"),
     secretRequired: t("messages.secretRequired"),
     secretUnavailable: t("messages.secretUnavailable"),
+    executionWebhookUrlAliasRequired: t("messages.executionWebhookUrlAliasRequired"),
+    executionWebsocketUrlAliasRequired: t("messages.executionWebsocketUrlAliasRequired"),
+    executionAliasInvalid: t("messages.executionAliasInvalid"),
     addedLabel: t("overlay.added"),
     removedLabel: t("overlay.removed"),
     totalLabel: t("base.optional"),

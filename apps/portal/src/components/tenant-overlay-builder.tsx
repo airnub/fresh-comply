@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { applyPatch, type Operation } from "fast-json-patch";
+import jsonPatch, { type Operation } from "fast-json-patch";
 import {
   Button,
   Card,
@@ -12,8 +12,34 @@ import {
   Select,
   Separator,
   Text,
-  TextArea
+  TextArea,
+  TextField
 } from "@radix-ui/themes";
+import type {
+  StepExecution,
+  WebhookStepExecution,
+  WebsocketStepExecution
+} from "@airnub/engine/types";
+import {
+  ExecutionAliasKey,
+  isTemporalExecution,
+  isWebhookExecution,
+  isWebsocketExecution,
+  normaliseExecution,
+  sanitizeTemporalExecution,
+  sanitizeWebhookExecution,
+  sanitizeWebsocketExecution
+} from "./tenant-overlay-execution";
+
+function filterSecretsByAliases(
+  secrets: OverlaySecretBinding[],
+  allowed?: string[]
+): OverlaySecretBinding[] {
+  if (!allowed || allowed.length === 0) {
+    return secrets;
+  }
+  return secrets.filter((secret) => allowed.includes(secret.alias));
+}
 
 export type OverlayStepType = {
   slug: string;
@@ -21,9 +47,10 @@ export type OverlayStepType = {
   title: string;
   summary: string;
   kind: string;
-  executionMode: "manual" | "temporal";
+  execution: StepExecution;
   defaultInput: Record<string, unknown>;
   secretAliases: string[];
+  executionAliasOptions?: Partial<Record<ExecutionAliasKey, string[]>>;
 };
 
 export type OverlaySecretBinding = {
@@ -56,6 +83,22 @@ export interface OverlayBuilderLabels {
   inputPlaceholder: string;
   secretLabel: string;
   secretPlaceholder: string;
+  executionLabel: string;
+  executionHint: string;
+  executionWebhookMethod: string;
+  executionWebhookUrlAlias: string;
+  executionWebhookTokenAlias: string;
+  executionWebhookPath: string;
+  executionWebhookSigningAlias: string;
+  executionTemporalWorkflow: string;
+  executionTemporalTaskQueue: string;
+  executionTemporalDefaultTaskQueue: string;
+  executionWebsocketUrlAlias: string;
+  executionWebsocketTokenAlias: string;
+  executionWebsocketMessageSchema: string;
+  executionWebsocketWorkflow: string;
+  executionWebsocketQueue: string;
+  executionAliasUnavailable: string;
   insertButton: string;
   resetButton: string;
   operationsHeading: string;
@@ -67,6 +110,9 @@ export interface OverlayBuilderLabels {
   mergeError: string;
   secretRequired: string;
   secretUnavailable: string;
+  executionWebhookUrlAliasRequired: string;
+  executionWebsocketUrlAliasRequired: string;
+  executionAliasInvalid: string;
   addedLabel: string;
   removedLabel: string;
   totalLabel: string;
@@ -94,11 +140,15 @@ export function TenantOverlayBuilder({
   const [inputJson, setInputJson] = useState(() =>
     JSON.stringify(stepTypes[0]?.defaultInput ?? {}, null, 2)
   );
+  const [executionState, setExecutionState] = useState<StepExecution>(() =>
+    stepTypes[0] ? normaliseExecution(stepTypes[0].execution) : { mode: "manual" }
+  );
   const [selectedSecret, setSelectedSecret] = useState<string>(
     secrets[0]?.alias ?? ""
   );
   const [inputError, setInputError] = useState<string | null>(null);
   const [secretError, setSecretError] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
   const [overlayOperations, setOverlayOperations] = useState<Operation[]>([]);
   const [persistMessage, setPersistMessage] = useState<string | null>(null);
   const [persistError, setPersistError] = useState<string | null>(null);
@@ -106,7 +156,7 @@ export function TenantOverlayBuilder({
 
   const mergeResult = useMemo(() => {
     try {
-      const result = applyPatch(structuredClone(baseWorkflow), overlayOperations, true, false);
+      const result = jsonPatch.applyPatch(structuredClone(baseWorkflow), overlayOperations, true, false);
       return {
         workflow: (result.newDocument as OverlayWorkflow) ?? baseWorkflow,
         error: null as string | null
@@ -147,6 +197,31 @@ export function TenantOverlayBuilder({
       activeStepType.secretAliases.includes(secret.alias)
     );
   }, [activeStepType, secrets]);
+
+  const executionAliasOptions = useMemo(() => {
+    return {
+      url: filterSecretsByAliases(
+        secrets,
+        activeStepType?.executionAliasOptions?.urlAlias
+      ),
+      token: filterSecretsByAliases(
+        secrets,
+        activeStepType?.executionAliasOptions?.tokenAlias
+      ),
+      signing: filterSecretsByAliases(
+        secrets,
+        activeStepType?.executionAliasOptions?.["signing.secretAlias"]
+      )
+    };
+  }, [activeStepType?.executionAliasOptions, secrets]);
+
+  useEffect(() => {
+    if (activeStepType) {
+      setInputJson(JSON.stringify(activeStepType.defaultInput ?? {}, null, 2));
+      setExecutionState(normaliseExecution(activeStepType.execution));
+      setExecutionError(null);
+    }
+  }, [activeStepType]);
 
   useEffect(() => {
     if (!activeStepType) {
@@ -224,6 +299,37 @@ export function TenantOverlayBuilder({
       setInputError(null);
     }
 
+    const executionClone = structuredClone(executionState);
+    let preparedExecution: StepExecution = executionClone;
+
+    if (isWebhookExecution(executionClone)) {
+      const alias = executionClone.config.urlAlias.trim();
+      if (!alias) {
+        setExecutionError(labels.executionWebhookUrlAliasRequired);
+        return;
+      }
+      if (alias.includes("://")) {
+        setExecutionError(labels.executionAliasInvalid);
+        return;
+      }
+      preparedExecution = sanitizeWebhookExecution(executionClone);
+    } else if (isWebsocketExecution(executionClone)) {
+      const alias = executionClone.config.urlAlias.trim();
+      if (!alias) {
+        setExecutionError(labels.executionWebsocketUrlAliasRequired);
+        return;
+      }
+      if (alias.includes("://")) {
+        setExecutionError(labels.executionAliasInvalid);
+        return;
+      }
+      preparedExecution = sanitizeWebsocketExecution(executionClone);
+    } else if (isTemporalExecution(executionClone)) {
+      preparedExecution = sanitizeTemporalExecution(executionClone);
+    }
+
+    setExecutionError(null);
+
     const timestamp = Date.now();
     const stepId = `${slug}-${version}-${timestamp}`;
     const secretsMetadata = selectedSecret
@@ -238,9 +344,7 @@ export function TenantOverlayBuilder({
         kind: stepType.kind,
         title: stepType.title,
         stepType: `${slug}@${version}`,
-        execution: {
-          mode: stepType.executionMode,
-        },
+        execution: preparedExecution,
         input: parsedInput,
         metadata: secretsMetadata,
       },
@@ -257,6 +361,7 @@ export function TenantOverlayBuilder({
     setPersistMessage(null);
     setPersistError(null);
     setSecretError(null);
+    setExecutionError(null);
   };
 
   const handlePersist = async () => {
@@ -290,6 +395,383 @@ export function TenantOverlayBuilder({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const renderExecutionFields = () => {
+    if (!executionState) {
+      return null;
+    }
+
+    if (isTemporalExecution(executionState)) {
+      return (
+        <Flex direction="column" gap="2">
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionTemporalWorkflow}
+            </Text>
+            <TextField.Root
+              value={executionState.workflow ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isTemporalExecution(prev)
+                    ? {
+                        ...prev,
+                        workflow: value,
+                        config: { ...prev.config, workflow: value }
+                      }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionTemporalTaskQueue}
+            </Text>
+            <TextField.Root
+              value={executionState.taskQueue ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isTemporalExecution(prev)
+                    ? {
+                        ...prev,
+                        taskQueue: value,
+                        config: { ...prev.config, taskQueue: value }
+                      }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionTemporalDefaultTaskQueue}
+            </Text>
+            <TextField.Root
+              value={executionState.defaultTaskQueue ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isTemporalExecution(prev)
+                    ? {
+                        ...prev,
+                        defaultTaskQueue: value,
+                        config: { ...prev.config, defaultTaskQueue: value }
+                      }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+        </Flex>
+      );
+    }
+
+    if (isWebhookExecution(executionState)) {
+      const signingAlias = executionState.config.signing?.secretAlias ?? "";
+      return (
+        <Flex direction="column" gap="2">
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebhookMethod}
+            </Text>
+            <Select.Root
+              value={executionState.config.method}
+              onValueChange={(value) => {
+                setExecutionState((prev) =>
+                  isWebhookExecution(prev)
+                    ? {
+                        ...prev,
+                        config: {
+                          ...prev.config,
+                          method: value as WebhookStepExecution["config"]["method"]
+                        }
+                      }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            >
+              <Select.Trigger className="w-full" />
+              <Select.Content>
+                {(["GET", "POST", "PUT", "PATCH", "DELETE"] as const).map((method) => (
+                  <Select.Item key={method} value={method}>
+                    {method}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebhookUrlAlias}
+            </Text>
+            <Select.Root
+              value={executionState.config.urlAlias}
+              onValueChange={(value) => {
+                setExecutionState((prev) =>
+                  isWebhookExecution(prev)
+                    ? { ...prev, config: { ...prev.config, urlAlias: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            >
+              <Select.Trigger
+                className="w-full"
+                placeholder={labels.secretPlaceholder}
+                disabled={executionAliasOptions.url.length === 0}
+              />
+              <Select.Content>
+                {executionAliasOptions.url.map((option) => (
+                  <Select.Item key={option.alias} value={option.alias}>
+                    {option.alias}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            {executionAliasOptions.url.length === 0 ? (
+              <Text size="1" color="gray">
+                {labels.executionAliasUnavailable}
+              </Text>
+            ) : null}
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebhookTokenAlias}
+            </Text>
+            <Select.Root
+              value={executionState.config.tokenAlias ?? ""}
+              onValueChange={(value) => {
+                setExecutionState((prev) =>
+                  isWebhookExecution(prev)
+                    ? { ...prev, config: { ...prev.config, tokenAlias: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            >
+              <Select.Trigger
+                className="w-full"
+                placeholder={labels.secretPlaceholder}
+                disabled={executionAliasOptions.token.length === 0}
+              />
+              <Select.Content>
+                <Select.Item value="">{labels.secretPlaceholder}</Select.Item>
+                {executionAliasOptions.token.map((option) => (
+                  <Select.Item key={option.alias} value={option.alias}>
+                    {option.alias}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            {executionAliasOptions.token.length === 0 ? (
+              <Text size="1" color="gray">
+                {labels.executionAliasUnavailable}
+              </Text>
+            ) : null}
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebhookPath}
+            </Text>
+            <TextField.Root
+              value={executionState.config.path ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isWebhookExecution(prev)
+                    ? { ...prev, config: { ...prev.config, path: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebhookSigningAlias}
+            </Text>
+            <Select.Root
+              value={signingAlias}
+              onValueChange={(value) => {
+                setExecutionState((prev) =>
+                  isWebhookExecution(prev)
+                    ? {
+                        ...prev,
+                        config: {
+                          ...prev.config,
+                          signing:
+                            value.length > 0
+                              ? {
+                                  algo: prev.config.signing?.algo ?? "hmac-sha256",
+                                  secretAlias: value
+                                }
+                              : undefined
+                        }
+                      }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            >
+              <Select.Trigger
+                className="w-full"
+                placeholder={labels.secretPlaceholder}
+                disabled={executionAliasOptions.signing.length === 0}
+              />
+              <Select.Content>
+                <Select.Item value="">{labels.secretPlaceholder}</Select.Item>
+                {executionAliasOptions.signing.map((option) => (
+                  <Select.Item key={option.alias} value={option.alias}>
+                    {option.alias}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            {executionAliasOptions.signing.length === 0 ? (
+              <Text size="1" color="gray">
+                {labels.executionAliasUnavailable}
+              </Text>
+            ) : null}
+          </label>
+        </Flex>
+      );
+    }
+
+    if (isWebsocketExecution(executionState)) {
+      return (
+        <Flex direction="column" gap="2">
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebsocketUrlAlias}
+            </Text>
+            <Select.Root
+              value={executionState.config.urlAlias}
+              onValueChange={(value) => {
+                setExecutionState((prev) =>
+                  isWebsocketExecution(prev)
+                    ? { ...prev, config: { ...prev.config, urlAlias: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            >
+              <Select.Trigger
+                className="w-full"
+                placeholder={labels.secretPlaceholder}
+                disabled={executionAliasOptions.url.length === 0}
+              />
+              <Select.Content>
+                {executionAliasOptions.url.map((option) => (
+                  <Select.Item key={option.alias} value={option.alias}>
+                    {option.alias}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            {executionAliasOptions.url.length === 0 ? (
+              <Text size="1" color="gray">
+                {labels.executionAliasUnavailable}
+              </Text>
+            ) : null}
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebsocketTokenAlias}
+            </Text>
+            <Select.Root
+              value={executionState.config.tokenAlias ?? ""}
+              onValueChange={(value) => {
+                setExecutionState((prev) =>
+                  isWebsocketExecution(prev)
+                    ? { ...prev, config: { ...prev.config, tokenAlias: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            >
+              <Select.Trigger
+                className="w-full"
+                placeholder={labels.secretPlaceholder}
+                disabled={executionAliasOptions.token.length === 0}
+              />
+              <Select.Content>
+                <Select.Item value="">{labels.secretPlaceholder}</Select.Item>
+                {executionAliasOptions.token.map((option) => (
+                  <Select.Item key={option.alias} value={option.alias}>
+                    {option.alias}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            {executionAliasOptions.token.length === 0 ? (
+              <Text size="1" color="gray">
+                {labels.executionAliasUnavailable}
+              </Text>
+            ) : null}
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebsocketMessageSchema}
+            </Text>
+            <TextField.Root
+              value={executionState.config.messageSchema ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isWebsocketExecution(prev)
+                    ? { ...prev, config: { ...prev.config, messageSchema: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebsocketWorkflow}
+            </Text>
+            <TextField.Root
+              value={executionState.config.temporalWorkflow ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isWebsocketExecution(prev)
+                    ? { ...prev, config: { ...prev.config, temporalWorkflow: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+          <label className="space-y-1">
+            <Text size="2" weight="medium">
+              {labels.executionWebsocketQueue}
+            </Text>
+            <TextField.Root
+              value={executionState.config.defaultTaskQueue ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setExecutionState((prev) =>
+                  isWebsocketExecution(prev)
+                    ? { ...prev, config: { ...prev.config, defaultTaskQueue: value } }
+                    : prev
+                );
+                setExecutionError(null);
+              }}
+            />
+          </label>
+        </Flex>
+      );
+    }
+
+    return null;
   };
 
   const stepTypeItems = stepTypes.map((type) => ({
@@ -378,6 +860,19 @@ export function TenantOverlayBuilder({
                   </Text>
                 ) : null}
               </label>
+
+              <div className="space-y-2">
+                <Text size="2" weight="medium">
+                  {labels.executionLabel}
+                </Text>
+                <Text size="1" color="gray">
+                  {labels.executionHint}
+                </Text>
+                {renderExecutionFields()}
+                {executionError ? (
+                  <Text size="1" color="red">{executionError}</Text>
+                ) : null}
+              </div>
 
               <label className="space-y-2">
                 <Text size="2" weight="medium">

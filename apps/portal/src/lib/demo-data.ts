@@ -66,20 +66,27 @@ export async function getDemoRun(): Promise<DemoRun> {
     materializeSteps(dsl).map(async (step, index) => {
       const execution = step.execution as StepExecution | undefined;
       const orchestration =
-        execution?.mode === "temporal"
+        execution?.mode === "temporal" || execution?.mode === "external:websocket"
           ? {
               status: orchestrationStates[index] ?? "idle",
-            workflowId: `demo-${step.id}`,
-            resultSummary:
-              index === 0
-                ? "Name available — reserved for 28 days"
-                : index === 1
-                  ? "Rendering board minutes and filings"
-                  : index === 3
-                    ? "Awaiting advisor confirmation"
-                    : undefined
-          }
-        : undefined;
+              workflowId: `demo-${step.id}`,
+              resultSummary:
+                index === 0
+                  ? "Name available — reserved for 28 days"
+                  : index === 1
+                    ? "Rendering board minutes and filings"
+                    : index === 3
+                      ? "Awaiting advisor confirmation"
+                      : execution?.mode === "external:websocket"
+                        ? "Listening for tenant stream events"
+                        : undefined
+            }
+          : execution?.mode === "external:webhook"
+            ? {
+                status: "idle" as const,
+                resultSummary: "Invoke tenant webhook with signed payload"
+              }
+            : undefined;
 
     const status: DemoStep["status"] =
       index === 0

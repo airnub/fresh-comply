@@ -1,5 +1,11 @@
-import { applyPatch, type Operation } from "fast-json-patch";
-import { WorkflowDSL, StepDef } from "./types.js";
+import jsonPatch, { type Operation } from "fast-json-patch";
+import {
+  WorkflowDSL,
+  StepDef,
+  type StepExecution,
+  type WebhookStepExecution,
+  type WebsocketStepExecution
+} from "./types.js";
 
 export type OverlayPatch = {
   operations: Operation[];
@@ -74,6 +80,71 @@ function validateSecretBindings(workflow: WorkflowDSL): string[] {
   return issues;
 }
 
+function isAlias(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 && !value.includes("://");
+}
+
+function validateWebhookExecution(stepId: string, execution: WebhookStepExecution, issues: string[]) {
+  const config = execution.config;
+  if (!isAlias(config.urlAlias)) {
+    issues.push(`Step ${stepId} webhook config must reference a urlAlias secret.`);
+  }
+  if ("url" in (config as Record<string, unknown>)) {
+    issues.push(`Step ${stepId} webhook config must not include a raw url; use urlAlias instead.`);
+  }
+  if (config.tokenAlias && !isAlias(config.tokenAlias)) {
+    issues.push(`Step ${stepId} webhook config tokenAlias must be a secret alias.`);
+  }
+  if ((config as Record<string, unknown>).token) {
+    issues.push(`Step ${stepId} webhook config must not include a raw token; use tokenAlias.`);
+  }
+  if (config.signing) {
+    if (config.signing.algo !== "hmac-sha256") {
+      issues.push(`Step ${stepId} webhook config uses unsupported signing algorithm ${config.signing.algo}.`);
+    }
+    if (!isAlias(config.signing.secretAlias)) {
+      issues.push(`Step ${stepId} webhook config signing.secretAlias must be a secret alias.`);
+    }
+  }
+}
+
+function validateWebsocketExecution(stepId: string, execution: WebsocketStepExecution, issues: string[]) {
+  const config = execution.config;
+  if (!isAlias(config.urlAlias)) {
+    issues.push(`Step ${stepId} websocket config must reference a urlAlias secret.`);
+  }
+  if (config.tokenAlias && !isAlias(config.tokenAlias)) {
+    issues.push(`Step ${stepId} websocket config tokenAlias must be a secret alias.`);
+  }
+  if ((config as Record<string, unknown>).token) {
+    issues.push(`Step ${stepId} websocket config must not include a raw token; use tokenAlias.`);
+  }
+}
+
+function validateExecutionMetadata(workflow: WorkflowDSL): string[] {
+  const issues: string[] = [];
+
+  for (const step of workflow.steps) {
+    const execution = step.execution as StepExecution | undefined;
+    if (!execution) {
+      continue;
+    }
+
+    switch (execution.mode) {
+      case "external:webhook":
+        validateWebhookExecution(step.id, execution, issues);
+        break;
+      case "external:websocket":
+        validateWebsocketExecution(step.id, execution, issues);
+        break;
+      default:
+        break;
+    }
+  }
+
+  return issues;
+}
+
 export function materializeWorkflow(dsl: WorkflowDSL, options: MaterializeOptions = {}): MaterializeResult {
   const overlays = options.overlays ?? [];
   let workflow = cloneWorkflow(dsl);
@@ -83,7 +154,7 @@ export function materializeWorkflow(dsl: WorkflowDSL, options: MaterializeOption
       continue;
     }
 
-    const result = applyPatch(cloneWorkflow(workflow), overlay.operations, true, false);
+    const result = jsonPatch.applyPatch(cloneWorkflow(workflow), overlay.operations, true, false);
     if (!result.newDocument) {
       throw new Error(`Failed to apply overlay patch${overlay.source ? ` from ${overlay.source}` : ""}`);
     }
@@ -98,6 +169,11 @@ export function materializeWorkflow(dsl: WorkflowDSL, options: MaterializeOption
   const secretIssues = validateSecretBindings(workflow);
   if (secretIssues.length > 0) {
     throw new Error(secretIssues.join("\n"));
+  }
+
+  const executionIssues = validateExecutionMetadata(workflow);
+  if (executionIssues.length > 0) {
+    throw new Error(executionIssues.join("\n"));
   }
 
   return {
