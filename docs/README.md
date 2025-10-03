@@ -10,8 +10,15 @@
 - **ADR-0003: White-Label Multi-Tenant Architecture** — `../adr/0003-white-label-multi-tenant-architecture.md`
 - **ADR-0002: Stripe Billing Scaffold** — `../adr/0002-billing-stripe.md`
 
+## Getting Started
+- **Local Development** — `getting-started/local-development.md`
+- **Codespaces** — `getting-started/codespaces.md`
+
 ## Operations
 - **Observability & Dashboards** — `ops/observability.md`
+
+## Guides
+- **Supabase** — `guides/supabase.md`
 
 ## Superseded / Archive
 - **Live Workflow — Irish Non-Profit Setup (Product Spec) (v2025-10-02)** — `../archive/2025-10-02-live-workflow-nonprofit-ie.md`

@@ -2,12 +2,18 @@
 
 ## Getting Started
 
+### Local development quickstart
+
 ```bash
-pnpm i
+pnpm install
+supabase start
+pnpm db:env:local
 pnpm dev
 ```
 
-This starts the FreshComply portal with demo data, including a workflow run that showcases the timeline, task board, and evidence drawer views.
+This spins up the local Supabase stack, syncs generated keys into `.env.local`, and starts the FreshComply portal and admin apps in parallel. See the [Local development guide](docs/getting-started/local-development.md), [Codespaces guide](docs/getting-started/codespaces.md), and [Supabase workflow guide](docs/guides/supabase.md) for the full walkthrough and troubleshooting steps.
+
+If you only need the portal, run `pnpm --filter ./apps/portal dev` instead of the aggregated `pnpm dev` task.
 
 ## Temporal Orchestration
 
