@@ -6,27 +6,14 @@ need() { command -v "$1" >/dev/null 2>&1; }
 
 if ! need pnpm; then echo "[post-create] pnpm is required on PATH" >&2; exit 1; fi
 
-ensure_packages() {
-  local pkgs=(git jq curl ca-certificates netcat-openbsd)
-  local missing=()
-  for pkg in "${pkgs[@]}"; do
-    dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
-  done
-
-  if ((${#missing[@]})); then
-    echo "[post-create] Installing apt packages: ${missing[*]}"
-    sudo apt-get update
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
-    sudo rm -rf /var/lib/apt/lists/*
-  fi
-}
-
-ensure_packages
+# Ensure handy tooling
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  git jq curl ca-certificates netcat-openbsd
+sudo rm -rf /var/lib/apt/lists/*
 
 # Speed up pnpm (use cache mount)
-PNPM_STORE_DIR="${PNPM_STORE_PATH:-${HOME}/.pnpm-store}"
-mkdir -p "${PNPM_STORE_DIR}"
-pnpm config set store-dir "${PNPM_STORE_DIR}"
+pnpm config set store-dir /home/node/.pnpm-store
 
 echo "[post-create] Installing workspace deps..."
 pnpm -w fetch

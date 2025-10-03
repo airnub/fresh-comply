@@ -13,16 +13,15 @@
   "hostRequirements": { "cpus": 2, "memory": "4gb", "storage": "16gb" },
 
   "containerEnv": {
-    "PNPM_HOME": "/home/vscode/.local/share/pnpm",
-    "PATH": "${containerEnv:PATH}:/home/vscode/.local/share/pnpm",
-    "PNPM_STORE_PATH": "/home/vscode/.pnpm-store",
-    "AUTO_START_SUPABASE": "true",
+    "PNPM_HOME": "/home/node/.pnpm",
+    "PATH": "${containerEnv:PATH}:/home/node/.pnpm",
+    "AUTO_START_SUPABASE": "false",
     "SUPABASE_VERSION": "latest",
     "NODE_OPTIONS": "--max-old-space-size=4096"
   },
 
   "mounts": [
-    "type=cache,source=pnpm-store,target=/home/vscode/.pnpm-store",
+    "type=cache,source=pnpm-store,target=/home/node/.pnpm-store",
     "type=cache,source=next-cache,target=${containerWorkspaceFolder}/.next/cache"
   ],
 
