@@ -202,6 +202,906 @@ comment on column audit_log.tenant_id is 'Tenant scope for hash chain enforcemen
 comment on column audit_log.chain_position is 'Monotonic position within the tenant-specific audit hash chain.';
 comment on trigger audit_log_block_mutations on audit_log is 'Prevents UPDATE or DELETE on the append-only audit ledger.';
 
+create table tenant_domains (
+  id uuid primary key default gen_random_uuid(),
+  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  domain text not null check (domain = lower(domain)),
+  is_primary boolean not null default false,
+  verified_at timestamptz,
+  cert_status text not null default 'pending' check (cert_status in (
+    'pending',
+    'provisioning',
+    'issued',
+    'failed',
+    'revoked'
+  )),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint tenant_domains_domain_not_blank check (length(trim(domain)) > 0),
+  unique(domain)
+);
+
+create unique index tenant_domains_tenant_domain_unique on tenant_domains(tenant_org_id, domain);
+create unique index tenant_domains_primary_unique on tenant_domains(tenant_org_id) where is_primary;
+create index tenant_domains_lookup_idx on tenant_domains(domain, verified_at);
+create index tenant_domains_tenant_idx on tenant_domains(tenant_org_id, verified_at);
+
+create table tenant_branding (
+  tenant_org_id uuid primary key references organisations(id) on delete cascade,
+  tokens jsonb not null default '{}'::jsonb,
+  logo_url text,
+  favicon_url text,
+  typography jsonb not null default '{}'::jsonb,
+  pdf_header jsonb not null default '{}'::jsonb,
+  pdf_footer jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index tenant_branding_updated_idx on tenant_branding(updated_at desc);
+create index tenant_branding_tokens_idx on tenant_branding using gin (tokens jsonb_path_ops);
+
+alter table tenant_domains enable row level security;
+alter table tenant_branding enable row level security;
+
+create policy "Service role manages tenant domains" on tenant_domains
+  for all using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+create policy "Tenant members manage domains" on tenant_domains
+  for all using (
+    auth.role() = 'service_role'
+    or public.is_member_of_org(tenant_org_id)
+  )
+  with check (
+    auth.role() = 'service_role'
+    or public.is_member_of_org(tenant_org_id)
+  );
+
+create policy "Service role manages tenant branding" on tenant_branding
+  for all using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+create policy "Tenant members manage branding" on tenant_branding
+  for all using (
+    auth.role() = 'service_role'
+    or public.is_member_of_org(tenant_org_id)
+  )
+  with check (
+    auth.role() = 'service_role'
+    or public.is_member_of_org(tenant_org_id)
+  );
+
+create or replace function public.normalize_domain(host text)
+returns text
+language sql
+immutable
+as $$
+  select lower(split_part(trim(host), ':', 1));
+$$;
+
+grant execute on function public.normalize_domain(text) to anon, authenticated, service_role;
+
+create or replace function public.resolve_tenant_branding(p_host text)
+returns table (
+  tenant_org_id uuid,
+  domain text,
+  tokens jsonb,
+  logo_url text,
+  favicon_url text,
+  typography jsonb,
+  pdf_header jsonb,
+  pdf_footer jsonb,
+  updated_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+declare
+  normalized text;
+begin
+  normalized := public.normalize_domain(p_host);
+  return query
+  select
+    d.tenant_org_id,
+    d.domain,
+    coalesce(b.tokens, '{}'::jsonb) as tokens,
+    b.logo_url,
+    b.favicon_url,
+    coalesce(b.typography, '{}'::jsonb) as typography,
+    coalesce(b.pdf_header, '{}'::jsonb) as pdf_header,
+    coalesce(b.pdf_footer, '{}'::jsonb) as pdf_footer,
+    coalesce(b.updated_at, d.updated_at) as updated_at
+  from tenant_domains d
+  left join tenant_branding b on b.tenant_org_id = d.tenant_org_id
+  where d.domain = normalized
+    and d.verified_at is not null
+  order by d.is_primary desc, coalesce(b.updated_at, d.updated_at) desc
+  limit 1;
+end;
+$$;
+
+grant execute on function public.resolve_tenant_branding(text) to anon, authenticated, service_role;
+
+create or replace function public.assert_tenant_membership(target_tenant uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+begin
+  if auth.role() = 'service_role' then
+    return;
+  end if;
+
+  if target_tenant is null then
+    raise exception 'Tenant context required' using errcode = '22023';
+  end if;
+
+  if not public.is_member_of_org(target_tenant) then
+    raise exception 'Permission denied for tenant %', target_tenant using errcode = '42501';
+  end if;
+end;
+$$;
+
+grant execute on function public.assert_tenant_membership(uuid) to authenticated, service_role;
+
+create or replace function public.rpc_upsert_tenant_branding(
+  p_tenant_org_id uuid,
+  p_tokens jsonb,
+  p_logo_url text,
+  p_favicon_url text,
+  p_typography jsonb,
+  p_pdf_header jsonb,
+  p_pdf_footer jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  normalized_tokens jsonb := coalesce(p_tokens, '{}'::jsonb);
+  normalized_typography jsonb := coalesce(p_typography, '{}'::jsonb);
+  normalized_pdf_header jsonb := coalesce(p_pdf_header, '{}'::jsonb);
+  normalized_pdf_footer jsonb := coalesce(p_pdf_footer, '{}'::jsonb);
+  previous tenant_branding;
+  result tenant_branding;
+  audit_payload jsonb;
+  audit_entry jsonb;
+  actor_id uuid := auth.uid();
+begin
+  perform public.assert_tenant_membership(p_tenant_org_id);
+
+  select * into previous
+  from tenant_branding
+  where tenant_org_id = p_tenant_org_id;
+
+  insert into tenant_branding as tb (
+    tenant_org_id,
+    tokens,
+    logo_url,
+    favicon_url,
+    typography,
+    pdf_header,
+    pdf_footer,
+    updated_at
+  )
+  values (
+    p_tenant_org_id,
+    normalized_tokens,
+    p_logo_url,
+    p_favicon_url,
+    normalized_typography,
+    normalized_pdf_header,
+    normalized_pdf_footer,
+    now()
+  )
+  on conflict (tenant_org_id) do update
+    set tokens = excluded.tokens,
+        logo_url = excluded.logo_url,
+        favicon_url = excluded.favicon_url,
+        typography = excluded.typography,
+        pdf_header = excluded.pdf_header,
+        pdf_footer = excluded.pdf_footer,
+        updated_at = now()
+  returning * into result;
+
+  audit_payload := jsonb_build_object(
+    'tenant_org_id', p_tenant_org_id,
+    'previous', to_jsonb(previous),
+    'current', to_jsonb(result)
+  );
+
+  audit_entry := public.rpc_append_audit_entry(
+    action => 'tenant_branding_update',
+    actor_id => actor_id,
+    reason_code => 'tenant_branding_update',
+    payload => audit_payload,
+    target_kind => 'tenant_branding',
+    target_id => p_tenant_org_id,
+    tenant_org_id => p_tenant_org_id,
+    actor_org_id => p_tenant_org_id
+  );
+
+  if audit_entry is not null then
+    audit_entry := audit_entry || jsonb_build_object(
+      'reason_code', 'tenant_branding_update',
+      'payload', audit_payload
+    );
+  end if;
+
+  return jsonb_build_object(
+    'branding', to_jsonb(result),
+    'audit_entry', audit_entry
+  );
+end;
+$$;
+
+grant execute on function public.rpc_upsert_tenant_branding(uuid, jsonb, text, text, jsonb, jsonb, jsonb) to authenticated, service_role;
+
+create or replace function public.rpc_get_tenant_branding(p_tenant_org_id uuid)
+returns tenant_branding
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+declare
+  result tenant_branding;
+begin
+  perform public.assert_tenant_membership(p_tenant_org_id);
+
+  select * into result
+  from tenant_branding
+  where tenant_org_id = p_tenant_org_id;
+
+  return result;
+end;
+$$;
+
+grant execute on function public.rpc_get_tenant_branding(uuid) to authenticated, service_role;
+
+create or replace function public.rpc_upsert_tenant_domain(
+  p_tenant_org_id uuid,
+  p_domain text,
+  p_is_primary boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  normalized_domain text;
+  existing tenant_domains%rowtype;
+  previous tenant_domains%rowtype;
+  result tenant_domains%rowtype;
+  demoted_domains jsonb := '[]'::jsonb;
+  audit_payload jsonb;
+  audit_entry jsonb;
+  actor_id uuid := auth.uid();
+begin
+  perform public.assert_tenant_membership(p_tenant_org_id);
+
+  normalized_domain := public.normalize_domain(p_domain);
+
+  if normalized_domain is null or length(trim(normalized_domain)) = 0 then
+    raise exception 'Domain value required' using errcode = '22023';
+  end if;
+
+  select *
+  into existing
+  from tenant_domains
+  where domain = normalized_domain
+  for update;
+
+  previous := existing;
+
+  if found then
+    if existing.tenant_org_id <> p_tenant_org_id then
+      raise exception 'Domain % already claimed by another tenant', normalized_domain using errcode = '42501';
+    end if;
+
+    update tenant_domains
+    set is_primary = coalesce(p_is_primary, existing.is_primary),
+        updated_at = now()
+    where id = existing.id
+    returning * into result;
+  else
+    insert into tenant_domains as td (
+      tenant_org_id,
+      domain,
+      is_primary,
+      cert_status,
+      updated_at
+    )
+    values (
+      p_tenant_org_id,
+      normalized_domain,
+      coalesce(p_is_primary, false),
+      'pending',
+      now()
+    )
+    returning * into result;
+  end if;
+
+  if result.is_primary then
+    demoted_domains := coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('id', id, 'domain', domain))
+        from tenant_domains
+        where tenant_org_id = p_tenant_org_id
+          and id <> result.id
+          and is_primary
+      ),
+      '[]'::jsonb
+    );
+
+    update tenant_domains
+    set is_primary = false,
+        updated_at = now()
+    where tenant_org_id = p_tenant_org_id
+      and id <> result.id
+      and is_primary;
+  end if;
+
+  audit_payload := jsonb_build_object(
+    'domain', result.domain,
+    'previous', to_jsonb(previous),
+    'current', to_jsonb(result),
+    'demoted_domains', demoted_domains
+  );
+
+  audit_entry := public.rpc_append_audit_entry(
+    action => 'tenant_domain_claim',
+    actor_id => actor_id,
+    reason_code => 'tenant_domain_claim',
+    payload => audit_payload,
+    target_kind => 'tenant_domain',
+    target_id => result.id,
+    tenant_org_id => result.tenant_org_id,
+    actor_org_id => result.tenant_org_id
+  );
+
+  if audit_entry is not null then
+    audit_entry := audit_entry || jsonb_build_object(
+      'reason_code', 'tenant_domain_claim',
+      'payload', audit_payload
+    );
+  end if;
+
+  return jsonb_build_object(
+    'domain', to_jsonb(result),
+    'audit_entry', audit_entry
+  );
+end;
+$$;
+
+grant execute on function public.rpc_upsert_tenant_domain(uuid, text, boolean) to authenticated, service_role;
+
+create or replace function public.rpc_mark_tenant_domain_verified(
+  p_domain_id uuid,
+  p_cert_status text,
+  p_verified_at timestamptz default now()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  result tenant_domains;
+  previous tenant_domains;
+  audit_payload jsonb;
+  audit_entry jsonb;
+  tenant_id uuid;
+  actor_id uuid := auth.uid();
+begin
+  select * into previous
+  from tenant_domains
+  where id = p_domain_id;
+
+  if previous.id is null then
+    raise exception 'Domain not found' using errcode = 'P0002';
+  end if;
+
+  tenant_id := previous.tenant_org_id;
+
+  perform public.assert_tenant_membership(tenant_id);
+
+  update tenant_domains
+  set verified_at = p_verified_at,
+      cert_status = coalesce(p_cert_status, cert_status),
+      updated_at = now()
+  where id = p_domain_id
+  returning * into result;
+
+  audit_payload := jsonb_build_object(
+    'domain', result.domain,
+    'previous', to_jsonb(previous),
+    'current', to_jsonb(result)
+  );
+
+  audit_entry := public.rpc_append_audit_entry(
+    action => 'tenant_domain_verify',
+    actor_id => actor_id,
+    reason_code => 'tenant_domain_verify',
+    payload => audit_payload,
+    target_kind => 'tenant_domain',
+    target_id => result.id,
+    tenant_org_id => result.tenant_org_id,
+    actor_org_id => result.tenant_org_id
+  );
+
+  if audit_entry is not null then
+    audit_entry := audit_entry || jsonb_build_object(
+      'reason_code', 'tenant_domain_verify',
+      'payload', audit_payload
+    );
+  end if;
+
+  return jsonb_build_object(
+    'domain', to_jsonb(result),
+    'audit_entry', audit_entry
+  );
+end;
+$$;
+
+grant execute on function public.rpc_mark_tenant_domain_verified(uuid, text, timestamptz) to authenticated, service_role;
+
+create or replace function public.rpc_delete_tenant_domain(
+  p_domain_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  existing tenant_domains;
+  removed boolean := false;
+  removed_count integer := 0;
+  audit_payload jsonb;
+  audit_entry jsonb;
+  actor_id uuid := auth.uid();
+begin
+  select * into existing
+  from tenant_domains
+  where id = p_domain_id;
+
+  if existing.id is null then
+    raise exception 'Domain not found' using errcode = 'P0002';
+  end if;
+
+  perform public.assert_tenant_membership(existing.tenant_org_id);
+
+  delete from tenant_domains
+  where id = p_domain_id;
+  get diagnostics removed_count = row_count;
+  removed := removed_count > 0;
+
+  if removed then
+    audit_payload := jsonb_build_object(
+      'domain', existing.domain,
+      'deleted', to_jsonb(existing)
+    );
+
+    audit_entry := public.rpc_append_audit_entry(
+      action => 'tenant_domain_delete',
+      actor_id => actor_id,
+      reason_code => 'tenant_domain_delete',
+      payload => audit_payload,
+      target_kind => 'tenant_domain',
+      target_id => existing.id,
+      tenant_org_id => existing.tenant_org_id,
+      actor_org_id => existing.tenant_org_id
+    );
+
+    if audit_entry is not null then
+      audit_entry := audit_entry || jsonb_build_object(
+        'reason_code', 'tenant_domain_delete',
+        'payload', audit_payload
+      );
+    end if;
+  end if;
+
+  return jsonb_build_object(
+    'removed', removed,
+    'audit_entry', audit_entry
+  );
+end;
+$$;
+
+grant execute on function public.rpc_delete_tenant_domain(uuid) to authenticated, service_role;
+
+create type billing_tenant_mode as enum ('direct', 'partner_managed');
+
+create type billing_subscription_status as enum (
+  'trialing',
+  'active',
+  'incomplete',
+  'incomplete_expired',
+  'past_due',
+  'canceled',
+  'unpaid',
+  'paused'
+);
+
+create table billing_prices (
+  stripe_price_id text primary key,
+  product_name text not null,
+  nickname text,
+  unit_amount integer,
+  currency text not null,
+  interval text,
+  interval_count integer,
+  is_active boolean not null default true,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table billing_tenants (
+  id uuid primary key default gen_random_uuid(),
+  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  stripe_customer_id text unique,
+  billing_mode billing_tenant_mode not null default 'direct',
+  partner_org_id uuid references organisations(id),
+  default_price_id text references billing_prices(stripe_price_id),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint billing_tenants_tenant_unique unique (tenant_org_id)
+);
+
+create table billing_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  billing_tenant_id uuid references billing_tenants(id) on delete set null,
+  stripe_subscription_id text not null unique,
+  status billing_subscription_status not null,
+  stripe_price_id text references billing_prices(stripe_price_id),
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  cancel_at timestamptz,
+  canceled_at timestamptz,
+  cancel_at_period_end boolean not null default false,
+  collection_method text,
+  latest_invoice_id text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index billing_tenants_tenant_idx on billing_tenants(tenant_org_id);
+create index billing_subscriptions_tenant_idx on billing_subscriptions(tenant_org_id);
+create index billing_subscriptions_status_idx on billing_subscriptions(status);
+create index billing_prices_active_idx on billing_prices(is_active);
+
+alter table billing_prices enable row level security;
+alter table billing_tenants enable row level security;
+alter table billing_subscriptions enable row level security;
+
+create policy "Service role manages billing prices" on billing_prices
+  for all using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+create policy "Authenticated read billing prices" on billing_prices
+  for select using (
+    auth.role() = 'service_role'
+    or auth.role() = 'authenticated'
+  );
+
+create policy "Service role manages billing tenants" on billing_tenants
+  for all using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+create policy "Tenant members read billing tenants" on billing_tenants
+  for select using (
+    auth.role() = 'service_role'
+    or public.is_member_of_org(tenant_org_id)
+  );
+
+create policy "Service role manages billing subscriptions" on billing_subscriptions
+  for all using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+create policy "Tenant members read billing subscriptions" on billing_subscriptions
+  for select using (
+    auth.role() = 'service_role'
+    or public.is_member_of_org(tenant_org_id)
+  );
+
+create or replace function public.rpc_upsert_billing_price(
+  p_stripe_price_id text,
+  p_product_name text,
+  p_nickname text default null,
+  p_unit_amount integer default null,
+  p_currency text,
+  p_interval text default null,
+  p_interval_count integer default null,
+  p_is_active boolean default true,
+  p_metadata jsonb default '{}'::jsonb
+)
+returns billing_prices
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_price billing_prices;
+begin
+  if coalesce(trim(p_stripe_price_id), '') = '' then
+    raise exception 'Stripe price id is required' using errcode = '23514';
+  end if;
+
+  insert into billing_prices as bp (
+    stripe_price_id,
+    product_name,
+    nickname,
+    unit_amount,
+    currency,
+    interval,
+    interval_count,
+    is_active,
+    metadata,
+    updated_at
+  )
+  values (
+    p_stripe_price_id,
+    p_product_name,
+    nullif(p_nickname, ''),
+    p_unit_amount,
+    p_currency,
+    nullif(p_interval, ''),
+    p_interval_count,
+    coalesce(p_is_active, true),
+    coalesce(p_metadata, '{}'::jsonb),
+    now()
+  )
+  on conflict (stripe_price_id) do update
+    set product_name = excluded.product_name,
+        nickname = excluded.nickname,
+        unit_amount = excluded.unit_amount,
+        currency = excluded.currency,
+        interval = excluded.interval,
+        interval_count = excluded.interval_count,
+        is_active = excluded.is_active,
+        metadata = excluded.metadata,
+        updated_at = now()
+  returning * into v_price;
+
+  return v_price;
+end;
+$$;
+
+grant execute on function public.rpc_upsert_billing_price(
+  text,
+  text,
+  text,
+  integer,
+  text,
+  text,
+  integer,
+  boolean,
+  jsonb
+) to authenticated, service_role;
+
+create or replace function public.rpc_upsert_billing_tenant(
+  p_tenant_org_id uuid,
+  p_stripe_customer_id text,
+  p_billing_mode billing_tenant_mode default 'direct',
+  p_partner_org_id uuid default null,
+  p_default_price_id text default null,
+  p_metadata jsonb default '{}'::jsonb
+)
+returns billing_tenants
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_tenant billing_tenants;
+begin
+  if p_tenant_org_id is null then
+    raise exception 'Tenant organisation id is required' using errcode = '23514';
+  end if;
+
+  perform public.assert_tenant_membership(p_tenant_org_id);
+
+  insert into billing_tenants as bt (
+    tenant_org_id,
+    stripe_customer_id,
+    billing_mode,
+    partner_org_id,
+    default_price_id,
+    metadata,
+    updated_at
+  )
+  values (
+    p_tenant_org_id,
+    p_stripe_customer_id,
+    coalesce(p_billing_mode, 'direct'),
+    p_partner_org_id,
+    nullif(p_default_price_id, ''),
+    coalesce(p_metadata, '{}'::jsonb),
+    now()
+  )
+  on conflict (tenant_org_id) do update
+    set stripe_customer_id = excluded.stripe_customer_id,
+        billing_mode = excluded.billing_mode,
+        partner_org_id = excluded.partner_org_id,
+        default_price_id = excluded.default_price_id,
+        metadata = excluded.metadata,
+        updated_at = now()
+  returning * into v_tenant;
+
+  return v_tenant;
+end;
+$$;
+
+grant execute on function public.rpc_upsert_billing_tenant(
+  uuid,
+  text,
+  billing_tenant_mode,
+  uuid,
+  text,
+  jsonb
+) to authenticated, service_role;
+
+create or replace function public.rpc_upsert_billing_subscription(
+  p_tenant_org_id uuid,
+  p_billing_tenant_id uuid default null,
+  p_stripe_subscription_id text,
+  p_status billing_subscription_status,
+  p_stripe_price_id text default null,
+  p_current_period_start timestamptz default null,
+  p_current_period_end timestamptz default null,
+  p_cancel_at timestamptz default null,
+  p_canceled_at timestamptz default null,
+  p_cancel_at_period_end boolean default false,
+  p_collection_method text default null,
+  p_latest_invoice_id text default null,
+  p_metadata jsonb default '{}'::jsonb
+)
+returns billing_subscriptions
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_subscription billing_subscriptions;
+  v_billing_tenant_id uuid;
+begin
+  if p_tenant_org_id is null then
+    raise exception 'Tenant organisation id is required' using errcode = '23514';
+  end if;
+
+  if coalesce(trim(p_stripe_subscription_id), '') = '' then
+    raise exception 'Stripe subscription id is required' using errcode = '23514';
+  end if;
+
+  perform public.assert_tenant_membership(p_tenant_org_id);
+
+  if p_billing_tenant_id is not null then
+    v_billing_tenant_id := p_billing_tenant_id;
+  else
+    select id
+      into v_billing_tenant_id
+    from billing_tenants
+    where tenant_org_id = p_tenant_org_id
+    order by updated_at desc
+    limit 1;
+  end if;
+
+  insert into billing_subscriptions as bs (
+    tenant_org_id,
+    billing_tenant_id,
+    stripe_subscription_id,
+    status,
+    stripe_price_id,
+    current_period_start,
+    current_period_end,
+    cancel_at,
+    canceled_at,
+    cancel_at_period_end,
+    collection_method,
+    latest_invoice_id,
+    metadata,
+    updated_at
+  )
+  values (
+    p_tenant_org_id,
+    v_billing_tenant_id,
+    p_stripe_subscription_id,
+    p_status,
+    nullif(p_stripe_price_id, ''),
+    p_current_period_start,
+    p_current_period_end,
+    p_cancel_at,
+    p_canceled_at,
+    coalesce(p_cancel_at_period_end, false),
+    nullif(p_collection_method, ''),
+    nullif(p_latest_invoice_id, ''),
+    coalesce(p_metadata, '{}'::jsonb),
+    now()
+  )
+  on conflict (stripe_subscription_id) do update
+    set tenant_org_id = excluded.tenant_org_id,
+        billing_tenant_id = excluded.billing_tenant_id,
+        status = excluded.status,
+        stripe_price_id = excluded.stripe_price_id,
+        current_period_start = excluded.current_period_start,
+        current_period_end = excluded.current_period_end,
+        cancel_at = excluded.cancel_at,
+        canceled_at = excluded.canceled_at,
+        cancel_at_period_end = excluded.cancel_at_period_end,
+        collection_method = excluded.collection_method,
+        latest_invoice_id = excluded.latest_invoice_id,
+        metadata = excluded.metadata,
+        updated_at = now()
+  returning * into v_subscription;
+
+  return v_subscription;
+end;
+$$;
+
+grant execute on function public.rpc_upsert_billing_subscription(
+  uuid,
+  uuid,
+  text,
+  billing_subscription_status,
+  text,
+  timestamptz,
+  timestamptz,
+  timestamptz,
+  timestamptz,
+  boolean,
+  text,
+  text,
+  jsonb
+) to authenticated, service_role;
+
+create or replace view billing_subscription_overview as
+select
+  bt.tenant_org_id,
+  bt.billing_mode,
+  bt.stripe_customer_id,
+  bt.partner_org_id,
+  bt.default_price_id,
+  bt.metadata as tenant_metadata,
+  bt.updated_at as tenant_updated_at,
+  bs.stripe_subscription_id,
+  bs.status,
+  bs.stripe_price_id,
+  bs.current_period_start,
+  bs.current_period_end,
+  bs.cancel_at,
+  bs.canceled_at,
+  bs.cancel_at_period_end,
+  bs.collection_method,
+  bs.latest_invoice_id,
+  bs.metadata as subscription_metadata,
+  bs.updated_at as subscription_updated_at,
+  bp.product_name,
+  bp.nickname,
+  bp.unit_amount,
+  bp.currency,
+  bp.interval,
+  bp.interval_count,
+  bp.is_active as price_active,
+  bp.metadata as price_metadata,
+  bp.updated_at as price_updated_at
+from billing_tenants bt
+left join billing_subscriptions bs on bs.billing_tenant_id = bt.id
+left join billing_prices bp on bp.stripe_price_id = coalesce(bs.stripe_price_id, bt.default_price_id);
+
+grant select on billing_subscription_overview to authenticated, service_role;
+
 create table dsr_requests (
   id uuid primary key default gen_random_uuid(),
   tenant_org_id uuid not null references organisations(id),
