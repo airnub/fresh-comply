@@ -9,12 +9,23 @@ const STATUS_COLORS: Record<string, BadgeProps["color"]> = {
   todo: "gray"
 };
 
+const ORCHESTRATION_STATUS_LABELS: Record<string, string> = {
+  idle: "Not started",
+  running: "Running",
+  awaiting_signal: "Awaiting signal",
+  completed: "Completed",
+  failed: "Failed"
+};
+
 export type TimelineItem = {
   id: string;
   title: string;
   status: string;
   dueDate?: string;
   assignee?: string;
+  executionMode?: "manual" | "temporal";
+  orchestrationStatus?: keyof typeof ORCHESTRATION_STATUS_LABELS;
+  orchestrationResult?: string;
 };
 
 export function Timeline({ items }: { items: TimelineItem[] }) {
@@ -34,9 +45,27 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
                       <Text as="p" size="3" weight="medium">
                         {item.title}
                       </Text>
-                      <Badge color={badgeColor} radius="full" variant="soft">
-                        {formattedStatus}
-                      </Badge>
+                      <Flex gap="2" wrap="wrap">
+                        <Badge color={badgeColor} radius="full" variant="soft">
+                          {formattedStatus}
+                        </Badge>
+                        {item.executionMode && (
+                          <Badge color={item.executionMode === "temporal" ? "blue" : "gray"} radius="full" variant="soft">
+                            {item.executionMode === "temporal"
+                              ? `Temporal · ${
+                                  item.orchestrationStatus
+                                    ? ORCHESTRATION_STATUS_LABELS[item.orchestrationStatus] ?? item.orchestrationStatus
+                                    : "Not started"
+                                }`
+                              : "Manual"}
+                          </Badge>
+                        )}
+                      </Flex>
+                      {item.orchestrationResult && (
+                        <Text as="span" size="2" color="gray">
+                          {item.orchestrationResult}
+                        </Text>
+                      )}
                     </Flex>
                     <Flex align="end" direction="column" gap="1">
                       {item.dueDate && (

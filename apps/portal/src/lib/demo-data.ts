@@ -1,6 +1,7 @@
 import path from "node:path";
 import { loadDSL } from "@airnub/engine/dsl";
 import { materializeSteps } from "@airnub/engine/engine";
+import type { StepExecution } from "@airnub/engine/types";
 import { verifyRule } from "@airnub/freshness/verify";
 import { SOURCES } from "@airnub/freshness/sources";
 import { renderBoardMinutes } from "@airnub/doc-templates/index";
@@ -14,6 +15,12 @@ const DSL_PATH = path.resolve(
   "ie-nonprofit-clg-charity.yaml"
 );
 
+export type DemoOrchestration = {
+  status: "idle" | "running" | "awaiting_signal" | "completed" | "failed";
+  workflowId?: string;
+  resultSummary?: string;
+};
+
 export type DemoStep = {
   id: string;
   title: string;
@@ -21,6 +28,8 @@ export type DemoStep = {
   dueDate?: string;
   assignee?: string;
   verifyRules?: Awaited<ReturnType<typeof verifyRule>>[];
+  execution?: StepExecution;
+  orchestration?: DemoOrchestration;
 };
 
 export type DemoRun = {
@@ -38,21 +47,63 @@ let cachedRun: DemoRun | null = null;
 export async function getDemoRun(): Promise<DemoRun> {
   if (cachedRun) return cachedRun;
   const dsl = loadDSL(DSL_PATH);
-  const steps = materializeSteps(dsl).map((step, index) => ({
-    id: step.id,
-    title: step.title,
-    status: index === 0 ? "in_progress" : index === 1 ? "waiting" : "todo",
-    dueDate: new Date(Date.now() + index * 1000 * 60 * 60 * 24 * 7).toISOString(),
-    assignee: index % 2 === 0 ? "Aoife Kelly" : "Brian Moore",
-    verifyRules: step.verify?.map((rule) => ({
-      id: rule.id,
-      name: rule.id.replace(/_/g, " "),
-      sources: Object.values(SOURCES)
-        .slice(0, 2)
-        .map((source) => source.url),
-      lastVerifiedAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24).toISOString()
-    }))
-  }));
+  const orchestrationStates: DemoOrchestration["status"][] = [
+    "completed",
+    "running",
+    "awaiting_signal",
+    "awaiting_signal",
+    "idle",
+    "idle",
+    "idle"
+  ];
+
+  const steps = materializeSteps(dsl).map((step, index) => {
+    const execution = step.execution as StepExecution | undefined;
+    const orchestration =
+      execution?.mode === "temporal"
+        ? {
+            status: orchestrationStates[index] ?? "idle",
+            workflowId: `demo-${step.id}`,
+            resultSummary:
+              index === 0
+                ? "Name available — reserved for 28 days"
+                : index === 1
+                  ? "Rendering board minutes and filings"
+                  : index === 3
+                    ? "Awaiting advisor confirmation"
+                    : undefined
+          }
+        : undefined;
+
+    const status: DemoStep["status"] =
+      index === 0
+        ? "done"
+        : index === 1
+          ? "in_progress"
+          : index === 2
+            ? "waiting"
+            : index === 3
+              ? "waiting"
+              : "todo";
+
+    return {
+      id: step.id,
+      title: step.title,
+      status,
+      dueDate: new Date(Date.now() + index * 1000 * 60 * 60 * 24 * 7).toISOString(),
+      assignee: index % 2 === 0 ? "Aoife Kelly" : "Brian Moore",
+      verifyRules: step.verify?.map((rule) => ({
+        id: rule.id,
+        name: rule.id.replace(/_/g, " "),
+        sources: Object.values(SOURCES)
+          .slice(0, 2)
+          .map((source) => source.url),
+        lastVerifiedAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24).toISOString()
+      })),
+      execution,
+      orchestration
+    } satisfies DemoStep;
+  });
 
   const documents = [renderBoardMinutes({
     orgName: "Company X (Client)",

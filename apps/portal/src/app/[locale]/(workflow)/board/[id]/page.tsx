@@ -37,14 +37,16 @@ export default async function TaskBoardPage({
             <Text size="2" color="gray">
               {tBoard("description")}
             </Text>
-            <TaskBoard
-              tasks={run.timeline.map((step) => ({
-                id: step.id,
-                title: step.title,
-                status: step.status,
-                assignee: step.assignee,
-                dueDate: step.dueDate
-              }))}
+              <TaskBoard
+                tasks={run.timeline.map((step) => ({
+                  id: step.id,
+                  title: step.title,
+                  status: step.status,
+                  assignee: step.assignee,
+                  dueDate: step.dueDate,
+                  executionMode: step.execution?.mode,
+                  orchestrationStatus: step.orchestration?.status
+                }))}
               statusLabels={statusLabels}
               formatDueDate={(isoDate) => tBoard("due", { date: new Date(isoDate) })}
             />

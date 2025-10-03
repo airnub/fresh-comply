@@ -26,6 +26,16 @@ pnpm dev      # start portal
 pnpm build
 ```
 
+### Temporal Orchestration (dev)
+
+```bash
+pnpm run dev:stack   # start Temporal + Postgres + optional UI (ops only)
+pnpm run dev:worker  # launch Temporal worker bundle
+pnpm dev             # start portal
+```
+
+> Temporal Web UI runs on http://localhost:8080 and is restricted to operations staff; do not surface links in customer-facing flows.
+
 ## Specs
 
 See **[Fresh-Comply Product Spec](docs/specs/fresh-comply-spec.md)** for architecture, data model, DSL, i18n/theme/a11y/GDPR plans, and roadmap. Legal templates live in **[`docs/LEGAL/`](docs/LEGAL/)**.

@@ -42,6 +42,7 @@
 * **Backend:** **Supabase Postgres** (+ RLS), **Supabase Storage** (docs), **Redis** (jobs/queues).
 * **LLM:** OpenAI Responses API + tool calls (connectors, doc generation, rule checks).
 * **Connectors:** CRO Open Services (read), data.gov.ie (Charities Register CKAN), Revenue/ROS (where feasible), RBO (guided), Pobal/LCDC/LAG feeds.
+* **Temporal Orchestration:** Temporal workers drive short-lived, retryable actions (connect/submit/poll) with Signals/Queries for human checkpoints; long compliance windows remain in the calendar engine.
 * **Freshness & Compliance Engine:** Source registry, watchers, moderation queue, versioned rules, **Re‑verify** endpoint.
 * **Document Factory:** Handlebars/MDX → Markdown/PDF with signature blocks + checksums.
 * **Notifications:** In‑app realtime + Email; digests & escalations; uniform UX (see §10).
@@ -65,21 +66,34 @@
 * **Rules:** Versioned objects with logic, sources[], `last_verified_at`.
 * **Runtime:** Materialise steps, enforce `requires`, emit Assignments, schedule CalendarEvents, render Evidence badges.
 
+* **Execution modes:** Each step declares `execution.mode` (`manual` | `temporal`) and optional workflow metadata; manual steps rely on the calendar/notification layer for long waits, while Temporal orchestrates short-lived actions with Signals/Queries for human checkpoints.
+
 **Example (abridged):**
 
 ```yaml
 id: setup-nonprofit-ie-charity
 version: 2025-10-02
 steps:
-  - id: cro-incorporation
+  - id: cro-name-check
     kind: action
-    title: Incorporate CLG on CRO CORE
-    requires: [two_directors, secretary, ppsn_or_vin, eea_director_or_s137_bond]
-    verify: [{id: eea_director_present_or_s137_bond}, {id: rbo_deadline_5_months}]
-  - id: rbo
+    title: "Check CRO name availability"
+    execution:
+      mode: temporal
+      workflow: "croNameCheckWorkflow"
+  - id: cro-a1-pack
+    kind: doc.generate
+    title: "Build A1 board minute and pack"
+    execution:
+      mode: temporal
+      workflow: "a1PackBuildWorkflow"
+  - id: cro-a1-submit
     kind: action
-    title: File RBO within 5 months
+    title: "Submit A1 via CORE (manual portal)"
+    execution:
+      mode: manual
 ```
+Default: CRO/ROS submissions, bridge polls, and TR2 helpers run in `temporal` mode where APIs exist; long compliance waits (RBO 5 months, VAT windows, ARD+B1) stay `manual` with calendar reminders.
+
 
 ---
 
@@ -169,7 +183,7 @@ These are integrated as:
 * **Retention & Deletion:** soft‑delete → scheduled hard‑delete; policy tables per entity; user‑initiated exports (ZIP/JSON/CSV).
 * **DPA:** standard processor DPA with annexes; **Subprocessors registry** & change‑notice policy; SCC annex placeholders.
 * **Records:** `docs/LEGAL/ROPA.yaml` maintained; admin UI read‑only later.
-* **Security:** TLS; encryption at rest; least‑privilege RBAC; admin action audit; secrets in vault; session via `@supabase/ssr`.
+* **Security:** TLS; encryption at rest; least‑privilege RBAC; admin action audit; secrets in vault; Temporal workers read via service credentials; workflow code never touches raw secrets; session via `@supabase/ssr`.
 * **Breach Response:** defined in `INCIDENT‑RESPONSE.md` (72‑hour notification flow).
 * **Consent:** Cookie banner with categories; server‑gated scripts; consent stored in cookie + DB.
 
@@ -191,6 +205,8 @@ These are integrated as:
 ## 13) Data Model (summary)
 
 Tables: organisations, users, memberships, engagements, workflow_defs, workflow_runs, steps, documents, rules, verifications, notifications, audit_log, calendar_events. (See scaffolding SQL; generated via Drizzle/Kysely later.)
+
+`workflow_runs` store `orchestration_provider` (default `none`) and `orchestration_workflow_id`; `steps` track `execution_mode` (`manual`|`temporal`) plus optional `orchestration_run_id` for Temporal linkage.
 
 ---
 
@@ -216,6 +232,7 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 ## 16) Testing & CI Gates
 
 * **Type & lint:** strict TS; `eslint-plugin-jsx-a11y`.
+* **Temporal workers:** unit tests for activity idempotency, workflow determinism, and a smoke workflow executed in CI.
 * **i18n:** unit tests for negotiation & fallbacks; snapshot major screens per locale.
 * **A11y:** Pa11y + axe on home, run, board; keyboard e2e.
 * **Contrast:** token checker script for WCAG AA thresholds.
