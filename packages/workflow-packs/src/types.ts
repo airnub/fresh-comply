@@ -37,6 +37,7 @@ export interface ImpactMap {
 
 export interface MergeResult {
   workflow: WorkflowDefinition;
+  snapshot: WorkflowDefinition;
   impactMap: ImpactMap;
   warnings: string[];
 }

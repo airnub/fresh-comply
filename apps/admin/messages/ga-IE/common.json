@@ -18,7 +18,8 @@
     "freshness": "Úire",
     "orgs": "Eagraíochtaí",
     "dsr": "DSR",
-    "cases": "Cásanna"
+    "cases": "Cásanna",
+    "stepTypes": "Cineálacha céime"
   },
   "dashboard": {
     "heading": "Forbhreathnú oibríochtúil",
@@ -174,6 +175,73 @@
     },
     "reason": {
       "submitting": "Á chur isteach…"
+    }
+  },
+  "stepTypes": {
+    "heading": "Clárlann cineálacha céime",
+    "subheading": "Foilsigh, suiteáil, agus iniúchtaigh forleagain tionant.",
+    "registry": {
+      "slug": "Slog: {slug}",
+      "category": "Catagóir: {category}",
+      "latest": "Leagan is déanaí: {version}",
+      "published": "Leaganacha foilsithe: {count}"
+    },
+    "versions": {
+      "title": "Amlíne leagan",
+      "subtitle": "Rianaigh dréachtaí agus eisiúintí foilsithe.",
+      "caption": "Leaganacha cineál céime",
+      "empty": "Níl leagan ar bith foilsithe fós.",
+      "columns": {
+        "stepType": "Cineál céime",
+        "version": "Leagan",
+        "status": "Stádas",
+        "schema": "Scéimre ionchuir",
+        "publishedAt": "Foilsithe"
+      },
+      "status": {
+        "draft": "Dréacht",
+        "published": "Foilsithe"
+      }
+    },
+    "installs": {
+      "title": "Suiteálacha tionant",
+      "subtitle": "Tionant ag gabháil le leaganacha clárlainne.",
+      "caption": "Tionantanna cumasaithe",
+      "empty": "Níl suiteáil tionant ann fós.",
+      "columns": {
+        "tenant": "Tionant",
+        "version": "Leagan céime",
+        "status": "Stádas",
+        "installedAt": "Suiteáilte"
+      },
+      "status": {
+        "enabled": "Cumasaithe",
+        "disabled": "Díchumasaithe"
+      }
+    },
+    "secrets": {
+      "title": "Ceangail rúin",
+      "subtitle": "Ailiasanna nasctha le hiontrálacha taisce an tionant.",
+      "caption": "Ailiasanna rúin gníomhacha",
+      "empty": "Níl aon cheangal rúin cumraithe.",
+      "columns": {
+        "tenant": "Tionant",
+        "alias": "Ailias",
+        "provider": "Soláthraí",
+        "externalId": "Tagairt sheachtrach"
+      }
+    },
+    "overlays": {
+      "title": "Snapshots forleagain",
+      "subtitle": "Snapshots comhleáite le déanaí in aghaidh tionant.",
+      "caption": "Gníomhaíocht forleagain is déanaí",
+      "empty": "Níor gabhadh snapshots forleagain fós.",
+      "columns": {
+        "workflow": "Sreabhadh oibre",
+        "tenant": "Tionant",
+        "count": "Forleagain",
+        "createdAt": "Gafa"
+      }
     }
   }
 }

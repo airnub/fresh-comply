@@ -160,7 +160,10 @@ export type Database = {
           subject_org_id: string;
           engager_org_id: string | null;
           status: "draft" | "active" | "done" | "archived";
+          orchestration_provider: string;
+          orchestration_workflow_id: string | null;
           created_by_user_id: string | null;
+          merged_workflow_snapshot: Json | null;
           created_at: string | null;
         };
         Insert: {
@@ -169,7 +172,10 @@ export type Database = {
           subject_org_id: string;
           engager_org_id?: string | null;
           status?: "draft" | "active" | "done" | "archived";
+          orchestration_provider?: string;
+          orchestration_workflow_id?: string | null;
           created_by_user_id?: string | null;
+          merged_workflow_snapshot?: Json | null;
           created_at?: string | null;
         };
         Update: {
@@ -178,7 +184,10 @@ export type Database = {
           subject_org_id?: string;
           engager_org_id?: string | null;
           status?: "draft" | "active" | "done" | "archived";
+          orchestration_provider?: string;
+          orchestration_workflow_id?: string | null;
           created_by_user_id?: string | null;
+          merged_workflow_snapshot?: Json | null;
           created_at?: string | null;
         };
         Relationships: [
@@ -219,8 +228,12 @@ export type Database = {
           key: string;
           title: string;
           status: "todo" | "in_progress" | "waiting" | "blocked" | "done";
+          orchestration_run_id: string | null;
+          execution_mode: "manual" | "temporal";
           due_date: string | null;
           assignee_user_id: string | null;
+          step_type_version_id: string | null;
+          permissions: string[] | null;
         };
         Insert: {
           id?: string;
@@ -228,8 +241,12 @@ export type Database = {
           key: string;
           title: string;
           status?: "todo" | "in_progress" | "waiting" | "blocked" | "done";
+          orchestration_run_id?: string | null;
+          execution_mode?: "manual" | "temporal";
           due_date?: string | null;
           assignee_user_id?: string | null;
+          step_type_version_id?: string | null;
+          permissions?: string[] | null;
         };
         Update: {
           id?: string;
@@ -237,8 +254,12 @@ export type Database = {
           key?: string;
           title?: string;
           status?: "todo" | "in_progress" | "waiting" | "blocked" | "done";
+          orchestration_run_id?: string | null;
+          execution_mode?: "manual" | "temporal";
           due_date?: string | null;
           assignee_user_id?: string | null;
+          step_type_version_id?: string | null;
+          permissions?: string[] | null;
         };
         Relationships: [
           {
@@ -253,6 +274,361 @@ export type Database = {
             columns: ["run_id"];
             isOneToOne: false;
             referencedRelation: "workflow_runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "steps_step_type_version_id_fkey";
+            columns: ["step_type_version_id"];
+            isOneToOne: false;
+            referencedRelation: "step_type_versions";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      json_schemas: {
+        Row: {
+          id: string;
+          slug: string;
+          version: string;
+          description: string | null;
+          schema: Json;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          version: string;
+          description?: string | null;
+          schema: Json;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          version?: string;
+          description?: string | null;
+          schema?: Json;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      step_types: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          category: string | null;
+          summary: string | null;
+          latest_version: string | null;
+          created_by: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          category?: string | null;
+          summary?: string | null;
+          latest_version?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          title?: string;
+          category?: string | null;
+          summary?: string | null;
+          latest_version?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "step_types_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      step_type_versions: {
+        Row: {
+          id: string;
+          step_type_id: string;
+          version: string;
+          definition: Json;
+          input_schema_id: string | null;
+          output_schema_id: string | null;
+          status: "draft" | "published" | "deprecated";
+          created_by: string | null;
+          created_at: string | null;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          step_type_id: string;
+          version: string;
+          definition: Json;
+          input_schema_id?: string | null;
+          output_schema_id?: string | null;
+          status?: "draft" | "published" | "deprecated";
+          created_by?: string | null;
+          created_at?: string | null;
+          published_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          step_type_id?: string;
+          version?: string;
+          definition?: Json;
+          input_schema_id?: string | null;
+          output_schema_id?: string | null;
+          status?: "draft" | "published" | "deprecated";
+          created_by?: string | null;
+          created_at?: string | null;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "step_type_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "step_type_versions_input_schema_id_fkey";
+            columns: ["input_schema_id"];
+            isOneToOne: false;
+            referencedRelation: "json_schemas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "step_type_versions_output_schema_id_fkey";
+            columns: ["output_schema_id"];
+            isOneToOne: false;
+            referencedRelation: "json_schemas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "step_type_versions_step_type_id_fkey";
+            columns: ["step_type_id"];
+            isOneToOne: false;
+            referencedRelation: "step_types";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      tenant_step_type_installs: {
+        Row: {
+          id: string;
+          org_id: string;
+          step_type_version_id: string;
+          installed_at: string | null;
+          status: "enabled" | "disabled";
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          step_type_version_id: string;
+          installed_at?: string | null;
+          status?: "enabled" | "disabled";
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          step_type_version_id?: string;
+          installed_at?: string | null;
+          status?: "enabled" | "disabled";
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_step_type_installs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tenant_step_type_installs_step_type_version_id_fkey";
+            columns: ["step_type_version_id"];
+            isOneToOne: false;
+            referencedRelation: "step_type_versions";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      tenant_secret_bindings: {
+        Row: {
+          id: string;
+          org_id: string;
+          alias: string;
+          description: string | null;
+          provider: string | null;
+          external_id: string;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          alias: string;
+          description?: string | null;
+          provider?: string | null;
+          external_id: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          alias?: string;
+          description?: string | null;
+          provider?: string | null;
+          external_id?: string;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_secret_bindings_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      tenant_workflow_overlays: {
+        Row: {
+          id: string;
+          org_id: string;
+          workflow_def_id: string;
+          title: string;
+          patch: Json;
+          status: "draft" | "published" | "archived";
+          created_by: string | null;
+          updated_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          workflow_def_id: string;
+          title: string;
+          patch: Json;
+          status?: "draft" | "published" | "archived";
+          created_by?: string | null;
+          updated_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          workflow_def_id?: string;
+          title?: string;
+          patch?: Json;
+          status?: "draft" | "published" | "archived";
+          created_by?: string | null;
+          updated_at?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_workflow_overlays_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tenant_workflow_overlays_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tenant_workflow_overlays_workflow_def_id_fkey";
+            columns: ["workflow_def_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_defs";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      workflow_overlay_snapshots: {
+        Row: {
+          id: string;
+          run_id: string;
+          tenant_overlay_id: string | null;
+          applied_overlays: Json;
+          merged_workflow: Json;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          run_id: string;
+          tenant_overlay_id?: string | null;
+          applied_overlays?: Json;
+          merged_workflow: Json;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          run_id?: string;
+          tenant_overlay_id?: string | null;
+          applied_overlays?: Json;
+          merged_workflow?: Json;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_overlay_snapshots_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workflow_overlay_snapshots_tenant_overlay_id_fkey";
+            columns: ["tenant_overlay_id"];
+            isOneToOne: false;
+            referencedRelation: "tenant_workflow_overlays";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      workflow_overlay_layers: {
+        Row: {
+          id: string;
+          snapshot_id: string;
+          source: string;
+          patch: Json;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          snapshot_id: string;
+          source: string;
+          patch: Json;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          snapshot_id?: string;
+          source?: string;
+          patch?: Json;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_overlay_layers_snapshot_id_fkey";
+            columns: ["snapshot_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_overlay_snapshots";
             referencedColumns: ["id"];
           }
         ];

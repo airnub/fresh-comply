@@ -18,7 +18,8 @@
     "freshness": "Freshness",
     "orgs": "Orgs",
     "dsr": "DSR",
-    "cases": "Cases"
+    "cases": "Cases",
+    "stepTypes": "Step types"
   },
   "dashboard": {
     "heading": "Operational overview",
@@ -174,6 +175,73 @@
     },
     "reason": {
       "submitting": "Submitting\u2026"
+    }
+  },
+  "stepTypes": {
+    "heading": "Step type registry",
+    "subheading": "Publish, install, and audit tenant overlays.",
+    "registry": {
+      "slug": "Slug: {slug}",
+      "category": "Category: {category}",
+      "latest": "Latest version: {version}",
+      "published": "Published versions: {count}"
+    },
+    "versions": {
+      "title": "Version timeline",
+      "subtitle": "Track drafts and published releases.",
+      "caption": "Step type versions",
+      "empty": "No versions published yet.",
+      "columns": {
+        "stepType": "Step type",
+        "version": "Version",
+        "status": "Status",
+        "schema": "Input schema",
+        "publishedAt": "Published"
+      },
+      "status": {
+        "draft": "Draft",
+        "published": "Published"
+      }
+    },
+    "installs": {
+      "title": "Tenant installs",
+      "subtitle": "Tenants pinned to registry versions.",
+      "caption": "Enabled tenants",
+      "empty": "No tenant installs yet.",
+      "columns": {
+        "tenant": "Tenant",
+        "version": "Step version",
+        "status": "Status",
+        "installedAt": "Installed"
+      },
+      "status": {
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      }
+    },
+    "secrets": {
+      "title": "Secret bindings",
+      "subtitle": "Aliases mapped to tenant vault entries.",
+      "caption": "Active secret aliases",
+      "empty": "No secret bindings configured.",
+      "columns": {
+        "tenant": "Tenant",
+        "alias": "Alias",
+        "provider": "Provider",
+        "externalId": "External reference"
+      }
+    },
+    "overlays": {
+      "title": "Overlay snapshots",
+      "subtitle": "Recent merged workflow snapshots per tenant.",
+      "caption": "Latest overlay activity",
+      "empty": "No overlay snapshots captured.",
+      "columns": {
+        "workflow": "Workflow",
+        "tenant": "Tenant",
+        "count": "Overlays",
+        "createdAt": "Captured"
+      }
     }
   }
 }
