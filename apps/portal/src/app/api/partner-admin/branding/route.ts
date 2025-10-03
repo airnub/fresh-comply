@@ -16,44 +16,74 @@ type BrandingPayload = {
   pdfFooter?: Record<string, unknown>;
 };
 
-export async function POST(request: Request) {
-  let payload: BrandingPayload;
+type BrandingRouteDependencies = {
+  getSupabaseClient: typeof getSupabaseClient;
+  resolveTenantBranding: typeof resolveTenantBranding;
+};
 
-  try {
-    payload = (await request.json()) as BrandingPayload;
-  } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
-  }
-
-  const host = request.headers.get("host");
-  const tenantBranding = await resolveTenantBranding(host);
-
-  try {
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase.rpc("rpc_upsert_tenant_branding", {
-      p_tenant_org_id: tenantBranding.tenantOrgId,
-      p_tokens: payload.tokens ?? {},
-      p_logo_url: payload.logoUrl ?? null,
-      p_favicon_url: payload.faviconUrl ?? null,
-      p_typography: payload.typography ?? {},
-      p_pdf_header: payload.pdfHeader ?? {},
-      p_pdf_footer: payload.pdfFooter ?? {}
-    });
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: error.code === "42501" ? 403 : 400 }
-      );
-    }
-
-    return NextResponse.json({ ok: true, branding: data }, { status: 200 });
-  } catch (error) {
-    if (error instanceof SupabaseConfigurationError) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 503 });
-    }
-    return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
-  }
+function formatRpcError(error: { message: string; code?: string; details?: string | null }) {
+  const message = error.details && error.details.trim().length > 0 ? error.details : error.message;
+  return NextResponse.json(
+    { ok: false, error: message },
+    { status: error.code === "42501" ? 403 : 400 }
+  );
 }
 
+export function createBrandingRoute({
+  getSupabaseClient: getClient,
+  resolveTenantBranding: resolveBranding
+}: BrandingRouteDependencies) {
+  return {
+    async POST(request: Request) {
+      let payload: BrandingPayload;
+
+      try {
+        payload = (await request.json()) as BrandingPayload;
+      } catch {
+        return NextResponse.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
+      }
+
+      const host = request.headers.get("host");
+      const tenantBranding = await resolveBranding(host);
+
+      try {
+        const supabase = getClient();
+        const { data, error } = await supabase.rpc("rpc_upsert_tenant_branding", {
+          p_tenant_org_id: tenantBranding.tenantOrgId,
+          p_tokens: payload.tokens ?? {},
+          p_logo_url: payload.logoUrl ?? null,
+          p_favicon_url: payload.faviconUrl ?? null,
+          p_typography: payload.typography ?? {},
+          p_pdf_header: payload.pdfHeader ?? {},
+          p_pdf_footer: payload.pdfFooter ?? {}
+        });
+
+        if (error) {
+          return formatRpcError(error);
+        }
+
+        const result = (data ?? {}) as Record<string, unknown>;
+        const branding = result.branding ?? null;
+        const audit = result.audit_entry ?? null;
+
+        return NextResponse.json({ ok: true, branding, audit }, { status: 200 });
+      } catch (error) {
+        if (error instanceof SupabaseConfigurationError) {
+          return NextResponse.json({ ok: false, error: error.message }, { status: 503 });
+        }
+        return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
+      }
+    }
+  };
+}
+
+const route = createBrandingRoute({
+  getSupabaseClient,
+  resolveTenantBranding
+});
+
+export const POST = route.POST;
+
 export const dynamic = "force-dynamic";
+
+export type { BrandingRouteDependencies };

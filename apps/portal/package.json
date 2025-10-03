@@ -6,6 +6,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "tsx --test src/app/api/orchestration/webhook/route.test.ts src/app/api/partner-admin/branding/route.test.ts src/app/api/partner-admin/domains/route.test.ts src/components/__tests__/tenant-overlay-builder.test.ts",
     "test:a11y": "cypress run --e2e --spec cypress/e2e/accessibility.cy.ts",
     "test:pa11y": "pa11y-ci ../../pa11yci.json"
   },
