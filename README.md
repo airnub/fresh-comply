@@ -43,15 +43,33 @@ The command prints a summary table to the console and writes both JSON and Markd
 
 ## CI expectations
 
-All pull requests run an automated workflow that checks linting, type safety, tests, documentation links, and database policies. Run the same commands locally before opening a PR:
+All pull requests run an automated workflow with required status checks for linting, type safety, unit tests, accessibility regressions (Cypress axe + pa11y), Temporal worker linting, database guards, and Markdown link hygiene. Configure the `main` branch protection rule in GitHub to require the following checks before merging:
+
+- `Lint`
+- `Typecheck`
+- `Unit tests`
+- `Accessibility`
+- `Temporal worker lint`
+- `Database policies`
+- `Documentation links`
+
+Run the same commands locally before opening a PR:
 
 ```bash
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm --filter @airnub/portal build
+pnpm --filter @airnub/portal start -- --hostname 0.0.0.0 --port 3000 &
+PORTAL_PID=$!
+pnpm --filter @airnub/portal test:a11y
+pnpm --filter @airnub/portal test:pa11y
+kill $PORTAL_PID
+pnpm --filter @airnub/orchestrator-temporal lint
 pnpm --filter @airnub/db run migrate --dry-run
 node packages/db/check-rls.mjs
 pnpm dlx lychee --no-progress --markdown --base . ./AGENTS.md './docs/**/*.md'
 ```
 
-Installing [`lychee`](https://github.com/lycheeverse/lychee) via `pnpm dlx` keeps the Markdown link checker aligned with CI.
+> [!NOTE]
+> Installing [`lychee`](https://github.com/lycheeverse/lychee) via `pnpm dlx` keeps the Markdown link checker aligned with CI.
