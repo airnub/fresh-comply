@@ -2,4 +2,6 @@
   "tenantx-ml-screening.title": "Machine learning screening (Tenant X)",
   "tenantx-ml-screening.description": "Automated screening that checks directors against Tenant X risk heuristics.",
   "tenantx-policy-attest.title": "Board policy attestation (Tenant X)",
-  "tenantx-policy-attest.description": "Collect signed confirmation that the board adopted Tenant X security policy."}
+  "tenantx-policy-attest.description": "Collect signed confirmation that the board adopted Tenant X security policy.",
+  "tenantx-sysy-enrichment.title": "System Y enrichment job",
+  "tenantx-sysy-enrichment.description": "Launch and monitor the System Y enrichment workflow via secure webhook ingress and polling fallback."}

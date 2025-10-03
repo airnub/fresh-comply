@@ -61,8 +61,9 @@ PENDING → OUTBOUND_SENT → AWAITING_CALLBACK (or POLLING) → PROCESSING_RESU
 - Audit: store header hashes (no secrets), payload hash, verification result, actor context.
 
 ### Egress (Outbound Calls)
-- Resolve **secret aliases** from vault (never inline in overlays or client).  
-- Headers: `Authorization: Bearer <token>`, `X‑FC‑Idempotency‑Key: {runId}:{stepId}`, optional `X‑FC‑Signature` (HMAC of body).  
+- Resolve **secret aliases** from vault (never inline in overlays or client).
+- Headers: `Authorization: Bearer <token>`, `X‑FC‑Idempotency‑Key: {runId}:{stepId}`, optional `X‑FC‑Signature` (HMAC of body).
+- Implementation: Temporal `externalJobWorkflow` proxies to signed HTTP activities that resolve aliases and attach idempotency headers at runtime.
 - Reliability: exponential backoff; circuit breaker; 4xx vs 5xx classification; correlation IDs.
 
 ### Data Protection
@@ -115,6 +116,8 @@ PENDING → OUTBOUND_SENT → AWAITING_CALLBACK (or POLLING) → PROCESSING_RESU
 
 > Overlays may reference **secret aliases** only; values resolved server‑side from vault (tenant‑scoped bindings).
 
+- Demo implementation: `examples/packs/tenant-x/overlay.patch.json` adds step `tenantx-sysy-enrichment` with localized copy in `examples/packs/tenant-x/messages/en-IE.json`.
+
 ---
 
 ## 6) Temporal Orchestration (sketch)
@@ -135,8 +138,9 @@ Key rules:
 **Ingress (server)**
 - Verify HMAC; reject on bad signature or stale timestamp.  
 - Identify tenant via path; map `channel` → expected step(s) for that tenant.  
-- Enqueue Signal call to Temporal with correlation IDs.  
+- Enqueue Signal call to Temporal with correlation IDs.
 - Idempotency: dedupe by `(tenantId, channel, nonce)`.
+- Implementation: `apps/portal/src/app/api/hooks/[tenantId]/[channel]/route.ts` verifies signatures, enforces nonce replay protection, resolves tenant aliases, and issues the `receivedCallback` signal with sanitized metadata.
 
 **Egress (server/activities)**
 - `request(config, payload)` resolves `urlAlias`/`tokenAlias` → HTTP call with backoff.  
