@@ -14,3 +14,5 @@ export const WorkflowRun = z.object({ id: Id, workflowDefId: Id, subjectOrgId: I
 export const Step = z.object({ id: Id, runId: Id, key: z.string(), title: z.string(), status: z.enum(["todo", "in_progress", "waiting", "blocked", "done"]), dueDate: z.string().datetime().optional(), assigneeUserId: Id.optional() });
 
 export type TOrg = z.infer<typeof Org>;
+
+export type { Database, Tables, TablesInsert, TablesUpdate, Json } from "./supabase";

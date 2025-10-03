@@ -3,7 +3,9 @@
     "title": "FreshComply Portal",
     "tagline": "Multi-tenant engagements & compliance workflows",
     "skipToContent": "Skip to main content",
-    "loading": "Loading"
+    "loading": "Loading",
+    "signedInAs": "Signed in as {user}",
+    "signOut": "Sign out"
   },
   "navigation": {
     "home": "Home",
@@ -100,5 +102,15 @@
     "deadlines": "Upcoming deadlines",
     "noDueDate": "No due date",
     "due": "Due {date, date, medium}"
+  },
+  "auth": {
+    "title": "Secure sign-in",
+    "description": "Enter your email address and we'll send you a magic link to access FreshComply.",
+    "emailLabel": "Work email",
+    "submit": "Send magic link",
+    "submitting": "Sending…",
+    "success": "Check your inbox for a sign-in link. The link expires in 5 minutes.",
+    "redirect": "After sign-in you'll be sent to {destination}.",
+    "error": "We couldn't send the link. Please try again."
   }
 }

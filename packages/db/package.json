@@ -6,6 +6,7 @@
   "files": ["schema.sql", "seeds.sql"],
   "scripts": {
     "migrate": "echo \"Run migrations via Supabase CLI\"",
-    "seed": "echo \"Apply seeds.sql to your database\""
+    "seed": "echo \"Apply seeds.sql to your database\"",
+    "verify:rls": "node ./check-rls.mjs"
   }
 }
