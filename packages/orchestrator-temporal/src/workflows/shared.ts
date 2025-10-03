@@ -18,6 +18,17 @@ export const confirmManualFilingSignal = defineSignal<[{ receiptUrl?: string; no
   "confirmManualFiling"
 );
 
+export type ExternalJobCallbackPayload = {
+  status?: "success" | "error" | "pending" | "completed" | "failed";
+  output?: unknown;
+  error?: { message: string; code?: string; details?: unknown };
+  externalRef?: string;
+  receivedAt?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export const receivedCallbackSignal = defineSignal<[ExternalJobCallbackPayload]>("receivedCallback");
+
 export const getStatusQuery = defineQuery<StepWorkflowStatus>("getStatus");
 
 export const getResultQuery = defineQuery<unknown>("getResult");

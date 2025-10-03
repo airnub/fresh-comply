@@ -7,7 +7,8 @@ const WORKFLOW_REGISTRY = {
   croNameCheckWorkflow: workflows.croNameCheckWorkflow,
   a1PackBuildWorkflow: workflows.a1PackBuildWorkflow,
   tr2SubmissionWorkflow: workflows.tr2SubmissionWorkflow,
-  etaxClearanceWorkflow: workflows.etaxClearanceWorkflow
+  etaxClearanceWorkflow: workflows.etaxClearanceWorkflow,
+  externalJobWorkflow: workflows.externalJobWorkflow
 } as const;
 
 export type SupportedWorkflow = keyof typeof WORKFLOW_REGISTRY;
@@ -102,3 +103,10 @@ export async function queryWorkflowStatus(workflowId: string) {
     await client.connection.close();
   }
 }
+
+export {
+  resolveSecretAlias,
+  generateNonce,
+  getSecretCacheDebugSnapshot,
+  SecretAliasResolutionError
+} from "./secrets.js";

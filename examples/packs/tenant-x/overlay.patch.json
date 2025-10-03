@@ -47,6 +47,63 @@
     }
   },
   {
+    "op": "add",
+    "path": "/steps/-",
+    "value": {
+      "id": "tenantx-sysy-enrichment",
+      "kind": "action",
+      "title_i18n": {
+        "en-IE": "System Y enrichment job"
+      },
+      "description_i18n": {
+        "en-IE": "Launches the System Y data enrichment job and waits for the secure callback or polling confirmation."
+      },
+      "stepType": "external-job-with-callback@1.0.0",
+      "execution": {
+        "mode": "temporal",
+        "workflow": "externalJobWorkflow",
+        "config": {
+          "workflow": "externalJobWorkflow",
+          "externalRefPath": "body.ticketId",
+          "egress": {
+            "method": "POST",
+            "urlAlias": "secrets.sysY.baseUrl",
+            "tokenAlias": "secrets.sysY.apiToken",
+            "path": "/v1/enrich",
+            "headers": {
+              "X-SystemY-Tenant": "tenant-x"
+            },
+            "signingSecretAlias": "secrets.sysY.egress"
+          },
+          "ingress": {
+            "timeoutSeconds": 900,
+            "escalateReason": "ingress_timeout"
+          },
+          "polling": {
+            "enabled": true,
+            "intervalSeconds": 30,
+            "maxAttempts": 40,
+            "statusPath": "/v1/jobs/{{ticketId}}",
+            "successWhen": {
+              "path": "body.status",
+              "equals": "complete"
+            },
+            "failureWhen": {
+              "path": "body.status",
+              "in": ["failed", "cancelled"]
+            }
+          },
+          "notesOnSuccess": "System Y enrichment completed",
+          "notesOnFailure": "System Y enrichment requires manual review"
+        }
+      },
+      "requires": ["tenantx-ml-screening"],
+      "verify": [
+        { "rule": "sysy_enrichment_complete" }
+      ]
+    }
+  },
+  {
     "op": "replace",
     "path": "/steps/8/requires",
     "value": ["tenantx-policy-attest"]
