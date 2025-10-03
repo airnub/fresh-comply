@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient, getSupabaseUser, SupabaseConfigurationError } from "../../../lib/auth/supabase-ssr";
+import { annotateSuccess, recordSpanError, withSpan } from "@airnub/utils";
 
 type ModerationResult = { ok: boolean; error?: string };
 
@@ -21,98 +22,133 @@ async function resolveContext() {
 }
 
 export async function approvePendingUpdate(id: string, reason: string): Promise<ModerationResult> {
-  const context = await resolveContext();
-  const now = new Date().toISOString();
-  if (!context) {
-    return { ok: true };
-  }
+  return withSpan(
+    "admin.serverActions.approvePendingUpdate",
+    { attributes: { "freshcomply.pendingUpdateId": id } },
+    async (span) => {
+      const context = await resolveContext();
+      const now = new Date().toISOString();
+      if (!context) {
+        span.setAttributes({ "freshcomply.supabase": "unavailable" });
+        annotateSuccess(span);
+        return { ok: true };
+      }
 
-  const { client, user } = context;
-  const { data, error } = await client
-    .from("freshness_pending_updates")
-    .update({
-      status: "approved",
-      approval_reason: reason,
-      rejection_reason: null,
-      approved_by_user_id: user?.id ?? null,
-      verified_at: now,
-      updated_at: now
-    })
-    .eq("id", id)
-    .select("workflow_keys, source_key, current_snapshot_id")
-    .maybeSingle();
+      const { client, user } = context;
+      const { data, error } = await client
+        .from("freshness_pending_updates")
+        .update({
+          status: "approved",
+          approval_reason: reason,
+          rejection_reason: null,
+          approved_by_user_id: user?.id ?? null,
+          verified_at: now,
+          updated_at: now
+        })
+        .eq("id", id)
+        .select("workflow_keys, source_key, current_snapshot_id")
+        .maybeSingle();
 
-  if (error) {
-    console.error("Unable to approve freshness update", error);
-    return { ok: false, error: error.message };
-  }
+      if (error) {
+        console.error("Unable to approve freshness update", error);
+        recordSpanError(span, error);
+        return { ok: false, error: error.message };
+      }
 
-  if (data?.workflow_keys?.length) {
-    await bumpWorkflowVersions(client, data.workflow_keys);
-    if (data.source_key === "funding_radar" && data.current_snapshot_id) {
-      await linkFundingOpportunitiesToWorkflows(client, data.current_snapshot_id, data.workflow_keys);
+      if (data?.workflow_keys?.length) {
+        await bumpWorkflowVersions(client, data.workflow_keys);
+        if (data.source_key === "funding_radar" && data.current_snapshot_id) {
+          await linkFundingOpportunitiesToWorkflows(client, data.current_snapshot_id, data.workflow_keys);
+        }
+      }
+
+      revalidatePath("/", "layout");
+      annotateSuccess(span);
+      return { ok: true };
     }
-  }
-
-  revalidatePath("/", "layout");
-  return { ok: true };
+  );
 }
 
 export async function rejectPendingUpdate(id: string, reason: string): Promise<ModerationResult> {
-  const context = await resolveContext();
-  const now = new Date().toISOString();
-  if (!context) {
-    return { ok: true };
-  }
+  return withSpan(
+    "admin.serverActions.rejectPendingUpdate",
+    { attributes: { "freshcomply.pendingUpdateId": id } },
+    async (span) => {
+      const context = await resolveContext();
+      const now = new Date().toISOString();
+      if (!context) {
+        span.setAttributes({ "freshcomply.supabase": "unavailable" });
+        annotateSuccess(span);
+        return { ok: true };
+      }
 
-  const { client, user } = context;
-  const { error } = await client
-    .from("freshness_pending_updates")
-    .update({
-      status: "rejected",
-      rejection_reason: reason,
-      approval_reason: null,
-      approved_by_user_id: user?.id ?? null,
-      updated_at: now
-    })
-    .eq("id", id);
+      const { client, user } = context;
+      const { error } = await client
+        .from("freshness_pending_updates")
+        .update({
+          status: "rejected",
+          rejection_reason: reason,
+          approval_reason: null,
+          approved_by_user_id: user?.id ?? null,
+          updated_at: now
+        })
+        .eq("id", id);
 
-  if (error) {
-    console.error("Unable to reject freshness update", error);
-    return { ok: false, error: error.message };
-  }
+      if (error) {
+        console.error("Unable to reject freshness update", error);
+        recordSpanError(span, error);
+        return { ok: false, error: error.message };
+      }
 
-  revalidatePath("/", "layout");
-  return { ok: true };
+      revalidatePath("/", "layout");
+      annotateSuccess(span);
+      return { ok: true };
+    }
+  );
 }
 
 async function bumpWorkflowVersions(client: ReturnType<typeof getSupabaseClient>, workflowKeys: string[]) {
   if (!workflowKeys.length) return;
-  const { data, error } = await client
-    .from("workflow_defs")
-    .select("id, version")
-    .in("key", workflowKeys);
-
-  if (error) {
-    console.warn("Unable to load workflow definitions for bump", error);
-    return;
-  }
-
-  if (!data?.length) {
-    return;
-  }
-
-  await Promise.all(
-    data.map(async (row) => {
-      const nextVersion = bumpPatch(row.version ?? "0.0.0");
-      const { error: updateError } = await client
+  await withSpan(
+    "admin.serverActions.bumpWorkflowVersions",
+    { attributes: { "freshcomply.workflow.keys": workflowKeys.join(",") } },
+    async (span) => {
+      const { data, error } = await client
         .from("workflow_defs")
-        .update({ version: nextVersion })
-        .eq("id", row.id);
-      if (updateError) {
-        console.warn(`Unable to bump workflow ${row.id}`, updateError);
+        .select("id, version")
+        .in("key", workflowKeys);
+
+      if (error) {
+        console.warn("Unable to load workflow definitions for bump", error);
+        recordSpanError(span, error);
+        return;
       }
-    })
+
+      if (!data?.length) {
+        annotateSuccess(span, { "freshcomply.workflow.count": 0 });
+        return;
+      }
+
+      let encounteredError = false;
+      await Promise.all(
+        data.map(async (row) => {
+          const nextVersion = bumpPatch(row.version ?? "0.0.0");
+          const { error: updateError } = await client
+            .from("workflow_defs")
+            .update({ version: nextVersion })
+            .eq("id", row.id);
+          if (updateError) {
+            console.warn(`Unable to bump workflow ${row.id}`, updateError);
+            recordSpanError(span, updateError);
+            encounteredError = true;
+          }
+        })
+      );
+
+      if (!encounteredError) {
+        annotateSuccess(span, { "freshcomply.workflow.count": data.length });
+      }
+    }
   );
 }
 
@@ -130,41 +166,60 @@ async function linkFundingOpportunitiesToWorkflows(
   workflowKeys: string[]
 ) {
   if (!workflowKeys.length) return;
-  const { data: snapshot, error: snapshotError } = await client
-    .from("freshness_snapshots")
-    .select("fingerprint")
-    .eq("id", snapshotId)
-    .maybeSingle();
+  await withSpan(
+    "admin.serverActions.linkFundingOpportunities",
+    { attributes: { "freshcomply.workflow.keys": workflowKeys.join(",") } },
+    async (span) => {
+      const { data: snapshot, error: snapshotError } = await client
+        .from("freshness_snapshots")
+        .select("fingerprint")
+        .eq("id", snapshotId)
+        .maybeSingle();
 
-  if (snapshotError || !snapshot?.fingerprint) {
-    console.warn("Unable to resolve funding snapshot for workflow linking", snapshotError);
-    return;
-  }
+      if (snapshotError || !snapshot?.fingerprint) {
+        console.warn("Unable to resolve funding snapshot for workflow linking", snapshotError);
+        if (snapshotError) {
+          recordSpanError(span, snapshotError);
+        }
+        return;
+      }
 
-  const { data: opportunities, error: fundingError } = await client
-    .from("funding_opportunities")
-    .select("id")
-    .eq("snapshot_fingerprint", snapshot.fingerprint);
+      span.setAttributes({ "freshcomply.snapshotFingerprint": snapshot.fingerprint });
 
-  if (fundingError) {
-    console.warn("Unable to load funding opportunities for workflow linking", fundingError);
-    return;
-  }
+      const { data: opportunities, error: fundingError } = await client
+        .from("funding_opportunities")
+        .select("id")
+        .eq("snapshot_fingerprint", snapshot.fingerprint);
 
-  if (!opportunities?.length) return;
+      if (fundingError) {
+        console.warn("Unable to load funding opportunities for workflow linking", fundingError);
+        recordSpanError(span, fundingError);
+        return;
+      }
 
-  const rows = workflowKeys.flatMap((workflowKey) =>
-    opportunities.map((opportunity) => ({
-      funding_opportunity_id: opportunity.id,
-      workflow_key: workflowKey
-    }))
+      if (!opportunities?.length) {
+        annotateSuccess(span, { "freshcomply.funding.count": 0 });
+        return;
+      }
+
+      const rows = workflowKeys.flatMap((workflowKey) =>
+        opportunities.map((opportunity) => ({
+          funding_opportunity_id: opportunity.id,
+          workflow_key: workflowKey
+        }))
+      );
+
+      const { error: linkError } = await client
+        .from("funding_opportunity_workflows")
+        .upsert(rows, { onConflict: "funding_opportunity_id,workflow_key" });
+
+      if (linkError) {
+        console.warn("Unable to persist funding opportunity workflow links", linkError);
+        recordSpanError(span, linkError);
+        return;
+      }
+
+      annotateSuccess(span, { "freshcomply.funding.count": opportunities.length });
+    }
   );
-
-  const { error: linkError } = await client
-    .from("funding_opportunity_workflows")
-    .upsert(rows, { onConflict: "funding_opportunity_id,workflow_key" });
-
-  if (linkError) {
-    console.warn("Unable to persist funding opportunity workflow links", linkError);
-  }
 }

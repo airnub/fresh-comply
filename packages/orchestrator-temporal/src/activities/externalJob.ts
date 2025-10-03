@@ -1,3 +1,4 @@
+import { annotateSuccess, buildRunAttributes, recordSpanError, withSpan } from "@airnub/utils";
 import { performSignedHttpRequest, type HttpRequestConfig } from "./http.js";
 import { persistStepProgress, recordAuditEvent, type StepActivityContext } from "./util.js";
 
@@ -66,58 +67,111 @@ function matchesCondition(target: unknown, condition?: { equals?: unknown; in?: 
 }
 
 export async function startExternalJob(input: ExternalJobStartInput): Promise<ExternalJobStartResult> {
-  const http = await performSignedHttpRequest({
-    tenantId: input.tenantId,
-    context: input,
-    request: input.request
-  });
+  return withSpan(
+    "temporal.activity.externalJob.start",
+    {
+      attributes: {
+        ...buildRunAttributes(input),
+        "freshcomply.tenantId": input.tenantId
+      }
+    },
+    async (span) => {
+      try {
+        const http = await performSignedHttpRequest({
+          tenantId: input.tenantId,
+          context: input,
+          request: input.request
+        });
 
-  await persistStepProgress({
-    orgId: input.orgId,
-    runId: input.runId,
-    stepKey: input.stepKey,
-    status: "waiting",
-    output: { http },
-    notes: "External job initiated; awaiting callback"
-  });
+        await persistStepProgress({
+          orgId: input.orgId,
+          runId: input.runId,
+          stepKey: input.stepKey,
+          status: "waiting",
+          output: { http },
+          notes: "External job initiated; awaiting callback"
+        });
 
-  return { http };
+        annotateSuccess(span);
+        return { http };
+      } catch (error) {
+        recordSpanError(span, error);
+        throw error;
+      }
+    }
+  );
 }
 
 export async function pollExternalJob(input: ExternalJobPollInput): Promise<ExternalJobPollResult> {
-  const response = await performSignedHttpRequest({
-    tenantId: input.tenantId,
-    context: input,
-    request: input.request,
-    idempotencyKey: `${input.runId}:${input.stepKey}:poll:${input.attempt}`
-  });
+  return withSpan(
+    "temporal.activity.externalJob.poll",
+    {
+      attributes: {
+        ...buildRunAttributes(input),
+        "freshcomply.tenantId": input.tenantId,
+        "freshcomply.externalJob.attempt": input.attempt
+      }
+    },
+    async (span) => {
+      try {
+        const response = await performSignedHttpRequest({
+          tenantId: input.tenantId,
+          context: input,
+          request: input.request,
+          idempotencyKey: `${input.runId}:${input.stepKey}:poll:${input.attempt}`
+        });
 
-  const successTarget = getByPath(response.body, input.success?.path);
-  if (matchesCondition(successTarget, input.success)) {
-    return { status: "completed", response };
-  }
+        const successTarget = getByPath(response.body, input.success?.path);
+        if (matchesCondition(successTarget, input.success)) {
+          annotateSuccess(span, { "freshcomply.externalJob.status": "completed" });
+          return { status: "completed", response };
+        }
 
-  const failureTarget = getByPath(response.body, input.failure?.path);
-  if (matchesCondition(failureTarget, input.failure)) {
-    return { status: "failed", response };
-  }
+        const failureTarget = getByPath(response.body, input.failure?.path);
+        if (matchesCondition(failureTarget, input.failure)) {
+          span.setAttributes({ "freshcomply.externalJob.status": "failed" });
+          return { status: "failed", response };
+        }
 
-  return { status: "running", response };
+        span.setAttributes({ "freshcomply.externalJob.status": "running" });
+        annotateSuccess(span);
+        return { status: "running", response };
+      } catch (error) {
+        recordSpanError(span, error);
+        throw error;
+      }
+    }
+  );
 }
 
 export async function persistExternalResult<T>(input: PersistExternalResultInput<T>) {
-  return await persistStepProgress(input);
+  return withSpan(
+    "temporal.activity.externalJob.persistResult",
+    { attributes: { ...buildRunAttributes(input), "freshcomply.step.status": input.status } },
+    async (span) => {
+      const result = await persistStepProgress(input);
+      annotateSuccess(span);
+      return result;
+    }
+  );
 }
 
 export async function escalateExternalJob(input: EscalationInput) {
-  await recordAuditEvent({
-    orgId: input.orgId,
-    runId: input.runId,
-    stepKey: input.stepKey,
-    action: "external_job_escalation",
-    metadata: {
-      reason: input.reason,
-      ...input.metadata
+  await withSpan(
+    "temporal.activity.externalJob.escalate",
+    { attributes: { ...buildRunAttributes(input), "freshcomply.escalation.reason": input.reason } },
+    async (span) => {
+      await recordAuditEvent({
+        orgId: input.orgId,
+        runId: input.runId,
+        stepKey: input.stepKey,
+        action: "external_job_escalation",
+        metadata: {
+          reason: input.reason,
+          ...input.metadata
+        }
+      });
+      annotateSuccess(span);
     }
-  });
+  );
 }

@@ -1,3 +1,4 @@
+import { annotateSuccess, buildRunAttributes, recordSpanError, withSpan } from "@airnub/utils";
 import { createHash, createHmac } from "node:crypto";
 import { fetch, Headers, Response } from "undici";
 import { resolveSecretAlias } from "../secrets.js";
@@ -72,76 +73,93 @@ async function parseBody(response: Response): Promise<{ bodyText?: string; body?
 }
 
 export async function performSignedHttpRequest(options: HttpExecutionContext): Promise<HttpExecutionResult> {
-  const { tenantId, context, request, idempotencyKey } = options;
-  const baseUrl = resolveSecretAlias(tenantId, request.urlAlias);
-  const token = request.tokenAlias ? resolveSecretAlias(tenantId, request.tokenAlias) : undefined;
-  const signingSecret = request.signingSecretAlias
-    ? resolveSecretAlias(tenantId, request.signingSecretAlias)
-    : undefined;
+  return withSpan(
+    "temporal.activity.performSignedHttpRequest",
+    {
+      attributes: {
+        ...buildRunAttributes(options.context),
+        "freshcomply.tenantId": options.tenantId,
+        "http.method": options.request.method,
+        "freshcomply.http.urlAlias": options.request.urlAlias
+      }
+    },
+    async (span) => {
+      const { tenantId, context, request, idempotencyKey } = options;
+      const baseUrl = resolveSecretAlias(tenantId, request.urlAlias);
+      const token = request.tokenAlias ? resolveSecretAlias(tenantId, request.tokenAlias) : undefined;
+      const signingSecret = request.signingSecretAlias
+        ? resolveSecretAlias(tenantId, request.signingSecretAlias)
+        : undefined;
 
-  const url = buildUrl(baseUrl, request.path, request.query);
-  const headers = new Headers();
-  headers.set("User-Agent", "fresh-comply-temporal/1.0");
-  headers.set("X-FC-Idempotency-Key", idempotencyKey ?? `${context.runId}:${context.stepKey}`);
-  headers.set("X-FC-Run-Id", context.runId);
-  headers.set("X-FC-Step-Key", context.stepKey);
+      const url = buildUrl(baseUrl, request.path, request.query);
+      const headers = new Headers();
+      headers.set("User-Agent", "fresh-comply-temporal/1.0");
+      headers.set("X-FC-Idempotency-Key", idempotencyKey ?? `${context.runId}:${context.stepKey}`);
+      headers.set("X-FC-Run-Id", context.runId);
+      headers.set("X-FC-Step-Key", context.stepKey);
 
-  for (const [key, value] of Object.entries(request.headers ?? {})) {
-    headers.set(key, value);
-  }
+      for (const [key, value] of Object.entries(request.headers ?? {})) {
+        headers.set(key, value);
+      }
 
-  let bodyString: string | undefined;
-  if (request.body !== undefined && request.body !== null) {
-    if (!headers.has("Content-Type")) {
-      headers.set("Content-Type", "application/json");
+      let bodyString: string | undefined;
+      if (request.body !== undefined && request.body !== null) {
+        if (!headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
+        }
+        bodyString = typeof request.body === "string" ? request.body : JSON.stringify(request.body);
+      }
+
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      if (signingSecret && bodyString) {
+        const signature = createHmac("sha256", signingSecret).update(bodyString).digest("hex");
+        headers.set("X-FC-Signature", signature);
+      }
+
+      const response = await fetch(url, {
+        method: request.method,
+        headers,
+        body: bodyString
+      });
+
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key.toLowerCase()] = value;
+      });
+
+      const { bodyText, body } = await parseBody(response);
+
+      const result: HttpExecutionResult = {
+        ok: response.ok,
+        status: response.status,
+        requestHash: hashPayload(bodyString),
+        responseHash: hashPayload(bodyText),
+        headers: responseHeaders,
+        bodyText,
+        body
+      };
+
+      span.setAttributes({ "http.status_code": response.status });
+
+      if (!response.ok) {
+        const error = new Error(
+          `HTTP request failed with status ${response.status}: ${bodyText ?? response.statusText}`
+        );
+        (error as Error & { metadata?: unknown }).metadata = {
+          status: response.status,
+          url,
+          headers: responseHeaders,
+          responseHash: result.responseHash
+        };
+        recordSpanError(span, error);
+        throw error;
+      }
+
+      annotateSuccess(span, { "freshcomply.http.responseHash": result.responseHash ?? "" });
+      return result;
     }
-    bodyString = typeof request.body === "string" ? request.body : JSON.stringify(request.body);
-  }
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  if (signingSecret && bodyString) {
-    const signature = createHmac("sha256", signingSecret).update(bodyString).digest("hex");
-    headers.set("X-FC-Signature", signature);
-  }
-
-  const response = await fetch(url, {
-    method: request.method,
-    headers,
-    body: bodyString
-  });
-
-  const responseHeaders: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    responseHeaders[key.toLowerCase()] = value;
-  });
-
-  const { bodyText, body } = await parseBody(response);
-
-  const result: HttpExecutionResult = {
-    ok: response.ok,
-    status: response.status,
-    requestHash: hashPayload(bodyString),
-    responseHash: hashPayload(bodyText),
-    headers: responseHeaders,
-    bodyText,
-    body
-  };
-
-  if (!response.ok) {
-    const error = new Error(
-      `HTTP request failed with status ${response.status}: ${bodyText ?? response.statusText}`
-    );
-    (error as Error & { metadata?: unknown }).metadata = {
-      status: response.status,
-      url,
-      headers: responseHeaders,
-      responseHash: result.responseHash
-    };
-    throw error;
-  }
-
-  return result;
+  );
 }

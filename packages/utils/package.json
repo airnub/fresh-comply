@@ -8,5 +8,8 @@
     "./date": "./src/date.ts",
     "./ics": "./src/ics.ts",
     "./index": "./src/index.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0"
   }
 }

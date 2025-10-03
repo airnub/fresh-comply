@@ -1,3 +1,4 @@
+import { annotateSuccess, recordSpanError, withSpan } from "@airnub/utils";
 import { createClient } from "@supabase/supabase-js";
 import type { SourceKey, WatchEvent } from "@airnub/freshness/watcher";
 import { pollSource } from "@airnub/freshness/watcher";
@@ -33,34 +34,53 @@ function getSupabaseClient() {
 }
 
 export async function refreshFreshnessSource(input: RefreshSourceInput): Promise<WatchEvent | null> {
-  const client = getSupabaseClient();
-  const workflows = input.workflows ?? DEFAULT_WORKFLOW_ROUTES[input.sourceKey];
-  const event = await pollSource(input.sourceKey, {
-    supabase: client,
-    workflows,
-    metadata: input.metadata
-  });
-  if (event?.current) {
-    await persistMaterializedViews(client, input.sourceKey, event);
-  }
-  return event;
+  return withSpan(
+    "temporal.activity.refreshFreshnessSource",
+    { attributes: { "freshcomply.sourceKey": input.sourceKey } },
+    async (span) => {
+      const client = getSupabaseClient();
+      const workflows = input.workflows ?? DEFAULT_WORKFLOW_ROUTES[input.sourceKey];
+      if (workflows?.length) {
+        span.setAttributes({ "freshcomply.freshness.workflowCount": workflows.length });
+      }
+      const event = await pollSource(input.sourceKey, {
+        supabase: client,
+        workflows,
+        metadata: input.metadata
+      });
+      if (event?.current) {
+        span.setAttributes({ "freshcomply.freshness.updated": true });
+        await persistMaterializedViews(client, input.sourceKey, event);
+      }
+      annotateSuccess(span, { "freshcomply.freshness.hasEvent": event ? 1 : 0 });
+      return event;
+    }
+  );
 }
 
 export async function refreshAllSources(options?: { workflows?: string[] }) {
-  const keys: SourceKey[] = [
-    "cro_open_services",
-    "charities_ckan",
-    "revenue_charities",
-    "funding_radar"
-  ];
-  const events: WatchEvent[] = [];
-  for (const key of keys) {
-    const event = await refreshFreshnessSource({ sourceKey: key, workflows: options?.workflows });
-    if (event) {
-      events.push(event);
+  return withSpan(
+    "temporal.activity.refreshAllSources",
+    {},
+    async (span) => {
+      const keys: SourceKey[] = [
+        "cro_open_services",
+        "charities_ckan",
+        "revenue_charities",
+        "funding_radar"
+      ];
+      const events: WatchEvent[] = [];
+      for (const key of keys) {
+        const event = await refreshFreshnessSource({ sourceKey: key, workflows: options?.workflows });
+        if (event) {
+          events.push(event);
+        }
+      }
+      span.setAttributes({ "freshcomply.freshness.sources": keys.length, "freshcomply.freshness.events": events.length });
+      annotateSuccess(span);
+      return events;
     }
-  }
-  return events;
+  );
 }
 
 async function persistMaterializedViews(
@@ -68,22 +88,34 @@ async function persistMaterializedViews(
   sourceKey: SourceKey,
   event: WatchEvent
 ) {
-  switch (sourceKey) {
-    case "cro_open_services":
-      await persistCroCompanies(client, event);
-      break;
-    case "charities_ckan":
-      await persistCharityMetrics(client, event);
-      break;
-    case "revenue_charities":
-      await persistRevenueCharities(client, event);
-      break;
-    case "funding_radar":
-      await persistFundingOpportunities(client, event);
-      break;
-    default:
-      break;
-  }
+  await withSpan(
+    "temporal.activity.persistMaterializedViews",
+    { attributes: { "freshcomply.sourceKey": sourceKey } },
+    async (span) => {
+      try {
+        switch (sourceKey) {
+          case "cro_open_services":
+            await persistCroCompanies(client, event);
+            break;
+          case "charities_ckan":
+            await persistCharityMetrics(client, event);
+            break;
+          case "revenue_charities":
+            await persistRevenueCharities(client, event);
+            break;
+          case "funding_radar":
+            await persistFundingOpportunities(client, event);
+            break;
+          default:
+            break;
+        }
+        annotateSuccess(span);
+      } catch (error) {
+        recordSpanError(span, error);
+        throw error;
+      }
+    }
+  );
 }
 
 function toDateString(value: unknown): string | null {

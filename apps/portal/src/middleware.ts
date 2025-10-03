@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@airnub/types";
 import { NextRequest, NextResponse } from "next/server";
+import { generateNonce, resolveSecurityHeaders } from "@airnub/utils";
 import { type AppLocale, defaultLocale, isAppLocale } from "./i18n/config";
 import { ensureLeadingLocale, negotiateLocale, setLocaleCookie } from "./i18n/request";
 
@@ -52,13 +53,23 @@ async function getSupabaseSession(request: NextRequest, response: NextResponse) 
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const nonce = generateNonce();
+  const securityHeaders = resolveSecurityHeaders({ nonce, protocol: request.nextUrl.protocol });
+
+  const applySecurityHeaders = (response: NextResponse) => {
+    for (const [key, value] of Object.entries(securityHeaders)) {
+      response.headers.set(key, value);
+    }
+    response.headers.set("x-csp-nonce", nonce);
+    return response;
+  };
 
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     PUBLIC_FILE.test(pathname)
   ) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
   const segments = pathname.split("/").filter(Boolean);
@@ -67,13 +78,14 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/auth")) {
     const locale = negotiateLocale(request);
     const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-csp-nonce", nonce);
     requestHeaders.set("x-next-intl-locale", locale);
 
-    const response = NextResponse.next({
+    const response = applySecurityHeaders(NextResponse.next({
       request: {
         headers: requestHeaders
       }
-    });
+    }));
 
     setLocaleCookie(response, locale);
     await getSupabaseSession(request, response);
@@ -84,7 +96,7 @@ export async function middleware(request: NextRequest) {
     const locale = negotiateLocale(request);
     const url = request.nextUrl.clone();
     url.pathname = ensureLeadingLocale(pathname === "/" ? "" : pathname, locale);
-    const response = NextResponse.redirect(url);
+    const response = applySecurityHeaders(NextResponse.redirect(url));
     await getSupabaseSession(request, response);
     setLocaleCookie(response, locale);
     return response;
@@ -92,20 +104,21 @@ export async function middleware(request: NextRequest) {
 
   const locale = (currentSegment ?? defaultLocale) as AppLocale;
   const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-csp-nonce", nonce);
   requestHeaders.set("x-next-intl-locale", locale);
 
-  const response = NextResponse.next({
+  const response = applySecurityHeaders(NextResponse.next({
     request: {
       headers: requestHeaders
     }
-  });
+  }));
   const session = await getSupabaseSession(request, response);
 
   if (!session) {
     const signInUrl = request.nextUrl.clone();
     signInUrl.pathname = "/auth/sign-in";
     signInUrl.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(signInUrl);
+    return applySecurityHeaders(NextResponse.redirect(signInUrl));
   }
 
   setLocaleCookie(response, locale);
