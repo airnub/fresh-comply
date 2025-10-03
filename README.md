@@ -40,3 +40,18 @@ pnpm tsx scripts/audit.ts
 ```
 
 The command prints a summary table to the console and writes both JSON and Markdown reports under `reports/` with timestamped filenames.
+
+## CI expectations
+
+All pull requests run an automated workflow that checks linting, type safety, tests, documentation links, and database policies. Run the same commands locally before opening a PR:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm --filter @airnub/db run migrate --dry-run
+node packages/db/check-rls.mjs
+pnpm dlx lychee --no-progress --markdown --base . ./AGENTS.md './docs/**/*.md'
+```
+
+Installing [`lychee`](https://github.com/lycheeverse/lychee) via `pnpm dlx` keeps the Markdown link checker aligned with CI.
