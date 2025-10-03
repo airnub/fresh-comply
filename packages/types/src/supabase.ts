@@ -9,132 +9,551 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      freshness_snapshots: {
+      adoption_records: {
         Row: {
           id: string;
-          source_key: string;
-          fingerprint: string;
-          payload: Json;
-          polled_at: string;
-          metadata: Json | null;
+          tenant_org_id: string;
+          run_id: string | null;
+          scope: string;
+          ref_id: string;
+          from_version: string | null;
+          to_version: string;
+          mode: string;
+          actor_id: string | null;
+          decided_at: string;
+          notes: Json | null;
+          created_at: string;
         };
         Insert: {
           id?: string;
-          source_key: string;
-          fingerprint: string;
-          payload: Json;
-          polled_at?: string;
-          metadata?: Json | null;
+          tenant_org_id: string;
+          run_id?: string | null;
+          scope: string;
+          ref_id: string;
+          from_version?: string | null;
+          to_version: string;
+          mode: string;
+          actor_id?: string | null;
+          decided_at?: string;
+          notes?: Json | null;
+          created_at?: string;
         };
         Update: {
           id?: string;
-          source_key?: string;
-          fingerprint?: string;
-          payload?: Json;
-          polled_at?: string;
-          metadata?: Json | null;
-        };
-        Relationships: [];
-      };
-      freshness_pending_updates: {
-        Row: {
-          id: string;
-          source_key: string;
-          current_snapshot_id: string;
-          previous_snapshot_id: string | null;
-          status: "pending" | "approved" | "rejected";
-          diff_summary: string;
-          diff_payload: Json | null;
-          detected_at: string;
-          approval_reason: string | null;
-          rejection_reason: string | null;
-          approved_by_user_id: string | null;
-          workflow_keys: string[] | null;
-          verified_at: string | null;
-          created_at: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          source_key: string;
-          current_snapshot_id: string;
-          previous_snapshot_id?: string | null;
-          status?: "pending" | "approved" | "rejected";
-          diff_summary: string;
-          diff_payload?: Json | null;
-          detected_at?: string;
-          approval_reason?: string | null;
-          rejection_reason?: string | null;
-          approved_by_user_id?: string | null;
-          workflow_keys?: string[] | null;
-          verified_at?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          source_key?: string;
-          current_snapshot_id?: string;
-          previous_snapshot_id?: string | null;
-          status?: "pending" | "approved" | "rejected";
-          diff_summary?: string;
-          diff_payload?: Json | null;
-          detected_at?: string;
-          approval_reason?: string | null;
-          rejection_reason?: string | null;
-          approved_by_user_id?: string | null;
-          workflow_keys?: string[] | null;
-          verified_at?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
+          tenant_org_id?: string;
+          run_id?: string | null;
+          scope?: string;
+          ref_id?: string;
+          from_version?: string | null;
+          to_version?: string;
+          mode?: string;
+          actor_id?: string | null;
+          decided_at?: string;
+          notes?: Json | null;
+          created_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "freshness_pending_updates_approved_by_user_id_fkey";
-            columns: ["approved_by_user_id"];
+            foreignKeyName: "adoption_records_actor_id_fkey";
+            columns: ["actor_id"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "freshness_pending_updates_current_snapshot_id_fkey";
-            columns: ["current_snapshot_id"];
+            foreignKeyName: "adoption_records_run_id_fkey";
+            columns: ["run_id"];
             isOneToOne: false;
-            referencedRelation: "freshness_snapshots";
+            referencedRelation: "workflow_runs";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "freshness_pending_updates_previous_snapshot_id_fkey";
-            columns: ["previous_snapshot_id"];
+            foreignKeyName: "adoption_records_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
             isOneToOne: false;
-            referencedRelation: "freshness_snapshots";
+            referencedRelation: "organisations";
             referencedColumns: ["id"];
           }
         ];
       };
-      freshness_rule_verifications: {
+      change_event: {
         Row: {
           id: string;
-          rule_id: string;
-          evidence: Json;
-          verified_at: string;
-          created_at: string | null;
+          tenant_org_id: string;
+          source_id: string;
+          from_hash: string | null;
+          to_hash: string;
+          detected_at: string;
+          severity: string;
+          notes: string | null;
+          created_at: string;
         };
         Insert: {
           id?: string;
-          rule_id: string;
-          evidence: Json;
-          verified_at: string;
-          created_at?: string | null;
+          tenant_org_id: string;
+          source_id: string;
+          from_hash?: string | null;
+          to_hash: string;
+          detected_at?: string;
+          severity: string;
+          notes?: string | null;
+          created_at?: string;
         };
         Update: {
           id?: string;
-          rule_id?: string;
-          evidence?: Json;
-          verified_at?: string;
-          created_at?: string | null;
+          tenant_org_id?: string;
+          source_id?: string;
+          from_hash?: string | null;
+          to_hash?: string;
+          detected_at?: string;
+          severity?: string;
+          notes?: string | null;
+          created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "change_event_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "source_registry";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "change_event_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      moderation_queue: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          change_event_id: string | null;
+          proposal: Json;
+          status: "pending" | "approved" | "rejected" | "amended";
+          classification: string | null;
+          reviewer_id: string | null;
+          decided_at: string | null;
+          created_by: string | null;
+          notes_md: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          change_event_id?: string | null;
+          proposal: Json;
+          status?: "pending" | "approved" | "rejected" | "amended";
+          classification?: string | null;
+          reviewer_id?: string | null;
+          decided_at?: string | null;
+          created_by?: string | null;
+          notes_md?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          change_event_id?: string | null;
+          proposal?: Json;
+          status?: "pending" | "approved" | "rejected" | "amended";
+          classification?: string | null;
+          reviewer_id?: string | null;
+          decided_at?: string | null;
+          created_by?: string | null;
+          notes_md?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "moderation_queue_change_event_id_fkey";
+            columns: ["change_event_id"];
+            isOneToOne: false;
+            referencedRelation: "change_event";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "moderation_queue_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "moderation_queue_reviewer_id_fkey";
+            columns: ["reviewer_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "moderation_queue_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      release_notes: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          scope: string;
+          ref_id: string;
+          from_version: string | null;
+          to_version: string;
+          classification: string;
+          effective_date: string | null;
+          notes_md: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          scope: string;
+          ref_id: string;
+          from_version?: string | null;
+          to_version: string;
+          classification: string;
+          effective_date?: string | null;
+          notes_md?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          scope?: string;
+          ref_id?: string;
+          from_version?: string | null;
+          to_version?: string;
+          classification?: string;
+          effective_date?: string | null;
+          notes_md?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "release_notes_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "release_notes_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      rule_versions: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          rule_id: string;
+          version: string;
+          logic_jsonb: Json;
+          sources: Json;
+          checksum: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          rule_id: string;
+          version: string;
+          logic_jsonb: Json;
+          sources: Json;
+          checksum: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          rule_id?: string;
+          version?: string;
+          logic_jsonb?: Json;
+          sources?: Json;
+          checksum?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_versions_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      source_registry: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          name: string;
+          url: string;
+          parser: string;
+          jurisdiction: string | null;
+          category: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          name: string;
+          url: string;
+          parser: string;
+          jurisdiction?: string | null;
+          category?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          name?: string;
+          url?: string;
+          parser?: string;
+          jurisdiction?: string | null;
+          category?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "source_registry_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      source_snapshot: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          source_id: string;
+          fetched_at: string;
+          content_hash: string;
+          parsed_facts: Json;
+          storage_ref: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          source_id: string;
+          fetched_at?: string;
+          content_hash: string;
+          parsed_facts: Json;
+          storage_ref?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          source_id?: string;
+          fetched_at?: string;
+          content_hash?: string;
+          parsed_facts?: Json;
+          storage_ref?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "source_snapshot_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "source_registry";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "source_snapshot_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      template_versions: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          template_id: string;
+          version: string;
+          storage_ref: string;
+          checksum: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          template_id: string;
+          version: string;
+          storage_ref: string;
+          checksum: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          template_id?: string;
+          version?: string;
+          storage_ref?: string;
+          checksum?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "template_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "template_versions_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      workflow_def_versions: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          workflow_def_id: string;
+          version: string;
+          graph_jsonb: Json;
+          rule_ranges: Json;
+          template_ranges: Json;
+          checksum: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          workflow_def_id: string;
+          version: string;
+          graph_jsonb: Json;
+          rule_ranges?: Json;
+          template_ranges?: Json;
+          checksum: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          workflow_def_id?: string;
+          version?: string;
+          graph_jsonb?: Json;
+          rule_ranges?: Json;
+          template_ranges?: Json;
+          checksum?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_def_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workflow_def_versions_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workflow_def_versions_workflow_def_id_fkey";
+            columns: ["workflow_def_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_defs";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      workflow_pack_versions: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          pack_id: string;
+          version: string;
+          overlay_jsonb: Json;
+          checksum: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          pack_id: string;
+          version: string;
+          overlay_jsonb: Json;
+          checksum: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          pack_id?: string;
+          version?: string;
+          overlay_jsonb?: Json;
+          checksum?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_pack_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workflow_pack_versions_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       organisations: {
         Row: {

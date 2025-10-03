@@ -18,7 +18,17 @@ const tablesWithRls = [
   "audit_log",
   "admin_actions",
   "dsr_requests",
-  "dsr_request_jobs"
+  "dsr_request_jobs",
+  "source_registry",
+  "source_snapshot",
+  "change_event",
+  "rule_versions",
+  "template_versions",
+  "workflow_def_versions",
+  "workflow_pack_versions",
+  "moderation_queue",
+  "release_notes",
+  "adoption_records"
 ];
 
 const missingRls = tablesWithRls.filter((table) => {
@@ -50,7 +60,48 @@ const requiredPolicies = {
   audit_log: ["Members read audit log", "Service role appends audit log"],
   admin_actions: ["Members read admin actions", "Service role appends admin actions"],
   dsr_requests: ["Members view DSR requests", "Members manage DSR requests"],
-  dsr_request_jobs: ["Service role manages DSR jobs"]
+  dsr_request_jobs: ["Service role manages DSR jobs"],
+  source_registry: [
+    "Service role manages source registry",
+    "Tenant members read source registry"
+  ],
+  source_snapshot: [
+    "Service role manages source snapshots",
+    "Tenant members read source snapshots"
+  ],
+  change_event: [
+    "Service role manages change events",
+    "Tenant members read change events"
+  ],
+  rule_versions: [
+    "Service role manages rule versions",
+    "Tenant members read rule versions"
+  ],
+  template_versions: [
+    "Service role manages template versions",
+    "Tenant members read template versions"
+  ],
+  workflow_def_versions: [
+    "Service role manages workflow def versions",
+    "Tenant members read workflow def versions"
+  ],
+  workflow_pack_versions: [
+    "Service role manages workflow pack versions",
+    "Tenant members read workflow pack versions"
+  ],
+  moderation_queue: [
+    "Service role manages moderation queue",
+    "Tenant members view moderation queue"
+  ],
+  release_notes: [
+    "Service role manages release notes",
+    "Tenant members read release notes"
+  ],
+  adoption_records: [
+    "Service role manages adoption records",
+    "Tenant members read adoption records",
+    "Tenant members insert adoption records"
+  ]
 };
 
 const missingPolicies = Object.entries(requiredPolicies).flatMap(([table, policies]) =>
