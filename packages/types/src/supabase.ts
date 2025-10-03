@@ -9,6 +9,133 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      freshness_snapshots: {
+        Row: {
+          id: string;
+          source_key: string;
+          fingerprint: string;
+          payload: Json;
+          polled_at: string;
+          metadata: Json | null;
+        };
+        Insert: {
+          id?: string;
+          source_key: string;
+          fingerprint: string;
+          payload: Json;
+          polled_at?: string;
+          metadata?: Json | null;
+        };
+        Update: {
+          id?: string;
+          source_key?: string;
+          fingerprint?: string;
+          payload?: Json;
+          polled_at?: string;
+          metadata?: Json | null;
+        };
+        Relationships: [];
+      };
+      freshness_pending_updates: {
+        Row: {
+          id: string;
+          source_key: string;
+          current_snapshot_id: string;
+          previous_snapshot_id: string | null;
+          status: "pending" | "approved" | "rejected";
+          diff_summary: string;
+          diff_payload: Json | null;
+          detected_at: string;
+          approval_reason: string | null;
+          rejection_reason: string | null;
+          approved_by_user_id: string | null;
+          workflow_keys: string[] | null;
+          verified_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          source_key: string;
+          current_snapshot_id: string;
+          previous_snapshot_id?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          diff_summary: string;
+          diff_payload?: Json | null;
+          detected_at?: string;
+          approval_reason?: string | null;
+          rejection_reason?: string | null;
+          approved_by_user_id?: string | null;
+          workflow_keys?: string[] | null;
+          verified_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          source_key?: string;
+          current_snapshot_id?: string;
+          previous_snapshot_id?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          diff_summary?: string;
+          diff_payload?: Json | null;
+          detected_at?: string;
+          approval_reason?: string | null;
+          rejection_reason?: string | null;
+          approved_by_user_id?: string | null;
+          workflow_keys?: string[] | null;
+          verified_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "freshness_pending_updates_approved_by_user_id_fkey";
+            columns: ["approved_by_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "freshness_pending_updates_current_snapshot_id_fkey";
+            columns: ["current_snapshot_id"];
+            isOneToOne: false;
+            referencedRelation: "freshness_snapshots";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "freshness_pending_updates_previous_snapshot_id_fkey";
+            columns: ["previous_snapshot_id"];
+            isOneToOne: false;
+            referencedRelation: "freshness_snapshots";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      freshness_rule_verifications: {
+        Row: {
+          id: string;
+          rule_id: string;
+          evidence: Json;
+          verified_at: string;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          rule_id: string;
+          evidence: Json;
+          verified_at: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          rule_id?: string;
+          evidence?: Json;
+          verified_at?: string;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
       organisations: {
         Row: {
           id: string;

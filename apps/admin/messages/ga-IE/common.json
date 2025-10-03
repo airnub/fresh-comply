@@ -100,7 +100,9 @@
     "subheading": "Athbhreithnigh difríochtaí faireora sula bhfoilseofar nuashonruithe.",
     "columns": {
       "watcher": "Faireoir",
-      "impact": "Tionchar"
+      "status": "Stádas",
+      "detected": "Braite",
+      "workflows": "Sreafaí oibre"
     },
     "tableCaption": "Nuashonruithe faireora ar feitheamh",
     "empty": "Níl aon nuashonruithe faireora ar feitheamh.",
@@ -114,6 +116,22 @@
     "reject": "Diúltaigh",
     "reason": {
       "submitting": "Á chur isteach…"
+    },
+    "noWorkflows": "Gan sreafaí ceangailte",
+    "selectedSource": "Difríocht {source} á hathbhreithniú",
+    "verifiedOn": "Fíoraithe ar {date}",
+    "locked": "Tá an nuashonrú {status}.",
+    "diffAdded": "{count, plural, one {# iontráil nua} other {# iontrálacha nua}}",
+    "diffRemoved": "{count, plural, one {# bainte} other {# bainte}}",
+    "diffUpdated": "{count, plural, one {# nuashonrú} other {# nuashonruithe}}",
+    "diffNoop": "Struchtúr athraithe",
+    "statuses": {
+      "pending": "Ar feitheamh",
+      "approved": "Ceadaithe",
+      "rejected": "Diúltaithe"
+    },
+    "error": {
+      "generic": "Tharla earráid"
     }
   },
   "orgs": {

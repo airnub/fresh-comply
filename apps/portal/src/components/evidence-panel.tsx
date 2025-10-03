@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { EvidenceDrawer, EvidenceItem } from "@airnub/ui";
+import { EvidenceDrawer } from "@airnub/ui";
 import { useTranslations } from "next-intl";
 import { Text } from "@radix-ui/themes";
+import type { Rule } from "@airnub/freshness/verify";
+import { SOURCES } from "@airnub/freshness/sources";
 
-export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }) {
-  const [items, setItems] = useState(initialItems);
+export function EvidencePanel({ initialRules }: { initialRules: Rule[] }) {
+  const [rules, setRules] = useState(initialRules);
   const [isPending, startTransition] = useTransition();
   const t = useTranslations("evidence");
 
@@ -19,15 +21,12 @@ export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }
       });
       if (!response.ok) return;
       const data = await response.json();
-      setItems((current) =>
-        current.map((item) =>
-          item.id === id
-            ? { ...item, lastVerifiedAt: data.rule.lastVerifiedAt }
-            : item
-        )
-      );
+      if (!data.rule) return;
+      setRules((current) => current.map((rule: Rule) => (rule.id === id ? data.rule : rule)));
     });
   }
+
+  const items = rules.map(mapRuleToItem);
 
   return (
     <div aria-live="polite">
@@ -44,4 +43,29 @@ export function EvidencePanel({ initialItems }: { initialItems: EvidenceItem[] }
       />
     </div>
   );
+}
+
+function mapRuleToItem(rule: Rule) {
+  const sources = rule.sources.map((sourceKey) => {
+    const source = SOURCES[sourceKey];
+    return { label: source.label, url: source.url };
+  });
+  const badgeStatus = rule.status ?? "stale";
+  const badgeColor = badgeStatus === "verified" ? "green" : badgeStatus === "pending" ? "amber" : "red";
+  const annotation = rule.lastVerifiedAt
+    ? `Verified on ${new Date(rule.lastVerifiedAt).toLocaleDateString()}`
+    : undefined;
+  return {
+    id: rule.id,
+    title: rule.name,
+    sources,
+    lastVerifiedAt: rule.lastVerifiedAt,
+    annotation,
+    badge: { label: `Freshness · ${badgeStatus}`, color: badgeColor },
+    metadata:
+      rule.evidence?.map((entry) => ({
+        label: SOURCES[entry.sourceKey].label,
+        value: `${entry.recordCount} records · ${new Date(entry.fetchedAt).toLocaleString()}`
+      })) ?? []
+  };
 }

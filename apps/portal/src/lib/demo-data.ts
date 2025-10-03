@@ -2,6 +2,7 @@ import path from "node:path";
 import { loadDSL } from "@airnub/engine/dsl";
 import { materializeSteps } from "@airnub/engine/engine";
 import type { StepExecution } from "@airnub/engine/types";
+import type { Rule } from "@airnub/freshness/verify";
 import { verifyRule } from "@airnub/freshness/verify";
 import { SOURCES } from "@airnub/freshness/sources";
 import { renderBoardMinutes } from "@airnub/doc-templates/index";
@@ -27,7 +28,11 @@ export type DemoStep = {
   status: "todo" | "in_progress" | "waiting" | "blocked" | "done";
   dueDate?: string;
   assignee?: string;
-  verifyRules?: Awaited<ReturnType<typeof verifyRule>>[];
+  verifyRules?: Rule[];
+  freshness?: {
+    status: Rule["status"];
+    verifiedAt?: string;
+  };
   execution?: StepExecution;
   orchestration?: DemoOrchestration;
 };
@@ -57,12 +62,13 @@ export async function getDemoRun(): Promise<DemoRun> {
     "idle"
   ];
 
-  const steps = materializeSteps(dsl).map((step, index) => {
-    const execution = step.execution as StepExecution | undefined;
-    const orchestration =
-      execution?.mode === "temporal"
-        ? {
-            status: orchestrationStates[index] ?? "idle",
+  const steps = await Promise.all(
+    materializeSteps(dsl).map(async (step, index) => {
+      const execution = step.execution as StepExecution | undefined;
+      const orchestration =
+        execution?.mode === "temporal"
+          ? {
+              status: orchestrationStates[index] ?? "idle",
             workflowId: `demo-${step.id}`,
             resultSummary:
               index === 0
@@ -82,28 +88,35 @@ export async function getDemoRun(): Promise<DemoRun> {
           ? "in_progress"
           : index === 2
             ? "waiting"
-            : index === 3
-              ? "waiting"
-              : "todo";
+          : index === 3
+            ? "waiting"
+            : "todo";
 
-    return {
-      id: step.id,
-      title: step.title,
-      status,
-      dueDate: new Date(Date.now() + index * 1000 * 60 * 60 * 24 * 7).toISOString(),
-      assignee: index % 2 === 0 ? "Aoife Kelly" : "Brian Moore",
-      verifyRules: step.verify?.map((rule) => ({
-        id: rule.id,
-        name: rule.id.replace(/_/g, " "),
-        sources: Object.values(SOURCES)
-          .slice(0, 2)
-          .map((source) => source.url),
-        lastVerifiedAt: new Date(Date.now() - (index + 1) * 1000 * 60 * 60 * 24).toISOString()
-      })),
-      execution,
-      orchestration
-    } satisfies DemoStep;
-  });
+      const verifyRules = step.verify
+        ? await Promise.all(
+            step.verify.map(async (rule) =>
+              verifyRule({
+                id: rule.id,
+                name: rule.id.replace(/_/g, " "),
+                sources: getSourcesForStep(step.id)
+              })
+            )
+          )
+        : undefined;
+
+      return {
+        id: step.id,
+        title: step.title,
+        status,
+        dueDate: new Date(Date.now() + index * 1000 * 60 * 60 * 24 * 7).toISOString(),
+        assignee: index % 2 === 0 ? "Aoife Kelly" : "Brian Moore",
+        verifyRules,
+        freshness: summariseFreshness(verifyRules),
+        execution,
+        orchestration
+      } satisfies DemoStep;
+    })
+  );
 
   const documents = [renderBoardMinutes({
     orgName: "Company X (Client)",
@@ -148,10 +161,37 @@ export async function reverifyRule(ruleId: string) {
   step.verifyRules = await Promise.all(
     step.verifyRules.map(async (rule) => (rule.id === ruleId ? await verifyRule(rule) : rule))
   );
+  step.freshness = summariseFreshness(step.verifyRules);
   return step.verifyRules.find((rule) => rule.id === ruleId);
 }
 
 export function getDemoDocument() {
   if (!cachedRun) return null;
   return cachedRun.documents[0];
+}
+
+type SourceKey = keyof typeof SOURCES;
+
+function getSourcesForStep(stepId: string): SourceKey[] {
+  switch (stepId) {
+    case "cro-name-check":
+      return ["cro_open_services"];
+    case "cro-a1-pack":
+      return ["cro_open_services", "charities_ckan"];
+    case "revenue-tr2":
+    case "revenue-etax-clearance":
+      return ["revenue_charities"];
+    default:
+      return ["charities_ckan"];
+  }
+}
+
+function summariseFreshness(rules?: Rule[]) {
+  if (!rules?.length) return undefined;
+  const timestamps = rules
+    .map((rule) => rule.lastVerifiedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => (a > b ? -1 : 1));
+  const status = rules.every((rule) => rule.status === "verified") ? "verified" : "stale";
+  return { status, verifiedAt: timestamps[0] };
 }

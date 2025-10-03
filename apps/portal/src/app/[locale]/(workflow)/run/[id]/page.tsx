@@ -20,12 +20,7 @@ export default async function WorkflowRunPage({
 
   const tWorkflow = await getTranslations({ locale, namespace: "workflow" });
 
-  const evidenceItems = (run.timeline[0].verifyRules ?? []).map((rule) => ({
-    id: rule.id,
-    title: rule.name,
-    sources: rule.sources.map((url) => ({ label: url, url })),
-    lastVerifiedAt: rule.lastVerifiedAt
-  }));
+  const evidenceRules = run.timeline.flatMap((step) => step.verifyRules ?? []);
 
   return (
     <Flex direction="column" gap="6">
@@ -47,7 +42,8 @@ export default async function WorkflowRunPage({
                 assignee: step.assignee,
                 executionMode: step.execution?.mode,
                 orchestrationStatus: step.orchestration?.status,
-                orchestrationResult: step.orchestration?.resultSummary
+                orchestrationResult: step.orchestration?.resultSummary,
+                freshness: step.freshness
               }))}
             />
           </Flex>
@@ -82,7 +78,7 @@ export default async function WorkflowRunPage({
               <Text size="2" color="gray">
                 {tWorkflow("evidenceDescription")}
               </Text>
-              <EvidencePanel initialItems={evidenceItems} />
+              <EvidencePanel initialRules={evidenceRules} />
             </Flex>
           </section>
         </Card>
