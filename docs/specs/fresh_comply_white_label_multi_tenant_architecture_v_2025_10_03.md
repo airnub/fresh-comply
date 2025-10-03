@@ -96,7 +96,17 @@ Stripe Connect + Billing recommended; invoices, tax/VAT handling, and payouts ar
 
 ---
 
-## 7) Minimal Schema Additions
+## 7) Audit Trail & DSR
+
+- **Append-only ledgers**: `audit_log` (tenant event stream) and `admin_actions` (platform-admin mutations) capture `{ id, tenant_org_id, subject_org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, action, payload jsonb, created_at, prev_hash, curr_hash }` with immutable retention windows.
+- **Hash-chain enforcement**: Postgres `BEFORE INSERT` trigger sets `curr_hash = sha256(prev_hash || row_digest)` and verifies `prev_hash` equals the latest committed hash per `(tenant_org_id, stream_key)`; `UPDATE`/`DELETE` are blocked via RLS and constraint triggers so the chain cannot be rewritten.
+- **RLS views**: expose tenant-safe `audit_log_view` / `admin_actions_view` filtering by `tenant_org_id` and enriching actor metadata; platform-only variants can traverse cross-tenant `subject_org_id` for DSR and incident response. The [Admin App Spec](./admin-app-spec.md) consumes the platform view for moderation tooling.
+- **RPC write-through pattern**: all admin surfaces and automated workflows call `rpc_append_audit_entry(actor, action, payload)` which writes to `admin_actions`, returns the hash link, and emits NOTIFY for workers that append to `audit_log` so UI latency stays low.
+- **DSR lifecycle coverage**: DSR intake, acknowledgement, hold, fulfillment, and closure events append to `audit_log` with legal basis, SLA timestamps, and export bundle references; exports include the latest hash signature to prove integrity during regulator handoffs.
+
+---
+
+## 8) Minimal Schema Additions
 
 ```
 tenants(id, name, created_at, ...)
@@ -123,7 +133,7 @@ All tables enforce tenant scoping via RLS; migrations are additive and non‑des
 
 ---
 
-## 8) Deployment & Routing
+## 9) Deployment & Routing
 
 - **Single portal app** serves all tenants; routing via domain. Middleware loads tenant config and sets branding tokens SSR.
 - **Platform Admin app** deploys separately, on an internal domain; additional SSO/conditional access as needed.
@@ -131,7 +141,7 @@ All tables enforce tenant scoping via RLS; migrations are additive and non‑des
 
 ---
 
-## 9) Implementation Roadmap (Increments)
+## 10) Implementation Roadmap (Increments)
 
 1) **Brand & Domain MVP**
    - Tables: `tenant_domains`, `tenant_branding`.
@@ -150,19 +160,25 @@ All tables enforce tenant scoping via RLS; migrations are additive and non‑des
 5) **Observability & Guardrails**
    - OTel tenant tagging; rate limits; “no inline secrets” overlay lint; audit enrichments.
 
+6) **Audit Trail & DSR**
+   - Migrations for `audit_log`, `admin_actions`, hash-chain triggers, and per-scope RLS views.
+   - RPC wrappers for write-through logging (`rpc_append_audit_entry`, `rpc_record_dsr_transition`) plus NOTIFY/LISTEN workers.
+   - Reporting surfaces: Admin App audit feeds, tenant self-serve export, DSR lifecycle dashboards.
+
 ---
 
-## 10) Acceptance Criteria
+## 11) Acceptance Criteria
 
 - Requests on a tenant’s custom domain render with that tenant’s theme, logo, and PDF branding; no FOUC.
 - Partner Admin can: add a domain (verified), set branding, create client orgs, invite users, start a workflow on behalf, and install step types/overlays with secret aliases only.
 - Temporal runs execute on per‑tenant task queues; Signals/Timers work; webhook ingress validates and routes to the correct run.
-- RLS prevents cross‑tenant data access; all admin actions are fully audited with `{ actor_org_id, on_behalf_of_org_id }`.
+- RLS prevents cross‑tenant data access; audit trail append-only tables enforce hash-chain integrity per tenant and surface `{ actor_org_id, on_behalf_of_org_id }` for every mutation.
+- DSR lifecycle events (intake → closure) are logged via the audit trail, and exports include integrity verification metadata from the hash chain.
 - Billing records exist for partner/client subscriptions (even if read‑only initially).
 
 ---
 
-## 11) Non‑Goals (MVP)
+## 12) Non‑Goals (MVP)
 
 - Per‑tenant dedicated Temporal namespaces (supported later if required).
 - Full billing flows (start with subscription scaffolding and upgrade later).
@@ -170,7 +186,7 @@ All tables enforce tenant scoping via RLS; migrations are additive and non‑des
 
 ---
 
-## 12) References to Existing Components
+## 13) References to Existing Components
 
 - **Tenant Overlays & Step Types:** reuse for partner‑specific automations and integrations.
 - **Bidirectional Integration Architecture:** secure ingress/egress, Signals/Timers, artifacts, and audits.
