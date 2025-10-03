@@ -20,7 +20,14 @@ Node kinds: `question|info|action|upload|doc.generate|tool.call|verify|schedule|
 Rules reference source links and store `last_verified_at`.
 
 ## Security
-Supabase RLS — WorkflowRun visible to subject org and engager org with active engagement. Audit includes `actor_org_id` and `on_behalf_of_org_id`.
+- Supabase auth via `@supabase/ssr`:
+  - Middleware (`apps/portal/src/middleware.ts`) uses `createMiddlewareClient` to refresh sessions and redirect unauthenticated users to `/auth/sign-in` while preserving locale routing.
+  - Server components load the active profile through `getActiveUserProfile`, and dedicated `/auth/sign-in`, `/auth/callback`, and `/auth/sign-out` routes handle magic-link OTP sign-in and global sign-out.
+- Row-level security (RLS):
+  - `packages/db/schema.sql` enables RLS on `organisations`, `users`, `memberships`, `engagements`, `workflow_defs`, `workflow_runs`, `steps`, `documents`, and `audit_log` with tenant-aware policies that only allow members of engager or subject organisations (or the service role) to read/write records.
+  - Helper SQL functions (`is_member_of_org`, `can_access_run`) centralise membership checks for policies.
+  - Automated guard: `pnpm --filter @airnub/db run verify:rls` fails if required `alter table ... enable row level security` statements, policies, or helper functions are missing from the schema.
+- Audit log entries capture `actor_org_id` and `on_behalf_of_org_id` so cross-tenant actions remain traceable under RLS constraints.
 
 ## UX
 Timeline with phases; Task Board; Evidence Drawer with sources & Re-verify; Doc previews; Calendar tab.

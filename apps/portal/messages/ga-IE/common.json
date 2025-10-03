@@ -3,7 +3,9 @@
     "title": "FreshComply",
     "tagline": "Sreafaí oibre comhlíonta il-thionónta",
     "skipToContent": "Léim go príomh-ábhar",
-    "loading": "Á lódáil"
+    "loading": "Á lódáil",
+    "signedInAs": "Logáilte isteach mar {user}",
+    "signOut": "Logáil amach"
   },
   "navigation": {
     "home": "Baile",
@@ -100,5 +102,15 @@
     "deadlines": "Spriocdhátaí atá le teacht",
     "noDueDate": "Gan spriocdháta",
     "due": "Sprioc: {date, date, medium}"
+  },
+  "auth": {
+    "title": "Sínigh isteach go slán",
+    "description": "Iontráil do sheoladh ríomhphoist agus seolfaimid nasc draíochta chugat chun rochtain a fháil ar FreshComply.",
+    "emailLabel": "Ríomhphost oibre",
+    "submit": "Seol nasc draíochta",
+    "submitting": "Á sheoladh…",
+    "success": "Seiceáil do bhosca isteach le haghaidh nasc logála isteach. Rachaidh an nasc as feidhm i gceann 5 nóiméad.",
+    "redirect": "Tar éis duit síniú isteach seolfar tú go {destination}.",
+    "error": "Níor éirigh linn an nasc a sheoladh. Bain triail eile as."
   }
 }

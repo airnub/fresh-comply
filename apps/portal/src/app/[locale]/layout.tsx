@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, unstable_setRequestLocale } from "next-intl/server";
-import { Box, Container, Flex, Heading, Link as ThemeLink, Text } from "@radix-ui/themes";
+import { Box, Button, Container, Flex, Heading, Link as ThemeLink, Text } from "@radix-ui/themes";
 import { ThemeProvider } from "@airnub/ui/ThemeProvider";
 import { VisuallyHidden } from "@airnub/ui/A11y";
 import { ActingForBanner } from "../../components/acting-for-banner";
@@ -11,6 +11,7 @@ import { LocaleSwitcher } from "../../components/LocaleSwitcher";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import SkipLink from "../../components/SkipLink";
 import { locales, isAppLocale } from "../../i18n/config";
+import { getActiveUserProfile } from "../../server/supabase";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -36,6 +37,20 @@ export default async function LocaleLayout({
   const tNav = await getTranslations({ locale, namespace: "navigation" });
   const tFooter = await getTranslations({ locale, namespace: "footer" });
 
+  let profile = null;
+  try {
+    profile = await getActiveUserProfile();
+  } catch (error) {
+    console.error("Supabase auth unavailable", error);
+  }
+
+  if (!profile) {
+    redirect(`/auth/sign-in?redirect=${encodeURIComponent(`/${locale}`)}`);
+  }
+
+  const userDisplayName = profile.name ?? profile.email;
+  const signOutAction = `/auth/sign-out?redirect=${encodeURIComponent(`/${locale}`)}`;
+
   const legalLinks: { href: string; label: string }[] = [
     { href: `/${locale}/privacy`, label: tNav("privacy") },
     { href: `/${locale}/terms`, label: tNav("terms") },
@@ -52,23 +67,31 @@ export default async function LocaleLayout({
             <header>
               <Box py="4" style={{ borderBottom: "1px solid var(--gray-a4)" }}>
                 <Container size="3">
-                  <Flex align="center" justify="between" gap="4" wrap="wrap">
-                    <Box>
-                      <ThemeLink asChild underline="never" color="blue">
-                        <Link href={`/${locale}`}>
-                          <Heading size="5">{tApp("title")}</Heading>
+                    <Flex align="center" justify="between" gap="4" wrap="wrap">
+                      <Box>
+                        <ThemeLink asChild underline="never" color="blue">
+                          <Link href={`/${locale}`}>
+                            <Heading size="5">{tApp("title")}</Heading>
                         </Link>
                       </ThemeLink>
                       <Text as="p" size="2" color="gray">
                         {tApp("tagline")}
                       </Text>
-                    </Box>
-                    <Flex align="center" gap="3" wrap="wrap">
-                      <LocaleSwitcher />
-                      <ThemeToggle />
+                      </Box>
+                      <Flex align="center" gap="3" wrap="wrap">
+                        <Text size="2" color="gray">
+                          {tApp("signedInAs", { user: userDisplayName })}
+                        </Text>
+                        <form action={signOutAction} method="post">
+                          <Button type="submit" variant="ghost" color="gray" size="2">
+                            {tApp("signOut")}
+                          </Button>
+                        </form>
+                        <LocaleSwitcher />
+                        <ThemeToggle />
+                      </Flex>
                     </Flex>
-                  </Flex>
-                </Container>
+                  </Container>
               </Box>
             </header>
           </Box>
