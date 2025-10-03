@@ -16,6 +16,7 @@ const tablesWithRls = [
   "steps",
   "documents",
   "audit_log",
+  "admin_actions",
   "dsr_requests",
   "dsr_request_jobs"
 ];
@@ -46,7 +47,8 @@ const requiredPolicies = {
   workflow_runs: ["Members access workflow runs", "Service role manages workflow runs"],
   steps: ["Members read steps", "Service role manages steps"],
   documents: ["Members read documents", "Service role manages documents"],
-  audit_log: ["Members read audit log", "Service role manages audit log"],
+  audit_log: ["Members read audit log", "Service role appends audit log"],
+  admin_actions: ["Members read admin actions", "Service role appends admin actions"],
   dsr_requests: ["Members view DSR requests", "Members manage DSR requests"],
   dsr_request_jobs: ["Service role manages DSR jobs"]
 };

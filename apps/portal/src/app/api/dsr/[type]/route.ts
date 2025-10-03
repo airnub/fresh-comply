@@ -6,6 +6,33 @@ import { annotateSpan, extractRunMetadataFromHeaders, setHttpAttributes, withTel
 
 const ROUTE = "/api/dsr/[type]";
 
+type SupabaseServiceClient = ReturnType<typeof getServiceSupabaseClient>;
+
+async function appendDsrAuditEntry(
+  supabase: SupabaseServiceClient,
+  request: { id: string; tenant_org_id: string; subject_org_id: string | null },
+  action: string,
+  reasonCode: string,
+  payload: Record<string, unknown>
+) {
+  const { error } = await supabase.rpc("rpc_append_audit_entry", {
+    action,
+    actor_id: null,
+    reason_code: reasonCode,
+    payload,
+    target_kind: "dsr_request",
+    target_id: request.id,
+    tenant_org_id: request.tenant_org_id,
+    actor_org_id: request.tenant_org_id,
+    on_behalf_of_org_id: request.subject_org_id ?? null,
+    subject_org_id: request.subject_org_id ?? null,
+  });
+
+  if (error) {
+    console.error("Unable to append DSR audit entry", { action, error });
+  }
+}
+
 type IncomingDsrPayload = {
   tenantOrgId: string;
   subjectOrgId?: string;
@@ -112,22 +139,18 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
         return response;
       }
 
-      await supabase
-        .from("audit_log")
-        .insert({
-          tenant_org_id: requestRow.tenant_org_id,
-          actor_org_id: requestRow.tenant_org_id,
-          on_behalf_of_org_id: requestRow.subject_org_id ?? null,
-          subject_org_id: requestRow.subject_org_id ?? null,
-          entity: "dsr_request",
-          action: "dsr.request.received",
-          meta_json: {
-            request_id: requestRow.id,
-            type,
-            status: "received",
-            received_at: requestRow.received_at
-          }
-        });
+      await appendDsrAuditEntry(
+        supabase,
+        requestRow,
+        "dsr.request.received",
+        "dsr_inbound_submission",
+        {
+          request_id: requestRow.id,
+          type,
+          status: "received",
+          received_at: requestRow.received_at,
+        }
+      );
 
       await supabase.from("dsr_request_jobs").insert([
         {
@@ -160,21 +183,17 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
             .update({ status: "acknowledged", ack_sent_at: ackSentAt, updated_at: ackSentAt })
             .eq("id", requestRow.id);
 
-          await supabase
-            .from("audit_log")
-            .insert({
-              tenant_org_id: requestRow.tenant_org_id,
-              actor_org_id: requestRow.tenant_org_id,
-              on_behalf_of_org_id: requestRow.subject_org_id ?? null,
-              subject_org_id: requestRow.subject_org_id ?? null,
-              entity: "dsr_request",
-              action: "dsr.request.acknowledged",
-              meta_json: {
-                request_id: requestRow.id,
-                type,
-                ack_sent_at: ackSentAt
-              }
-            });
+          await appendDsrAuditEntry(
+            supabase,
+            requestRow,
+            "dsr.request.acknowledged",
+            "dsr_acknowledgement_dispatched",
+            {
+              request_id: requestRow.id,
+              type,
+              ack_sent_at: ackSentAt,
+            }
+          );
           span.addEvent("dsr.acknowledged", {
             requestId: requestRow.id,
             ackSentAt

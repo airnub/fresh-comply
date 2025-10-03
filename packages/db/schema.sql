@@ -1,3 +1,5 @@
+create extension if not exists pgcrypto;
+
 create table organisations(
   id uuid primary key default gen_random_uuid(),
   tenant_org_id uuid not null references organisations(id),
@@ -179,12 +181,20 @@ create table audit_log(
   on_behalf_of_org_id uuid references organisations(id),
   subject_org_id uuid references organisations(id),
   entity text,
+  target_kind text,
+  target_id uuid,
   run_id uuid references workflow_runs(id),
   step_id uuid references steps(id),
   action text not null,
-  meta_json jsonb,
-  created_at timestamptz default now()
+  lawful_basis text,
+  meta_json jsonb not null default '{}'::jsonb,
+  prev_hash text not null default repeat('0', 64),
+  row_hash text not null,
+  created_at timestamptz not null default now(),
+  inserted_at timestamptz not null default now()
 );
+
+create unique index audit_log_row_hash_key on audit_log(row_hash);
 
 create table dsr_requests (
   id uuid primary key default gen_random_uuid(),
@@ -532,9 +542,8 @@ create policy "Members read audit log" on audit_log
     )
   );
 
-create policy "Service role manages audit log" on audit_log
-  for all
-  using (public.is_platform_service())
+create policy "Service role appends audit log" on audit_log
+  for insert
   with check (public.is_platform_service());
 
 create policy "Members read admin actions" on admin_actions
@@ -551,9 +560,8 @@ create policy "Members read admin actions" on admin_actions
     )
   );
 
-create policy "Service role manages admin actions" on admin_actions
-  for all
-  using (public.is_platform_service())
+create policy "Service role appends admin actions" on admin_actions
+  for insert
   with check (public.is_platform_service());
 
 create policy "Members view DSR requests" on dsr_requests
@@ -696,54 +704,223 @@ create policy "Members read overlay layers" on workflow_overlay_layers
 create table if not exists admin_actions(
   id uuid primary key default gen_random_uuid(),
   tenant_org_id uuid not null references organisations(id),
-  actor_id uuid references users(id) not null,
+  actor_id uuid references users(id),
   actor_org_id uuid references organisations(id),
   on_behalf_of_org_id uuid references organisations(id),
   subject_org_id uuid references organisations(id),
+  target_kind text,
+  target_id uuid,
   action text not null,
-  reason text not null,
+  reason_code text not null,
+  lawful_basis text,
   payload jsonb not null default '{}'::jsonb,
   requires_second_approval boolean not null default false,
   second_actor_id uuid references users(id),
+  prev_hash text not null default repeat('0', 64),
+  row_hash text not null,
   created_at timestamptz not null default now(),
+  inserted_at timestamptz not null default now(),
   approved_at timestamptz
 );
 
-create or replace function admin_record_action(
-  p_action text,
-  p_actor_id uuid,
-  p_reason text,
-  p_payload jsonb,
-  p_entity text default null,
-  p_entity_id uuid default null,
-  p_requires_second boolean default false,
-  p_second_actor_id uuid default null,
-  p_tenant_org_id uuid default null,
-  p_actor_org_id uuid default null,
-  p_on_behalf_of_org_id uuid default null,
-  p_subject_org_id uuid default null,
-  p_run_id uuid default null,
-  p_step_id uuid default null
+create unique index admin_actions_row_hash_key on admin_actions(row_hash);
+
+create or replace function raise_append_only()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'Ledger tables are append-only';
+end;
+$$;
+
+create or replace function compute_audit_log_hash()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_prev_hash text;
+begin
+  new.created_at := coalesce(new.created_at, now());
+  new.inserted_at := coalesce(new.inserted_at, now());
+  new.meta_json := coalesce(new.meta_json, '{}'::jsonb);
+  new.target_kind := coalesce(new.target_kind, new.entity);
+
+  select row_hash
+    into v_prev_hash
+  from audit_log
+  where tenant_org_id = new.tenant_org_id
+  order by inserted_at desc, created_at desc, id desc
+  limit 1
+  for update;
+
+  if v_prev_hash is null then
+    v_prev_hash := repeat('0', 64);
+  end if;
+
+  if new.prev_hash is null then
+    new.prev_hash := v_prev_hash;
+  elsif new.prev_hash <> v_prev_hash then
+    raise exception 'Invalid prev_hash for tenant %', new.tenant_org_id;
+  end if;
+
+  new.row_hash := encode(
+    digest(
+      jsonb_build_object(
+        'tenant_org_id', new.tenant_org_id,
+        'actor_user_id', new.actor_user_id,
+        'actor_org_id', new.actor_org_id,
+        'on_behalf_of_org_id', new.on_behalf_of_org_id,
+        'subject_org_id', new.subject_org_id,
+        'entity', new.entity,
+        'target_kind', new.target_kind,
+        'target_id', new.target_id,
+        'run_id', new.run_id,
+        'step_id', new.step_id,
+        'action', new.action,
+        'lawful_basis', new.lawful_basis,
+        'meta_json', new.meta_json,
+        'prev_hash', new.prev_hash,
+        'created_at', to_char(new.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+        'inserted_at', to_char(new.inserted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+      )::text,
+      'sha256'
+    ),
+    'hex'
+  );
+
+  return new;
+end;
+$$;
+
+create or replace function compute_admin_actions_hash()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_prev_hash text;
+begin
+  new.created_at := coalesce(new.created_at, now());
+  new.inserted_at := coalesce(new.inserted_at, now());
+  new.payload := coalesce(new.payload, '{}'::jsonb);
+
+  select row_hash
+    into v_prev_hash
+  from admin_actions
+  where tenant_org_id = new.tenant_org_id
+  order by inserted_at desc, created_at desc, id desc
+  limit 1
+  for update;
+
+  if v_prev_hash is null then
+    v_prev_hash := repeat('0', 64);
+  end if;
+
+  if new.prev_hash is null then
+    new.prev_hash := v_prev_hash;
+  elsif new.prev_hash <> v_prev_hash then
+    raise exception 'Invalid prev_hash for tenant %', new.tenant_org_id;
+  end if;
+
+  new.row_hash := encode(
+    digest(
+      jsonb_build_object(
+        'tenant_org_id', new.tenant_org_id,
+        'actor_id', new.actor_id,
+        'actor_org_id', new.actor_org_id,
+        'on_behalf_of_org_id', new.on_behalf_of_org_id,
+        'subject_org_id', new.subject_org_id,
+        'target_kind', new.target_kind,
+        'target_id', new.target_id,
+        'action', new.action,
+        'reason_code', new.reason_code,
+        'lawful_basis', new.lawful_basis,
+        'payload', new.payload,
+        'requires_second_approval', new.requires_second_approval,
+        'second_actor_id', new.second_actor_id,
+        'prev_hash', new.prev_hash,
+        'created_at', to_char(new.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+        'inserted_at', to_char(new.inserted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+        'approved_at', case when new.approved_at is not null then to_char(new.approved_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') else null end
+      )::text,
+      'sha256'
+    ),
+    'hex'
+  );
+
+  return new;
+end;
+$$;
+
+create trigger audit_log_before_insert
+  before insert on audit_log
+  for each row execute function compute_audit_log_hash();
+
+create trigger admin_actions_before_insert
+  before insert on admin_actions
+  for each row execute function compute_admin_actions_hash();
+
+create constraint trigger audit_log_block_mutations
+  after update or delete on audit_log
+  for each statement execute function raise_append_only();
+
+create constraint trigger admin_actions_block_mutations
+  after update or delete on admin_actions
+  for each statement execute function raise_append_only();
+
+create or replace function rpc_append_audit_entry(
+  action text,
+  actor_id uuid,
+  reason_code text,
+  payload jsonb default '{}'::jsonb,
+  target_kind text default null,
+  target_id uuid default null,
+  requires_second boolean default false,
+  second_actor_id uuid default null,
+  tenant_org_id uuid default null,
+  actor_org_id uuid default null,
+  on_behalf_of_org_id uuid default null,
+  subject_org_id uuid default null,
+  run_id uuid default null,
+  step_id uuid default null,
+  lawful_basis text default null
 ) returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  v_action_id uuid;
+  v_admin_action_id uuid;
+  v_audit_id uuid;
   v_tenant_org_id uuid;
   v_subject_org_id uuid;
+  v_target_kind text;
+  v_target_id uuid;
+  v_payload jsonb;
 begin
-  if p_requires_second and (p_second_actor_id is null or p_second_actor_id = p_actor_id) then
+  if action is null or length(trim(action)) = 0 then
+    raise exception 'Action is required';
+  end if;
+
+  if reason_code is null or length(trim(reason_code)) = 0 then
+    raise exception 'Reason code is required';
+  end if;
+
+  if requires_second and (second_actor_id is null or second_actor_id = actor_id) then
     raise exception 'Second approver required';
   end if;
 
-  v_tenant_org_id := coalesce(p_tenant_org_id, p_actor_org_id, p_on_behalf_of_org_id);
+  v_tenant_org_id := coalesce(tenant_org_id, actor_org_id, on_behalf_of_org_id, subject_org_id);
   if v_tenant_org_id is null then
     raise exception 'tenant_org_id is required';
   end if;
 
-  v_subject_org_id := p_subject_org_id;
+  v_subject_org_id := subject_org_id;
+  v_target_kind := coalesce(target_kind, case when run_id is not null then 'workflow_run' when step_id is not null then 'step' else null end);
+  v_target_id := coalesce(target_id, case when v_target_kind = 'workflow_run' then run_id when v_target_kind = 'step' then step_id else null end);
+  v_payload := coalesce(payload, '{}'::jsonb);
 
   insert into admin_actions(
     tenant_org_id,
@@ -751,8 +928,11 @@ begin
     actor_org_id,
     on_behalf_of_org_id,
     subject_org_id,
+    target_kind,
+    target_id,
     action,
-    reason,
+    reason_code,
+    lawful_basis,
     payload,
     requires_second_approval,
     second_actor_id,
@@ -760,18 +940,21 @@ begin
   )
   values(
     v_tenant_org_id,
-    p_actor_id,
-    p_actor_org_id,
-    p_on_behalf_of_org_id,
+    actor_id,
+    actor_org_id,
+    on_behalf_of_org_id,
     v_subject_org_id,
-    p_action,
-    p_reason,
-    coalesce(p_payload, '{}'::jsonb),
-    p_requires_second,
-    p_second_actor_id,
-    case when p_requires_second then now() else null end
+    v_target_kind,
+    v_target_id,
+    action,
+    reason_code,
+    lawful_basis,
+    v_payload,
+    requires_second,
+    second_actor_id,
+    case when requires_second then now() else null end
   )
-  returning id into v_action_id;
+  returning id into v_admin_action_id;
 
   insert into audit_log(
     tenant_org_id,
@@ -780,25 +963,37 @@ begin
     on_behalf_of_org_id,
     subject_org_id,
     entity,
+    target_kind,
+    target_id,
     run_id,
     step_id,
     action,
+    lawful_basis,
     meta_json
   )
   values(
     v_tenant_org_id,
-    p_actor_id,
-    p_actor_org_id,
-    p_on_behalf_of_org_id,
+    actor_id,
+    actor_org_id,
+    on_behalf_of_org_id,
     v_subject_org_id,
-    coalesce(p_entity, case when p_run_id is not null then 'workflow_run' when p_step_id is not null then 'step' else null end),
-    coalesce(p_run_id, case when p_entity = 'workflow_run' then p_entity_id else null end),
-    coalesce(p_step_id, case when p_entity = 'step' then p_entity_id else null end),
-    p_action,
-    coalesce(p_payload, '{}'::jsonb)
-  );
+    v_target_kind,
+    v_target_kind,
+    v_target_id,
+    run_id,
+    step_id,
+    action,
+    lawful_basis,
+    v_payload
+  )
+  returning id into v_audit_id;
 
-  return jsonb_build_object('action_id', v_action_id, 'action', p_action);
+  return jsonb_build_object(
+    'admin_action_id', v_admin_action_id,
+    'audit_id', v_audit_id,
+    'action', action,
+    'tenant_org_id', v_tenant_org_id
+  );
 end;
 $$;
 
@@ -815,14 +1010,14 @@ security definer
 set search_path = public
 as $$
 begin
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'step_type_create',
     actor_id,
     reason,
     jsonb_build_object('step_type', step_type),
-    p_tenant_org_id => tenant_org_id,
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id
+    tenant_org_id => tenant_org_id,
+    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id
   );
 end;
 $$;
@@ -841,16 +1036,16 @@ security definer
 set search_path = public
 as $$
 begin
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'step_type_update',
     actor_id,
     reason,
     jsonb_build_object('step_type_id', step_type_id, 'patch', patch),
     'step_type',
     step_type_id,
-    p_tenant_org_id => tenant_org_id,
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id
+    tenant_org_id => tenant_org_id,
+    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id
   );
 end;
 $$;
@@ -884,19 +1079,19 @@ begin
   end if;
 
   update steps set assignee_user_id = assignee_id where id = step_id;
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'step_reassign',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'step_id', step_id, 'assignee_id', assignee_id),
     'step',
     step_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id,
-    p_step_id => step_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id,
+    step_id => step_id
   );
 end;
 $$;
@@ -930,19 +1125,19 @@ begin
   end if;
 
   update steps set due_date = new_due_date::date where id = step_id;
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'step_due_date_update',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'step_id', step_id, 'due_date', new_due_date),
     'step',
     step_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id,
-    p_step_id => step_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id,
+    step_id => step_id
   );
 end;
 $$;
@@ -976,19 +1171,19 @@ begin
   end if;
 
   update steps set status = new_status where id = step_id;
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'step_status_update',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'step_id', step_id, 'status', new_status),
     'step',
     step_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id,
-    p_step_id => step_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id,
+    step_id => step_id
   );
 end;
 $$;
@@ -1020,18 +1215,18 @@ begin
     raise exception 'Workflow run % not found', run_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'document_regenerate',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'document_id', document_id),
     'document',
     document_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id
   );
 end;
 $$;
@@ -1063,18 +1258,18 @@ begin
     raise exception 'Workflow run % not found', run_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'run_digest_resend',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'recipient_email', recipient_email),
     'workflow_run',
     run_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id
   );
 end;
 $$;
@@ -1106,7 +1301,7 @@ begin
     raise exception 'Workflow run % not found', run_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'run_cancel',
     actor_id,
     reason,
@@ -1139,15 +1334,15 @@ security definer
 set search_path = public
 as $$
 begin
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'freshness_diff_approve',
     actor_id,
     reason,
     jsonb_build_object('diff_id', diff_id, 'notes', notes),
-    p_tenant_org_id => tenant_org_id,
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => subject_org_id
+    tenant_org_id => tenant_org_id,
+    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => subject_org_id
   );
 end;
 $$;
@@ -1167,15 +1362,15 @@ security definer
 set search_path = public
 as $$
 begin
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'freshness_diff_reject',
     actor_id,
     reason,
     jsonb_build_object('diff_id', diff_id, 'notes', notes),
-    p_tenant_org_id => tenant_org_id,
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => subject_org_id
+    tenant_org_id => tenant_org_id,
+    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => subject_org_id
   );
 end;
 $$;
@@ -1207,17 +1402,17 @@ begin
     raise exception 'DSR request % not found', request_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'dsr_acknowledge',
     actor_id,
     reason,
     jsonb_build_object('request_id', request_id, 'notes', notes),
     'dsr_request',
     request_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id)
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id)
   );
 end;
 $$;
@@ -1249,17 +1444,17 @@ begin
     raise exception 'DSR request % not found', request_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'dsr_resolve',
     actor_id,
     reason,
     jsonb_build_object('request_id', request_id, 'resolution', resolution),
     'dsr_request',
     request_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id)
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id)
   );
 end;
 $$;
@@ -1291,17 +1486,17 @@ begin
     raise exception 'DSR request % not found', request_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'dsr_export',
     actor_id,
     reason,
     jsonb_build_object('request_id', request_id, 'destination', destination),
     'dsr_request',
     request_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id)
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id)
   );
 end;
 $$;
@@ -1334,7 +1529,7 @@ begin
     raise exception 'DSR request % not found', request_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     case when enabled then 'legal_hold_enable' else 'legal_hold_disable' end,
     actor_id,
     reason,
@@ -1375,17 +1570,17 @@ begin
   values(org_id, alias, provider, external_id, description)
   returning id into v_binding_id;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'secret_alias_bind',
     actor_id,
     reason,
     jsonb_build_object('binding_id', v_binding_id, 'org_id', org_id, 'alias', alias, 'provider', provider, 'external_id', external_id, 'description', description),
     'tenant_secret_binding',
     v_binding_id,
-    p_tenant_org_id => coalesce(tenant_org_id, org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, org_id),
-    p_on_behalf_of_org_id => coalesce(on_behalf_of_org_id, org_id),
-    p_subject_org_id => coalesce(subject_org_id, org_id)
+    tenant_org_id => coalesce(tenant_org_id, org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, org_id),
+    on_behalf_of_org_id => coalesce(on_behalf_of_org_id, org_id),
+    subject_org_id => coalesce(subject_org_id, org_id)
   );
 end;
 $$;
@@ -1419,17 +1614,17 @@ begin
       external_id = coalesce(new_external_id, tenant_secret_bindings.external_id)
   where id = binding_id;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'secret_alias_update',
     actor_id,
     reason,
     jsonb_build_object('binding_id', binding_id, 'description', new_description, 'external_id', new_external_id),
     'tenant_secret_binding',
     binding_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_org_id),
-    p_on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_org_id),
-    p_subject_org_id => coalesce(subject_org_id, v_org_id)
+    tenant_org_id => coalesce(tenant_org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_org_id),
+    on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_org_id),
+    subject_org_id => coalesce(subject_org_id, v_org_id)
   );
 end;
 $$;
@@ -1458,7 +1653,7 @@ begin
   end if;
 
   delete from tenant_secret_bindings where id = binding_id;
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'secret_alias_remove',
     actor_id,
     reason,
@@ -1497,17 +1692,17 @@ begin
     raise exception 'Secret binding % not found', binding_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'secret_alias_test',
     actor_id,
     reason,
     jsonb_build_object('binding_id', binding_id),
     'tenant_secret_binding',
     binding_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_org_id),
-    p_on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_org_id),
-    p_subject_org_id => coalesce(subject_org_id, v_org_id)
+    tenant_org_id => coalesce(tenant_org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_org_id),
+    on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_org_id),
+    subject_org_id => coalesce(subject_org_id, v_org_id)
   );
 end;
 $$;
@@ -1540,18 +1735,18 @@ begin
     raise exception 'Workflow run % not found', run_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'temporal_signal',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'signal', signal, 'payload', payload),
     'workflow_run',
     run_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id
   );
 end;
 $$;
@@ -1583,18 +1778,18 @@ begin
     raise exception 'Workflow run % not found', run_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'temporal_retry',
     actor_id,
     reason,
     jsonb_build_object('run_id', run_id, 'activity_id', activity_id),
     'workflow_run',
     run_id,
-    p_tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    p_actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
-    p_on_behalf_of_org_id => on_behalf_of_org_id,
-    p_subject_org_id => coalesce(subject_org_id, v_subject_org_id),
-    p_run_id => run_id
+    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
+    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    on_behalf_of_org_id => on_behalf_of_org_id,
+    subject_org_id => coalesce(subject_org_id, v_subject_org_id),
+    run_id => run_id
   );
 end;
 $$;
@@ -1626,7 +1821,7 @@ begin
     raise exception 'Workflow run % not found', run_id;
   end if;
 
-  return admin_record_action(
+  return rpc_append_audit_entry(
     'temporal_cancel',
     actor_id,
     reason,
