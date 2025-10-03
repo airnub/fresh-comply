@@ -16,9 +16,11 @@
   },
   "dependencies": {
     "@airnub/doc-templates": "workspace:*",
+    "@airnub/types": "workspace:*",
     "@temporalio/client": "^1.11.0",
     "@temporalio/workflow": "^1.11.0",
     "@temporalio/worker": "^1.11.0",
+    "@supabase/supabase-js": "^2.45.0",
     "undici": "^5.28.4"
   },
   "devDependencies": {

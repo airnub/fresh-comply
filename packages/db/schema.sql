@@ -175,6 +175,74 @@ create table audit_log(
   created_at timestamptz default now()
 );
 
+create table cro_companies (
+  company_number text primary key,
+  name text not null,
+  status text,
+  company_type text,
+  registered_on date,
+  dissolved_on date,
+  last_return_date date,
+  address jsonb,
+  eircode text,
+  metadata jsonb,
+  snapshot_fingerprint text,
+  source_resource_id text,
+  refreshed_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+
+create table charity_registration_metrics (
+  metric_key text primary key,
+  metric_label text not null,
+  values_json jsonb not null,
+  source_resource_id text,
+  snapshot_fingerprint text,
+  refreshed_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+
+create table revenue_charity_registry (
+  id uuid primary key default gen_random_uuid(),
+  charity_name text not null,
+  charity_address text,
+  source_resource_id text,
+  snapshot_fingerprint text,
+  refreshed_at timestamptz default now(),
+  created_at timestamptz default now(),
+  unique(charity_name, source_resource_id)
+);
+
+create table funding_opportunities (
+  id uuid primary key default gen_random_uuid(),
+  external_id text not null,
+  source_resource_id text not null,
+  title text not null,
+  summary text,
+  call_year integer,
+  call_type text,
+  domain text,
+  county text,
+  lead_institution text,
+  acronym text,
+  amount_awarded numeric,
+  currency text,
+  metadata jsonb,
+  snapshot_fingerprint text,
+  refreshed_at timestamptz default now(),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(external_id, source_resource_id)
+);
+
+create table funding_opportunity_workflows (
+  id uuid primary key default gen_random_uuid(),
+  funding_opportunity_id uuid references funding_opportunities(id) on delete cascade,
+  workflow_key text not null,
+  created_at timestamptz default now(),
+  unique(funding_opportunity_id, workflow_key)
+);
+
 create or replace function public.is_member_of_org(target_org_id uuid)
 returns boolean
 language sql

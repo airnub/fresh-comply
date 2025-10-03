@@ -863,6 +863,209 @@ export type Database = {
             columns: ["step_id"];
             isOneToOne: false;
             referencedRelation: "steps";
+          referencedColumns: ["id"];
+        }
+      ];
+      };
+      cro_companies: {
+        Row: {
+          company_number: string;
+          name: string;
+          status: string | null;
+          company_type: string | null;
+          registered_on: string | null;
+          dissolved_on: string | null;
+          last_return_date: string | null;
+          address: Json | null;
+          eircode: string | null;
+          metadata: Json | null;
+          snapshot_fingerprint: string | null;
+          source_resource_id: string | null;
+          refreshed_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          company_number: string;
+          name: string;
+          status?: string | null;
+          company_type?: string | null;
+          registered_on?: string | null;
+          dissolved_on?: string | null;
+          last_return_date?: string | null;
+          address?: Json | null;
+          eircode?: string | null;
+          metadata?: Json | null;
+          snapshot_fingerprint?: string | null;
+          source_resource_id?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          company_number?: string;
+          name?: string;
+          status?: string | null;
+          company_type?: string | null;
+          registered_on?: string | null;
+          dissolved_on?: string | null;
+          last_return_date?: string | null;
+          address?: Json | null;
+          eircode?: string | null;
+          metadata?: Json | null;
+          snapshot_fingerprint?: string | null;
+          source_resource_id?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      charity_registration_metrics: {
+        Row: {
+          metric_key: string;
+          metric_label: string;
+          values_json: Json;
+          source_resource_id: string | null;
+          snapshot_fingerprint: string | null;
+          refreshed_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          metric_key: string;
+          metric_label: string;
+          values_json: Json;
+          source_resource_id?: string | null;
+          snapshot_fingerprint?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          metric_key?: string;
+          metric_label?: string;
+          values_json?: Json;
+          source_resource_id?: string | null;
+          snapshot_fingerprint?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      revenue_charity_registry: {
+        Row: {
+          id: string;
+          charity_name: string;
+          charity_address: string | null;
+          source_resource_id: string | null;
+          snapshot_fingerprint: string | null;
+          refreshed_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          charity_name: string;
+          charity_address?: string | null;
+          source_resource_id?: string | null;
+          snapshot_fingerprint?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          charity_name?: string;
+          charity_address?: string | null;
+          source_resource_id?: string | null;
+          snapshot_fingerprint?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      funding_opportunities: {
+        Row: {
+          id: string;
+          external_id: string;
+          source_resource_id: string;
+          title: string;
+          summary: string | null;
+          call_year: number | null;
+          call_type: string | null;
+          domain: string | null;
+          county: string | null;
+          lead_institution: string | null;
+          acronym: string | null;
+          amount_awarded: number | null;
+          currency: string | null;
+          metadata: Json | null;
+          snapshot_fingerprint: string | null;
+          refreshed_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          external_id: string;
+          source_resource_id: string;
+          title: string;
+          summary?: string | null;
+          call_year?: number | null;
+          call_type?: string | null;
+          domain?: string | null;
+          county?: string | null;
+          lead_institution?: string | null;
+          acronym?: string | null;
+          amount_awarded?: number | null;
+          currency?: string | null;
+          metadata?: Json | null;
+          snapshot_fingerprint?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          external_id?: string;
+          source_resource_id?: string;
+          title?: string;
+          summary?: string | null;
+          call_year?: number | null;
+          call_type?: string | null;
+          domain?: string | null;
+          county?: string | null;
+          lead_institution?: string | null;
+          acronym?: string | null;
+          amount_awarded?: number | null;
+          currency?: string | null;
+          metadata?: Json | null;
+          snapshot_fingerprint?: string | null;
+          refreshed_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      funding_opportunity_workflows: {
+        Row: {
+          id: string;
+          funding_opportunity_id: string;
+          workflow_key: string;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          funding_opportunity_id: string;
+          workflow_key: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          funding_opportunity_id?: string;
+          workflow_key?: string;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "funding_opportunity_workflows_funding_opportunity_id_fkey";
+            columns: ["funding_opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "funding_opportunities";
             referencedColumns: ["id"];
           }
         ];

@@ -3,3 +3,4 @@ export { a1PackBuildWorkflow } from "./a1PackBuild.workflow.js";
 export { tr2SubmissionWorkflow } from "./tr2Submission.workflow.js";
 export { etaxClearanceWorkflow } from "./etaxClearance.workflow.js";
 export { externalJobWorkflow } from "./externalJob.workflow.js";
+export { freshnessRefreshWorkflow } from "./freshnessRefresh.workflow.js";

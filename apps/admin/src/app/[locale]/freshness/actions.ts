@@ -39,7 +39,7 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
       updated_at: now
     })
     .eq("id", id)
-    .select("workflow_keys")
+    .select("workflow_keys, source_key, current_snapshot_id")
     .maybeSingle();
 
   if (error) {
@@ -49,6 +49,9 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
 
   if (data?.workflow_keys?.length) {
     await bumpWorkflowVersions(client, data.workflow_keys);
+    if (data.source_key === "funding_radar" && data.current_snapshot_id) {
+      await linkFundingOpportunitiesToWorkflows(client, data.current_snapshot_id, data.workflow_keys);
+    }
   }
 
   revalidatePath("/", "layout");
@@ -119,4 +122,49 @@ function bumpPatch(version: string) {
   const safeMinor = Number.isFinite(minor) ? minor : 0;
   const safeMajor = Number.isFinite(major) ? major : 0;
   return `${safeMajor}.${safeMinor}.${nextPatch}`;
+}
+
+async function linkFundingOpportunitiesToWorkflows(
+  client: ReturnType<typeof getSupabaseClient>,
+  snapshotId: string,
+  workflowKeys: string[]
+) {
+  if (!workflowKeys.length) return;
+  const { data: snapshot, error: snapshotError } = await client
+    .from("freshness_snapshots")
+    .select("fingerprint")
+    .eq("id", snapshotId)
+    .maybeSingle();
+
+  if (snapshotError || !snapshot?.fingerprint) {
+    console.warn("Unable to resolve funding snapshot for workflow linking", snapshotError);
+    return;
+  }
+
+  const { data: opportunities, error: fundingError } = await client
+    .from("funding_opportunities")
+    .select("id")
+    .eq("snapshot_fingerprint", snapshot.fingerprint);
+
+  if (fundingError) {
+    console.warn("Unable to load funding opportunities for workflow linking", fundingError);
+    return;
+  }
+
+  if (!opportunities?.length) return;
+
+  const rows = workflowKeys.flatMap((workflowKey) =>
+    opportunities.map((opportunity) => ({
+      funding_opportunity_id: opportunity.id,
+      workflow_key: workflowKey
+    }))
+  );
+
+  const { error: linkError } = await client
+    .from("funding_opportunity_workflows")
+    .upsert(rows, { onConflict: "funding_opportunity_id,workflow_key" });
+
+  if (linkError) {
+    console.warn("Unable to persist funding opportunity workflow links", linkError);
+  }
 }
