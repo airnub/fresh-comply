@@ -65,6 +65,23 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </Flex>
         </section>
       </Card>
+      <Card asChild variant="surface" size="3">
+        <section aria-labelledby="home-billing-heading">
+          <Flex direction="column" gap="3">
+            <Heading id="home-billing-heading" size="4">
+              {tHome("billingCardTitle")}
+            </Heading>
+            <Text size="2" color="gray">
+              {tHome("billingCardDescription")}
+            </Text>
+            <Flex>
+              <Button asChild>
+                <Link href={`/${locale}/billing`}>{tHome("billingCardCta")}</Link>
+              </Button>
+            </Flex>
+          </Flex>
+        </section>
+      </Card>
     </Flex>
   );
 }
