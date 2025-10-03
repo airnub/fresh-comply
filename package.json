@@ -12,6 +12,9 @@
     "check:contrast": "node scripts/check-contrast.mjs",
     "dev:worker": "pnpm --filter @airnub/orchestrator-temporal tsx src/worker.ts",
     "dev:stack": "docker compose -f infra/docker-compose.yml up -d",
+    "dev:admin": "next dev -p 3100 apps/admin",
+    "build:admin": "next build apps/admin",
+    "start:admin": "next start -p 3100 apps/admin"
     "test": "turbo run test"
   },
   "devDependencies": {

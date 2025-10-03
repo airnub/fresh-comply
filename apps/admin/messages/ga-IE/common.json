@@ -1,0 +1,179 @@
+{
+  "auth": {
+    "title": "Logáil isteach i Riarthóir FreshComply",
+    "subtitle": "Cuir isteach do ríomhphost oibre chun nasc slán a fháil",
+    "emailLabel": "Ríomhphost oibre",
+    "otpNotice": "Seolfaimid nasc aon-uaire chuig do bhosca isteach.",
+    "submit": "Seol nasc logála isteach",
+    "supportHeadline": "An bhfuil cabhair uait?",
+    "supportNote": "Déan teagmháil leis an innealtóir oibríochtaí ar dualgas chun rochtain a iarraidh."
+  },
+  "navigation": {
+    "title": "Consól Riarthóirí",
+    "adminBadge": "Inmheánach",
+    "primary": "Príomh-nascleanúint",
+    "dashboard": "Deais",
+    "search": "Cuardach",
+    "runs": "Rithí",
+    "freshness": "Úire",
+    "orgs": "Eagraíochtaí",
+    "dsr": "DSR",
+    "cases": "Cásanna"
+  },
+  "dashboard": {
+    "heading": "Forbhreathnú oibríochtúil",
+    "subheading": "Déan monatóireacht ar shláinte sreafaí oibre, ar scuaineanna, agus ar chomharthaí iniúchta.",
+    "metrics": {
+      "activeRuns": "Rithí gníomhacha",
+      "activeRunsHint": "Rithí atá ag dul chun cinn trí chéimeanna faoi láthair.",
+      "awaitingApproval": "Ag feitheamh le ceadú",
+      "awaitingApprovalHint": "Míreanna a éilíonn gníomh riarthóra.",
+      "dsrSla": "SLA DSR",
+      "dsrSlaHint": "Iarratais réitithe laistigh de fhuinneoga SLA."
+    }
+  },
+  "search": {
+    "heading": "Cuardach domhanda",
+    "subheading": "Aimsigh rithí, céimeanna, eagraíochtaí, nó cásanna tacaíochta.",
+    "label": "Fiosrú",
+    "placeholder": "Cuardaigh de réir ainm, aitheantais, nó ríomhphoist",
+    "submit": "Cuardaigh",
+    "columns": {
+      "type": "Cineál",
+      "name": "Ainm",
+      "status": "Stádas"
+    },
+    "tableCaption": "Torthaí cuardaigh is déanaí",
+    "empty": "Níl torthaí ar an iarratas seo go fóill."
+  },
+  "runs": {
+    "heading": "Rith {runId}",
+    "subheading": "Athbhreithnigh amlíne, fianaise, agus fógraí.",
+    "overview": "Forbhreathnú",
+    "timeline": "Amlíne",
+    "diffHeading": "Athrú le déanaí",
+    "actions": {
+      "reassign": "Athdháil",
+      "due": "Athraigh dáta dlite",
+      "status": "Nuashonraigh stádas",
+      "regenerate": "Athghin cáipéis",
+      "digest": "Seol achoimre",
+      "cancel": "Cealaigh sreabhadh oibre"
+    },
+    "fields": {
+      "status": "Stádas",
+      "owner": "Úinéir",
+      "dueDate": "Dáta dlite",
+      "mode": "Mód forghníomhaithe"
+    },
+    "reason": {
+      "reassignTitle": "Athdháil an chéim",
+      "reassignDescription": "Tabhair cúis leis an athdháileadh.",
+      "dueTitle": "Athraigh an dáta dlite",
+      "dueDescription": "Mínigh cén fáth go bhfuil an dáta dlite ag athrú.",
+      "statusTitle": "Nuashonraigh stádas",
+      "statusDescription": "Taifead cén fáth go bhfuil an stádas ag athrú.",
+      "regenerateTitle": "Athghin an doiciméad",
+      "regenerateDescription": "Déan cur síos ar an gcúis go bhfuil gá an doiciméad a athghiniúint.",
+      "digestTitle": "Seol an achoimre arís",
+      "digestDescription": "Mínigh cén fáth ar chóir achoimre nua a sheoladh.",
+      "submitting": "Á chur isteach…"
+    },
+    "listHeading": "Rithí sreafa oibre ({count})",
+    "listSubheading": "Roghnaigh rith chun sonraí na comhordaithe a scrúdú.",
+    "viewRun": "Féach ar an rith",
+    "actionsTitle": "Gníomhartha"
+  },
+  "temporal": {
+    "heading": "Temporal do {runId}",
+    "subheading": "Scrúdaigh staid an tsreafa oibre trí APIs bainistithe.",
+    "recentActivities": "Gníomhaíochtaí le déanaí",
+    "actions": "Rialuithe sreafa oibre",
+    "sendSignal": "Seol comhartha",
+    "retryLast": "Bain triail arís as an ngníomhaíocht dheireanach",
+    "cancelWorkflow": "Cealaigh sreabhadh oibre",
+    "securityNote": "Déantar gach gníomh a sheachadadh trí sheirbhísí FreshComply agus déantar iniúchadh orthu."
+  },
+  "freshness": {
+    "heading": "Modhnóireacht úire",
+    "subheading": "Athbhreithnigh difríochtaí faireora sula bhfoilseofar nuashonruithe.",
+    "columns": {
+      "watcher": "Faireoir",
+      "impact": "Tionchar"
+    },
+    "tableCaption": "Nuashonruithe faireora ar feitheamh",
+    "empty": "Níl aon nuashonruithe faireora ar feitheamh.",
+    "diffHeading": "Réamhamharc ar an difríocht",
+    "diffHint": "Tá na hathruithe atá ag feitheamh le ceadú aibhsithe thíos.",
+    "approveTitle": "Ceadaigh an t-athrú",
+    "approveDescription": "Déan cur síos ar an gcúis go bhfuil an nuashonrú faireora seo réidh le foilsiú.",
+    "approve": "Ceadaigh",
+    "rejectTitle": "Diúltaigh don athrú",
+    "rejectDescription": "Roinn aiseolas don údar faireora.",
+    "reject": "Diúltaigh",
+    "reason": {
+      "submitting": "Á chur isteach…"
+    }
+  },
+  "orgs": {
+    "heading": "Eagraíochtaí agus ballraíochtaí",
+    "subheading": "Bainistigh eagraíochtaí, úsáideoirí, agus naisc rannpháirtíochta.",
+    "actions": {
+      "addOrg": "Cuir eagraíocht leis",
+      "inviteUser": "Tabhair cuireadh d’úsáideoir"
+    },
+    "columns": {
+      "name": "Ainm",
+      "type": "Cineál",
+      "engagements": "Rannpháirtíochtaí"
+    },
+    "tableCaption": "Eolaire",
+    "empty": "Níor aimsíodh eagraíochtaí."
+  },
+  "dsr": {
+    "heading": "Consól DSR",
+    "subheading": "Rianaigh iarrataí príobháideachais agus amadóirí SLA.",
+    "columns": {
+      "subject": "Ábhar sonraí",
+      "received": "Faighte",
+      "status": "Stádas"
+    },
+    "tableCaption": "Iarratais oscailte",
+    "empty": "Níl aon DSRanna ag feitheamh le gníomh.",
+    "ackTitle": "Aithin an t-iarratas",
+    "ackDescription": "Mínigh conas a aithníodh an t-iarratas.",
+    "exportTitle": "Easpórtáil sonraí",
+    "exportDescription": "Déan cur síos ar an bpacáiste easpórtáilte.",
+    "eraseTitle": "Scrios sonraí",
+    "eraseDescription": "Taifead an chúis leis an scriosadh sula leanfar ar aghaidh.",
+    "actions": {
+      "acknowledge": "Aithin",
+      "export": "Easpórtáil",
+      "erase": "Scrios"
+    },
+    "reason": {
+      "submitting": "Á chur isteach…"
+    }
+  },
+  "cases": {
+    "heading": "Cásanna tacaíochta",
+    "subheading": "Modhnaigh sreafaí oibre tacaíochta agus ardúcháin.",
+    "columns": {
+      "subject": "Ábhar",
+      "status": "Stádas"
+    },
+    "tableCaption": "Cásanna le déanaí",
+    "empty": "Níor aimsíodh cásanna.",
+    "createTitle": "Cruthaigh cás tacaíochta",
+    "createDescription": "Tabhair comhthéacs don chás nua.",
+    "escalateTitle": "Ardaigh an cás",
+    "escalateDescription": "Mínigh cén fáth atá an cás á ardú.",
+    "actions": {
+      "create": "Cruthaigh cás",
+      "escalate": "Ardaigh"
+    },
+    "reason": {
+      "submitting": "Á chur isteach…"
+    }
+  }
+}

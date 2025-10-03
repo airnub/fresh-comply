@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  @apply min-h-screen bg-surface text-foreground antialiased;
+}
+
+.bg-surface {
+  background-color: hsl(0 0% 100% / 1);
+}
+
+:root[class~="dark"] .bg-surface {
+  background-color: hsl(228 17% 12% / 1);
+}
+
+.text-foreground {
+  color: hsl(230 15% 15% / 1);
+}
+
+:root[class~="dark"] .text-foreground {
+  color: hsl(210 40% 98% / 1);
+}

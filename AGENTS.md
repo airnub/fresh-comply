@@ -38,4 +38,4 @@ pnpm dev             # start portal
 
 ## Specs
 
-See **[Fresh-Comply Product Spec](docs/specs/fresh-comply-spec.md)** for architecture, data model, DSL, i18n/theme/a11y/GDPR plans, and roadmap. Legal templates live in **[`docs/LEGAL/`](docs/LEGAL/)**.
+See **[Fresh-Comply Product Spec](docs/specs/fresh-comply-spec.md)** and **[Admin Back Office Spec](docs/specs/admin-app-spec.md)** for architecture, data model, DSL, i18n/theme/a11y/GDPR plans, and roadmap. Legal templates live in **[`docs/LEGAL/`](docs/LEGAL/)**.

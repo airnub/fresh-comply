@@ -20,3 +20,11 @@ pnpm dev              # start the Next.js portal
 ```
 
 The Temporal UI (http://localhost:8080) is provided for operations engineers only and should not be exposed to end users.
+
+## Admin Runbook
+
+```bash
+pnpm run dev:stack     # temporal + deps (if needed)
+pnpm run dev:worker    # temporal worker (if using Temporal features)
+pnpm run dev:admin     # admin app on :3100
+```
