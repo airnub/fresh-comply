@@ -143,7 +143,11 @@ async function main() {
         .update({ status: "acknowledged", ack_sent_at: ackSentAt, updated_at: ackSentAt })
         .eq("id", request.id);
       await client.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.subject_org_id ?? null,
+        subject_org_id: request.subject_org_id ?? null,
+        entity: "dsr_request",
         action: "dsr.request.acknowledged",
         meta_json: { request_id: request.id, ack_sent_at: ackSentAt }
       });
@@ -178,7 +182,11 @@ async function main() {
         .update({ status: "escalated", updated_at: nowIso })
         .eq("id", request.id);
       await client.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.subject_org_id ?? null,
+        subject_org_id: request.subject_org_id ?? null,
+        entity: "dsr_request",
         action: "dsr.request.escalated",
         meta_json: { request_id: request.id, due_at: request.due_at }
       });

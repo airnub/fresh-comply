@@ -18,12 +18,22 @@ export async function POST(request: Request, { params }: { params: { requestId: 
     return parsed;
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return NextResponse.json({ error: "Tenant context unavailable" }, { status: 403 });
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_resolve_dsr", {
       actor_id: context.userId,
       request_id: params.requestId,
       reason: parsed.reason,
       resolution: parsed.resolution,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

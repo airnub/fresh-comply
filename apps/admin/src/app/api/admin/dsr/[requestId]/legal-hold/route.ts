@@ -31,6 +31,13 @@ export async function POST(request: Request, { params }: { params: { requestId: 
     return NextResponse.json({ error: "Second approver must be another admin" }, { status: 400 });
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return NextResponse.json({ error: "Tenant context unavailable" }, { status: 403 });
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_toggle_legal_hold", {
       actor_id: context.userId,
@@ -38,6 +45,9 @@ export async function POST(request: Request, { params }: { params: { requestId: 
       reason: parsed.reason,
       enabled: parsed.enabled,
       second_actor_id: secondActorId,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

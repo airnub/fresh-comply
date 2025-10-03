@@ -27,6 +27,13 @@ export async function POST(request: Request) {
     return parsed;
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId ?? parsed.orgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId ?? parsed.orgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return NextResponse.json({ error: "Tenant context unavailable" }, { status: 403 });
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_bind_secret_alias", {
       actor_id: context.userId,
@@ -36,6 +43,9 @@ export async function POST(request: Request) {
       provider: parsed.provider,
       external_id: parsed.externalId,
       description: parsed.description ?? null,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: parsed.orgId,
     });
 
     return NextResponse.json({

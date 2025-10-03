@@ -38,6 +38,13 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
     return jsonError(422, "Binding org, alias, provider, and reference are required");
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_bind_tenant_secret_alias", {
       reason: payload.reason,
@@ -47,6 +54,9 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
       alias: binding.alias,
       provider: binding.provider,
       external_id: binding.external_id,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

@@ -27,12 +27,22 @@ export async function POST(request: Request, { params }: { params: { runId: stri
     return NextResponse.json({ error: "Cancellation does not require second approval" }, { status: 400 });
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return NextResponse.json({ error: "Tenant context unavailable" }, { status: 403 });
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_cancel_run", {
       actor_id: context.userId,
       run_id: params.runId,
       reason: parsed.reason,
       second_actor_id: parsed.approvedBy,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

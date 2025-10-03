@@ -17,11 +17,21 @@ export async function POST(request: Request, { params }: { params: { bindingId: 
     return parsed;
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return NextResponse.json({ error: "Tenant context unavailable" }, { status: 403 });
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_test_secret_alias", {
       actor_id: context.userId,
       binding_id: params.bindingId,
       reason: parsed.reason,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

@@ -41,6 +41,13 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
     return jsonError(422, "Version id is required when not following latest");
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_enable_tenant_step_type", {
       reason: payload.reason,
@@ -49,6 +56,9 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
       org_slug: install.org_slug,
       version_id: install.version_id ?? null,
       follow_latest: install.follow_latest ?? false,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

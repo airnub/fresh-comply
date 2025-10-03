@@ -41,6 +41,13 @@ export async function PATCH(
     return jsonError(422, "Install patch payload is required");
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_update_tenant_step_type_install", {
       reason: payload.reason,
@@ -48,6 +55,9 @@ export async function PATCH(
       step_type_id: stepTypeId,
       install_id: installId,
       patch: payload.patch,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({
@@ -89,12 +99,22 @@ export async function DELETE(
     return jsonError(422, "Reason code is required", { validationErrors: ["Reason code is required"] });
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_disable_tenant_step_type", {
       reason: payload.reason,
       actor_id: context.userId,
       step_type_id: stepTypeId,
       install_id: installId,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

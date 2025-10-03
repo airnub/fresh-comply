@@ -20,6 +20,13 @@ export async function PATCH(request: Request, { params }: { params: { runId: str
     return parsed;
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return NextResponse.json({ error: "Tenant context unavailable" }, { status: 403 });
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_update_step_due_date", {
       actor_id: context.userId,
@@ -27,6 +34,9 @@ export async function PATCH(request: Request, { params }: { params: { runId: str
       step_id: params.stepId,
       reason: parsed.reason,
       due_date: parsed.dueDate,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({
