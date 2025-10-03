@@ -22,8 +22,8 @@ export function canEditStep(context: AdminContext): boolean {
   return stepEditorRoles.includes(context.role);
 }
 
-export function requiresSecondApproval(action: "cancel_workflow" | "delete_record" | string): boolean {
-  if (action === "cancel_workflow" || action === "delete_record") {
+export function requiresSecondApproval(action: "cancel_workflow" | "delete_record" | "legal_hold_toggle" | string): boolean {
+  if (action === "cancel_workflow" || action === "delete_record" || action === "legal_hold_toggle") {
     return true;
   }
   return false;

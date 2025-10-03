@@ -21,6 +21,7 @@ describe("rbac helpers", () => {
   it("requires second approval for high-risk actions", () => {
     expect(requiresSecondApproval("cancel_workflow")).toBe(true);
     expect(requiresSecondApproval("delete_record")).toBe(true);
+    expect(requiresSecondApproval("legal_hold_toggle")).toBe(true);
     expect(requiresSecondApproval("other")).toBe(false);
   });
 

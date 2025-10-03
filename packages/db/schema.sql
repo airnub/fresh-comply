@@ -567,3 +567,543 @@ create policy "Members read overlay layers" on workflow_overlay_layers
         and public.can_access_run(s.run_id)
     )
   );
+
+create table if not exists admin_actions(
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references users(id) not null,
+  action text not null,
+  reason text not null,
+  payload jsonb not null default '{}'::jsonb,
+  requires_second_approval boolean not null default false,
+  second_actor_id uuid references users(id),
+  created_at timestamptz not null default now(),
+  approved_at timestamptz
+);
+
+create table if not exists audit_log(
+  id uuid primary key default gen_random_uuid(),
+  action_id uuid references admin_actions(id) on delete cascade,
+  entity text,
+  entity_id uuid,
+  diff jsonb,
+  created_at timestamptz not null default now()
+);
+
+create or replace function admin_record_action(
+  p_action text,
+  p_actor_id uuid,
+  p_reason text,
+  p_payload jsonb,
+  p_entity text default null,
+  p_entity_id uuid default null,
+  p_requires_second boolean default false,
+  p_second_actor_id uuid default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_action_id uuid;
+begin
+  if p_requires_second and (p_second_actor_id is null or p_second_actor_id = p_actor_id) then
+    raise exception 'Second approver required';
+  end if;
+
+  insert into admin_actions(actor_id, action, reason, payload, requires_second_approval, second_actor_id, approved_at)
+  values(p_actor_id, p_action, p_reason, coalesce(p_payload, '{}'::jsonb), p_requires_second, p_second_actor_id,
+         case when p_requires_second then now() else null end)
+  returning id into v_action_id;
+
+  insert into audit_log(action_id, entity, entity_id, diff)
+  values(v_action_id, p_entity, p_entity_id, coalesce(p_payload, '{}'::jsonb));
+
+  return jsonb_build_object('action_id', v_action_id, 'action', p_action);
+end;
+$$;
+
+create or replace function admin_create_step_type(
+  actor_id uuid,
+  reason text,
+  step_type jsonb
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'step_type_create',
+    actor_id,
+    reason,
+    jsonb_build_object('step_type', step_type)
+  );
+end;
+$$;
+
+create or replace function admin_update_step_type(
+  actor_id uuid,
+  reason text,
+  step_type_id uuid,
+  patch jsonb
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'step_type_update',
+    actor_id,
+    reason,
+    jsonb_build_object('step_type_id', step_type_id, 'patch', patch),
+    'step_type',
+    step_type_id
+  );
+end;
+$$;
+
+create or replace function admin_reassign_step(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  step_id uuid,
+  assignee_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update steps set assignee_user_id = assignee_id where id = step_id;
+  return admin_record_action(
+    'step_reassign',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'step_id', step_id, 'assignee_id', assignee_id),
+    'step',
+    step_id
+  );
+end;
+$$;
+
+create or replace function admin_update_step_due_date(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  step_id uuid,
+  new_due_date text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update steps set due_date = new_due_date::date where id = step_id;
+  return admin_record_action(
+    'step_due_date_update',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'step_id', step_id, 'due_date', new_due_date),
+    'step',
+    step_id
+  );
+end;
+$$;
+
+create or replace function admin_update_step_status(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  step_id uuid,
+  new_status text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update steps set status = new_status where id = step_id;
+  return admin_record_action(
+    'step_status_update',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'step_id', step_id, 'status', new_status),
+    'step',
+    step_id
+  );
+end;
+$$;
+
+create or replace function admin_regenerate_document(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  document_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'document_regenerate',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'document_id', document_id),
+    'document',
+    document_id
+  );
+end;
+$$;
+
+create or replace function admin_resend_run_digest(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  recipient_email text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'run_digest_resend',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'recipient_email', recipient_email),
+    'workflow_run',
+    run_id
+  );
+end;
+$$;
+
+create or replace function admin_cancel_run(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  second_actor_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'run_cancel',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id),
+    'workflow_run',
+    run_id,
+    true,
+    second_actor_id
+  );
+end;
+$$;
+
+create or replace function admin_approve_freshness_diff(
+  actor_id uuid,
+  reason text,
+  diff_id uuid,
+  notes text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'freshness_diff_approve',
+    actor_id,
+    reason,
+    jsonb_build_object('diff_id', diff_id, 'notes', notes)
+  );
+end;
+$$;
+
+create or replace function admin_reject_freshness_diff(
+  actor_id uuid,
+  reason text,
+  diff_id uuid,
+  notes text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'freshness_diff_reject',
+    actor_id,
+    reason,
+    jsonb_build_object('diff_id', diff_id, 'notes', notes)
+  );
+end;
+$$;
+
+create or replace function admin_acknowledge_dsr(
+  actor_id uuid,
+  reason text,
+  request_id uuid,
+  notes text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'dsr_acknowledge',
+    actor_id,
+    reason,
+    jsonb_build_object('request_id', request_id, 'notes', notes),
+    'dsr_request',
+    request_id
+  );
+end;
+$$;
+
+create or replace function admin_resolve_dsr(
+  actor_id uuid,
+  reason text,
+  request_id uuid,
+  resolution text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'dsr_resolve',
+    actor_id,
+    reason,
+    jsonb_build_object('request_id', request_id, 'resolution', resolution),
+    'dsr_request',
+    request_id
+  );
+end;
+$$;
+
+create or replace function admin_export_dsr_bundle(
+  actor_id uuid,
+  reason text,
+  request_id uuid,
+  destination text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'dsr_export',
+    actor_id,
+    reason,
+    jsonb_build_object('request_id', request_id, 'destination', destination),
+    'dsr_request',
+    request_id
+  );
+end;
+$$;
+
+create or replace function admin_toggle_legal_hold(
+  actor_id uuid,
+  reason text,
+  request_id uuid,
+  enabled boolean,
+  second_actor_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    case when enabled then 'legal_hold_enable' else 'legal_hold_disable' end,
+    actor_id,
+    reason,
+    jsonb_build_object('request_id', request_id, 'enabled', enabled),
+    'dsr_request',
+    request_id,
+    enabled,
+    second_actor_id
+  );
+end;
+$$;
+
+create or replace function admin_bind_secret_alias(
+  actor_id uuid,
+  reason text,
+  org_id uuid,
+  alias text,
+  provider text,
+  external_id text,
+  description text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_binding_id uuid;
+begin
+  insert into tenant_secret_bindings(org_id, alias, provider, external_id, description)
+  values(org_id, alias, provider, external_id, description)
+  returning id into v_binding_id;
+
+  return admin_record_action(
+    'secret_alias_bind',
+    actor_id,
+    reason,
+    jsonb_build_object('binding_id', v_binding_id, 'org_id', org_id, 'alias', alias, 'provider', provider, 'external_id', external_id, 'description', description),
+    'tenant_secret_binding',
+    v_binding_id
+  );
+end;
+$$;
+
+create or replace function admin_update_secret_alias(
+  actor_id uuid,
+  reason text,
+  binding_id uuid,
+  new_description text,
+  new_external_id text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update tenant_secret_bindings
+  set description = coalesce(new_description, tenant_secret_bindings.description),
+      external_id = coalesce(new_external_id, tenant_secret_bindings.external_id)
+  where id = binding_id;
+
+  return admin_record_action(
+    'secret_alias_update',
+    actor_id,
+    reason,
+    jsonb_build_object('binding_id', binding_id, 'description', new_description, 'external_id', new_external_id),
+    'tenant_secret_binding',
+    binding_id
+  );
+end;
+$$;
+
+create or replace function admin_remove_secret_alias(
+  actor_id uuid,
+  reason text,
+  binding_id uuid,
+  second_actor_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from tenant_secret_bindings where id = binding_id;
+  return admin_record_action(
+    'secret_alias_remove',
+    actor_id,
+    reason,
+    jsonb_build_object('binding_id', binding_id),
+    'tenant_secret_binding',
+    binding_id,
+    true,
+    second_actor_id
+  );
+end;
+$$;
+
+create or replace function admin_test_secret_alias(
+  actor_id uuid,
+  reason text,
+  binding_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'secret_alias_test',
+    actor_id,
+    reason,
+    jsonb_build_object('binding_id', binding_id),
+    'tenant_secret_binding',
+    binding_id
+  );
+end;
+$$;
+
+create or replace function admin_temporal_signal(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  signal text,
+  payload jsonb
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'temporal_signal',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'signal', signal, 'payload', payload),
+    'workflow_run',
+    run_id
+  );
+end;
+$$;
+
+create or replace function admin_temporal_retry(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  activity_id text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'temporal_retry',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id, 'activity_id', activity_id),
+    'workflow_run',
+    run_id
+  );
+end;
+$$;
+
+create or replace function admin_temporal_cancel(
+  actor_id uuid,
+  reason text,
+  run_id uuid,
+  second_actor_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return admin_record_action(
+    'temporal_cancel',
+    actor_id,
+    reason,
+    jsonb_build_object('run_id', run_id),
+    'workflow_run',
+    run_id,
+    true,
+    second_actor_id
+  );
+end;
+$$;

@@ -1,37 +1,28 @@
 import { NextResponse } from "next/server";
-import { callAdminRpc, jsonError, resolveAdminContext } from "./_utils";
+import { z } from "zod";
+import { callAdminRpc, jsonError, parseJsonBody, resolveAdminContext } from "../_lib";
 
-interface CreateStepTypePayload {
-  reason?: string;
-  stepType?: Record<string, unknown>;
-}
+const createStepTypeSchema = z.object({
+  reason: z.string().min(1, "Reason code is required"),
+  stepType: z.record(z.any(), { invalid_type_error: "Step type definition is required" }),
+});
 
 export async function POST(request: Request) {
-  const context = await resolveAdminContext();
+  const context = await resolveAdminContext(["platform_admin"]);
   if (context instanceof NextResponse) {
     return context;
   }
 
-  let payload: CreateStepTypePayload;
-  try {
-    payload = (await request.json()) as CreateStepTypePayload;
-  } catch (error) {
-    return jsonError(400, "Invalid JSON body");
-  }
-
-  if (!payload.reason || !payload.reason.trim()) {
-    return jsonError(422, "Reason code is required", { validationErrors: ["Reason code is required"] });
-  }
-
-  if (!payload.stepType) {
-    return jsonError(422, "Step type definition is required");
+  const parsed = await parseJsonBody(request, createStepTypeSchema);
+  if (parsed instanceof NextResponse) {
+    return parsed;
   }
 
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_create_step_type", {
-      reason: payload.reason,
+      reason: parsed.reason,
       actor_id: context.userId,
-      step_type: payload.stepType,
+      step_type: parsed.stepType,
     });
 
     return NextResponse.json({
