@@ -4,8 +4,30 @@ import { revalidatePath } from "next/cache";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient, getSupabaseUser, SupabaseConfigurationError } from "../../../lib/auth/supabase-ssr";
 import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
+import type { Json } from "@airnub/types/supabase";
+import type { SourceDiff } from "@airnub/freshness/watcher";
 
 type ModerationResult = { ok: boolean; error?: string };
+
+type SourceModerationProposal = {
+  kind: "source_change";
+  sourceKey: string;
+  severity: string;
+  summary: string;
+  detectedAt: string;
+  workflows: string[];
+  diff: SourceDiff;
+  current: {
+    snapshotId: string | null | undefined;
+    fingerprint: string;
+    records?: unknown;
+  };
+  previous: null | {
+    snapshotId: string | undefined;
+    fingerprint: string;
+    records?: unknown;
+  };
+};
 
 async function resolveContext() {
   try {
@@ -48,17 +70,16 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
 
     const { client, user } = context;
     const { data, error } = await client
-      .from("freshness_pending_updates")
+      .from("moderation_queue")
       .update({
         status: "approved",
-        approval_reason: reason,
-        rejection_reason: null,
-        approved_by_user_id: user?.id ?? null,
-        verified_at: now,
+        notes_md: reason,
+        reviewer_id: user?.id ?? null,
+        decided_at: now,
         updated_at: now
       })
       .eq("id", id)
-      .select("workflow_keys, source_key, current_snapshot_id")
+      .select("proposal")
       .maybeSingle();
 
     if (error) {
@@ -67,10 +88,12 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
       return { ok: false, error: error.message };
     }
 
-    if (data?.workflow_keys?.length) {
-      await bumpWorkflowVersions(client, data.workflow_keys);
-      if (data.source_key === "funding_radar" && data.current_snapshot_id) {
-        await linkFundingOpportunitiesToWorkflows(client, data.current_snapshot_id, data.workflow_keys);
+    const proposal = parseModerationProposal(data?.proposal);
+
+    if (proposal?.workflows?.length) {
+      await bumpWorkflowVersions(client, proposal.workflows);
+      if (proposal.sourceKey === "funding_radar" && proposal.current?.snapshotId) {
+        await linkFundingOpportunitiesToWorkflows(client, proposal.current.snapshotId, proposal.workflows);
       }
     }
 
@@ -101,12 +124,12 @@ export async function rejectPendingUpdate(id: string, reason: string): Promise<M
 
     const { client, user } = context;
     const { error } = await client
-      .from("freshness_pending_updates")
+      .from("moderation_queue")
       .update({
         status: "rejected",
-        rejection_reason: reason,
-        approval_reason: null,
-        approved_by_user_id: user?.id ?? null,
+        notes_md: reason,
+        reviewer_id: user?.id ?? null,
+        decided_at: now,
         updated_at: now
       })
       .eq("id", id);
@@ -168,12 +191,12 @@ async function linkFundingOpportunitiesToWorkflows(
 ) {
   if (!workflowKeys.length) return;
   const { data: snapshot, error: snapshotError } = await client
-    .from("freshness_snapshots")
-    .select("fingerprint")
+    .from("source_snapshot")
+    .select("content_hash")
     .eq("id", snapshotId)
     .maybeSingle();
 
-  if (snapshotError || !snapshot?.fingerprint) {
+  if (snapshotError || !snapshot?.content_hash) {
     console.warn("Unable to resolve funding snapshot for workflow linking", snapshotError);
     return;
   }
@@ -181,7 +204,7 @@ async function linkFundingOpportunitiesToWorkflows(
   const { data: opportunities, error: fundingError } = await client
     .from("funding_opportunities")
     .select("id")
-    .eq("snapshot_fingerprint", snapshot.fingerprint);
+    .eq("snapshot_fingerprint", snapshot.content_hash);
 
   if (fundingError) {
     console.warn("Unable to load funding opportunities for workflow linking", fundingError);
@@ -204,4 +227,14 @@ async function linkFundingOpportunitiesToWorkflows(
   if (linkError) {
     console.warn("Unable to persist funding opportunity workflow links", linkError);
   }
+}
+
+function parseModerationProposal(value: Json | null): SourceModerationProposal | null {
+  if (!value || typeof value !== "object") return null;
+  const proposal = value as SourceModerationProposal;
+  if (proposal.kind !== "source_change") return null;
+  return {
+    ...proposal,
+    workflows: Array.isArray(proposal.workflows) ? proposal.workflows : []
+  };
 }

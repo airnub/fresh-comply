@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@airnub/orchestrator-temporal": "workspace:*",
+    "@airnub/freshness": "workspace:*",
     "@airnub/types": "workspace:*",
+    "@airnub/utils": "workspace:*",
     "@airnub/ui": "workspace:*",
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.45.0",

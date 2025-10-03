@@ -1,37 +1,38 @@
 import type { SourceDiff } from "@airnub/freshness/watcher";
 import { SOURCE_POLLERS } from "@airnub/freshness/watcher";
 import { getSupabaseClient, SupabaseConfigurationError } from "../lib/auth/supabase-ssr";
-import type { Database, Json } from "@airnub/types/supabase";
-
-type FreshnessRow = Database["public"]["Tables"]["freshness_pending_updates"]["Row"];
+import type { Json } from "@airnub/types/supabase";
 
 type PendingUpdate = {
   id: string;
-  sourceKey: FreshnessRow["source_key"];
-  summary: FreshnessRow["diff_summary"];
+  sourceKey: string;
+  summary: string;
   detectedAt: string;
-  status: FreshnessRow["status"];
+  status: "pending" | "approved" | "rejected" | "amended";
   workflows: string[];
   diff: SourceDiff;
   current: unknown;
   previous: unknown;
-  verifiedAt?: string | null;
+  severity?: string;
 };
 
-function parseDiffPayload(value: Json | null): {
-  diff: SourceDiff;
-  current: unknown;
-  previous: unknown;
-} {
-  if (!value || typeof value !== "object") {
-    return { diff: { added: [], removed: [], changed: [] }, current: null, previous: null };
-  }
-  const payload = value as Record<string, unknown>;
-  return {
-    diff: (payload.diff as SourceDiff) ?? { added: [], removed: [], changed: [] },
-    current: payload.current,
-    previous: payload.previous
-  };
+type SourceModerationProposal = {
+  kind: "source_change";
+  sourceKey: string;
+  severity?: string;
+  summary: string;
+  detectedAt: string;
+  workflows?: string[];
+  diff?: SourceDiff;
+  current?: unknown;
+  previous?: unknown;
+};
+
+function parseProposal(value: Json | null): SourceModerationProposal | null {
+  if (!value || typeof value !== "object") return null;
+  const proposal = value as SourceModerationProposal;
+  if (proposal.kind !== "source_change") return null;
+  return proposal;
 }
 
 function buildFallback(): PendingUpdate[] {
@@ -44,6 +45,7 @@ function buildFallback(): PendingUpdate[] {
       detectedAt,
       status: "pending",
       workflows: ["setup-nonprofit-ie"],
+      severity: "minor",
       diff: {
         added: [
           {
@@ -56,8 +58,7 @@ function buildFallback(): PendingUpdate[] {
         changed: []
       },
       current: [],
-      previous: [],
-      verifiedAt: null
+      previous: []
     }
   ];
 }
@@ -66,9 +67,9 @@ export async function getPendingFreshnessUpdates(): Promise<PendingUpdate[]> {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
-      .from("freshness_pending_updates")
-      .select("id, source_key, diff_summary, diff_payload, detected_at, status, workflow_keys, verified_at")
-      .order("detected_at", { ascending: false });
+      .from("moderation_queue")
+      .select("id, status, proposal, created_at, updated_at")
+      .order("created_at", { ascending: false });
 
     if (error) {
       throw error;
@@ -79,18 +80,20 @@ export async function getPendingFreshnessUpdates(): Promise<PendingUpdate[]> {
     }
 
     return data.map((row) => {
-      const payload = parseDiffPayload(row.diff_payload);
+      const proposal = parseProposal(row.proposal);
+      const diff = proposal?.diff ?? { added: [], removed: [], changed: [] };
+      const workflows = Array.isArray(proposal?.workflows) ? proposal?.workflows : [];
       return {
         id: row.id,
-        sourceKey: row.source_key,
-        summary: row.diff_summary,
-        detectedAt: row.detected_at,
+        sourceKey: proposal?.sourceKey ?? "unknown",
+        summary: proposal?.summary ?? "Pending change",
+        detectedAt: proposal?.detectedAt ?? row.created_at ?? new Date().toISOString(),
         status: row.status,
-        workflows: row.workflow_keys ?? [],
-        diff: payload.diff,
-        current: payload.current,
-        previous: payload.previous,
-        verifiedAt: row.verified_at
+        workflows,
+        diff,
+        current: proposal?.current ?? null,
+        previous: proposal?.previous ?? null,
+        severity: proposal?.severity
       } satisfies PendingUpdate;
     });
   } catch (error) {
