@@ -39,6 +39,8 @@ docs/specs/integration-architecture-bidirectional.md
 
 ADR-0001: Temporal Orchestration (Custom UI, targeted use)
 docs/adr/0001-temporal-orchestration.md
+ADR-0002: Stripe Billing Scaffold (White-Label Tenants)
+docs/adr/0002-billing-stripe.md
 
 Superseded / Archive
 
