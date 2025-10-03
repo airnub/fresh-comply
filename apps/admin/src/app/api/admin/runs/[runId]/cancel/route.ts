@@ -5,7 +5,7 @@ import { requiresSecondApproval } from "../../../../../../lib/rbac";
 
 const schema = z.object({
   reason: z.string().min(1, "Reason code is required"),
-  approvedBy: z.string().uuid("Second approver id must be a UUID"),
+  secondActorId: z.string().uuid("Second approver id must be a UUID"),
 });
 
 export async function POST(request: Request, { params }: { params: { runId: string } }) {
@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: { runId: stri
     return parsed;
   }
 
-  if (parsed.approvedBy === context.userId) {
+  if (parsed.secondActorId === context.userId) {
     return NextResponse.json({ error: "Second approver must be a different admin" }, { status: 400 });
   }
 
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: { params: { runId: stri
       actor_id: context.userId,
       run_id: params.runId,
       reason: parsed.reason,
-      second_actor_id: parsed.approvedBy,
+      second_actor_id: parsed.secondActorId,
       tenant_org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,

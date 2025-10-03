@@ -52,7 +52,7 @@ export async function PATCH(request: Request, { params }: { params: { bindingId:
 
 const deleteSchema = z.object({
   reason: z.string().min(1, "Reason code is required"),
-  approvedBy: z.string().uuid("Second approver id must be a UUID").optional(),
+  secondActorId: z.string().uuid("Second approver id must be a UUID").optional(),
 });
 
 export async function DELETE(request: Request, { params }: { params: { bindingId: string } }) {
@@ -66,7 +66,7 @@ export async function DELETE(request: Request, { params }: { params: { bindingId
     return parsed;
   }
 
-  const secondActorId = parsed.approvedBy ?? null;
+  const secondActorId = parsed.secondActorId ?? null;
   if (secondActorId && secondActorId === context.userId) {
     return NextResponse.json({ error: "Second approver must be another admin" }, { status: 400 });
   }

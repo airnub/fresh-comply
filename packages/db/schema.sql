@@ -1025,6 +1025,12 @@ returns trigger
 language plpgsql
 as $$
 begin
+  if tg_op = 'UPDATE' and tg_table_name = 'admin_actions' then
+    if current_setting('app.admin_actions_allow_update', true) = 'on' then
+      return null;
+    end if;
+  end if;
+
   raise exception 'Ledger tables are append-only';
 end;
 $$;
@@ -1146,6 +1152,66 @@ begin
   );
 
   return new;
+end;
+$$;
+
+create or replace function refresh_admin_actions_hash_chain(p_tenant_id uuid)
+returns void
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_prev_hash text := repeat('0', 64);
+  v_row_hash text;
+  rec admin_actions%rowtype;
+begin
+  if p_tenant_id is null then
+    raise exception 'tenant_org_id is required';
+  end if;
+
+  perform set_config('app.admin_actions_allow_update', 'on', true);
+
+  for rec in
+    select *
+    from admin_actions
+    where tenant_org_id = p_tenant_id
+    order by inserted_at, created_at, id
+  loop
+    v_row_hash := encode(
+      digest(
+        jsonb_build_object(
+          'tenant_org_id', rec.tenant_org_id,
+          'actor_id', rec.actor_id,
+          'actor_org_id', rec.actor_org_id,
+          'on_behalf_of_org_id', rec.on_behalf_of_org_id,
+          'subject_org_id', rec.subject_org_id,
+          'target_kind', rec.target_kind,
+          'target_id', rec.target_id,
+          'action', rec.action,
+          'reason_code', rec.reason_code,
+          'lawful_basis', rec.lawful_basis,
+          'payload', coalesce(rec.payload, '{}'::jsonb),
+          'requires_second_approval', rec.requires_second_approval,
+          'second_actor_id', rec.second_actor_id,
+          'prev_hash', v_prev_hash,
+          'created_at', to_char(rec.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+          'inserted_at', to_char(rec.inserted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+          'approved_at', case when rec.approved_at is not null then to_char(rec.approved_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') else null end
+        )::text,
+        'sha256'
+      ),
+      'hex'
+    );
+
+    update admin_actions
+    set prev_hash = v_prev_hash,
+        row_hash = v_row_hash
+    where id = rec.id;
+
+    v_prev_hash := v_row_hash;
+  end loop;
+
+  perform set_config('app.admin_actions_allow_update', 'off', true);
 end;
 $$;
 
@@ -1332,7 +1398,7 @@ begin
     v_payload,
     requires_second,
     second_actor_id,
-    case when requires_second then now() else null end
+    case when requires_second then null else now() end
   )
   returning id into v_admin_action_id;
 
@@ -1376,6 +1442,140 @@ begin
   );
 end;
 $$;
+
+create or replace function rpc_confirm_admin_action(
+  action_id uuid,
+  actor_id uuid,
+  tenant_org_id uuid,
+  actor_org_id uuid,
+  on_behalf_of_org_id uuid default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_action admin_actions%rowtype;
+  v_now timestamptz := now();
+  v_audit_id uuid;
+  v_run_id uuid;
+  v_step_id uuid;
+  v_target_kind text;
+  v_meta jsonb;
+begin
+  if action_id is null then
+    raise exception 'action_id is required';
+  end if;
+
+  if actor_id is null then
+    raise exception 'actor_id is required';
+  end if;
+
+  if tenant_org_id is null then
+    raise exception 'tenant_org_id is required';
+  end if;
+
+  if actor_org_id is null then
+    raise exception 'actor_org_id is required';
+  end if;
+
+  select *
+    into v_action
+  from admin_actions
+  where id = action_id
+  for update;
+
+  if not found then
+    raise exception 'Admin action % not found', action_id;
+  end if;
+
+  if v_action.tenant_org_id <> tenant_org_id then
+    raise exception 'Tenant mismatch for admin action %', action_id;
+  end if;
+
+  if not v_action.requires_second_approval then
+    raise exception 'Admin action % does not require second approval', action_id;
+  end if;
+
+  if v_action.approved_at is not null then
+    raise exception 'Admin action % already approved', action_id;
+  end if;
+
+  if v_action.actor_id = actor_id then
+    raise exception 'Second approver must be a different admin';
+  end if;
+
+  if v_action.second_actor_id is not null and v_action.second_actor_id <> actor_id then
+    raise exception 'Admin action % requires approval by the nominated admin', action_id;
+  end if;
+
+  perform set_config('app.admin_actions_allow_update', 'on', true);
+  update admin_actions
+    set second_actor_id = actor_id,
+        approved_at = v_now
+    where id = action_id;
+  perform set_config('app.admin_actions_allow_update', 'off', true);
+
+  perform refresh_admin_actions_hash_chain(v_action.tenant_org_id);
+
+  v_run_id := case
+    when v_action.payload ? 'run_id' and jsonb_typeof(v_action.payload->'run_id') = 'string' then (v_action.payload->>'run_id')::uuid
+    else null
+  end;
+  v_step_id := case
+    when v_action.payload ? 'step_id' and jsonb_typeof(v_action.payload->'step_id') = 'string' then (v_action.payload->>'step_id')::uuid
+    else null
+  end;
+  v_target_kind := coalesce(v_action.target_kind, 'admin_action');
+  v_meta := jsonb_build_object(
+    'admin_action_id', action_id,
+    'initiator_id', v_action.actor_id,
+    'approver_id', actor_id,
+    'action', v_action.action,
+    'reason_code', v_action.reason_code,
+    'payload', coalesce(v_action.payload, '{}'::jsonb)
+  );
+
+  insert into audit_log(
+    tenant_org_id,
+    actor_user_id,
+    actor_org_id,
+    on_behalf_of_org_id,
+    subject_org_id,
+    entity,
+    target_kind,
+    target_id,
+    run_id,
+    step_id,
+    action,
+    lawful_basis,
+    meta_json
+  )
+  values(
+    v_action.tenant_org_id,
+    actor_id,
+    actor_org_id,
+    on_behalf_of_org_id,
+    v_action.subject_org_id,
+    v_target_kind,
+    v_target_kind,
+    v_action.target_id,
+    v_run_id,
+    v_step_id,
+    'admin_action_confirmed',
+    v_action.lawful_basis,
+    v_meta
+  )
+  returning id into v_audit_id;
+
+  return jsonb_build_object(
+    'admin_action_id', action_id,
+    'approved_at', v_now,
+    'audit_id', v_audit_id
+  );
+end;
+$$;
+
 
 create or replace function admin_create_step_type(
   actor_id uuid,
