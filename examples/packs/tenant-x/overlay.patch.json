@@ -13,9 +13,9 @@
         "workflow": "tenantX.mlScreening",
         "taskQueue": "tenant-x-main",
         "input_schema": "schemas/ml-screening.json",
-        "permissions": ["org:member"],
-        "secret_aliases": ["secrets.mlApiKey"]
+        "secrets": ["secrets.mlApiKey"]
       },
+      "permissions": ["org:member"],
       "verify": [
         { "rule": "ml_screening_passed" }
       ]
@@ -37,9 +37,9 @@
       },
       "execution": {
         "mode": "manual",
-        "input_schema": "schemas/policy-attest.json",
-        "permissions": ["org:member"]
+        "input_schema": "schemas/policy-attest.json"
       },
+      "permissions": ["org:member"],
       "requires": ["rbo"],
       "verify": [
         { "rule": "board_policy_signed" }

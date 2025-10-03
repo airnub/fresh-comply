@@ -4,10 +4,26 @@ export interface StepExecution {
   mode: ExecutionMode;
   workflow?: string;
   taskQueue?: string;
-  webhook?: string;
+  externalWebhook?: string;
   input_schema?: string;
-  permissions?: string[];
-  secret_aliases?: string[];
+  secrets?: string[];
+}
+
+export type LawfulBasis =
+  | "contract"
+  | "legal_obligation"
+  | "legitimate_interest"
+  | "consent";
+
+export interface StepPolicyRetention {
+  entity: string;
+  duration: string;
+}
+
+export interface StepPolicy {
+  lawful_basis?: LawfulBasis;
+  retention?: StepPolicyRetention;
+  pii?: string[];
 }
 
 export interface VerificationRule {
@@ -30,9 +46,11 @@ export interface WorkflowStep {
   description_i18n?: Record<string, string>;
   execution?: StepExecution;
   required?: boolean;
+  permissions?: string[];
   requires?: string[];
   verify?: VerificationRule[];
   sources?: StepSource[];
+  policy?: StepPolicy;
   metadata?: Record<string, unknown>;
 }
 

@@ -1,112 +1,296 @@
-# Workflow Extension Packs — Specification
+# FreshComply Workflow Packs — Workflow-Agnostic Extension Model
 
-**Version:** 2025-10-04  
-**Owner:** Workflow Engineer @ FreshComply  
-**Status:** Draft — Implements initial runtime + tooling requested in follow-on brief.
+**Version:** 2025-10-03  \\
+**Owner:** Workflow Engineer @ FreshComply  \\
+**Status:** Source of truth for extending core workflows without forking
 
-## 1. Purpose
+> Goal: Allow any company (tenant) to add, replace, or remove steps (manual or automated) on top of the canonical workflows while preserving compliance guarantees, i18n/a11y/UX consistency, and auditability. This spec is workflow-agnostic and jurisdiction-agnostic.
 
-Enable tenant-specific overlays that extend core jurisdictional workflows without forking base definitions. Provide a safe packaging
-model for automated (Temporal) and manual steps, enforce legal guardrails, and surface impact to admins.
+---
 
-## 2. Layered Workflow Model
+## 1) Design Principles
 
-1. **Core:** Canonical Airlab definition shipped in `packages/workflows`.
-2. **Jurisdiction:** Regional overlays maintained by FreshComply.
-3. **Industry:** Optional overlays (e.g., Charity vs. Social Enterprise).
-4. **Tenant Pack:** Signed package uploaded by an organisation admin.
-5. **Run-time Answers:** Branching driven by form responses.
+- **Layered, not forked:** Extensions are overlays applied at runtime (and at publish time), not edits of core files.
+- **Contract-driven:** Steps declare inputs/outputs via JSON Schema; verification rules and deadlines are explicit.
+- **Safe by default:** Policy lints block removal of legally required steps; data handling declares basis/retention.
+- **UI-consistent:** All tenant steps render through our Radix + shadcn components with next-intl/i18n.
+- **Engine-agnostic automation:** Steps can be manual, Temporal-backed, or external webhook automations.
+- **Auditable:** Every merge, enable/disable, and runtime transition is recorded with diffs and reason codes.
 
-Each layer merges into the next via JSON Patch overlays at run start. Required steps marked in core definitions must survive every merge.
+---
 
-## 3. DSL Additions
+## 2) Layered Overlay Model
+
+```
+Core (Airlab canonical)
+  → Jurisdiction pack (e.g., Ireland)
+    → Industry pack (e.g., Charity)
+      → Tenant overlay (Company X)
+        → Answers (runtime branching)
+```
+
+- Each layer can add/replace/remove steps, edges, labels, deadlines, docs, and messages.
+- Conflicts are resolved via three-way merge with an Impact Map (see Freshness Engine) before publish.
+
+---
+
+## 3) DSL Additions (authoritative)
 
 ### 3.1 Execution Modes
 
-`execution.mode` now supports three values:
+```yaml
+steps:
+  - id: cro-name-check
+    kind: action
+    title_i18n: { en-IE: "Check CRO name", ga-IE: "Seiceáil ainm CRO" }
+    execution:
+      mode: temporal            # "manual" | "temporal" | "external"
+      workflow: croNameCheckWorkflow  # when temporal
+      taskQueue: tenantX-main        # optional; defaults per tenant
+      input_schema: schemas/cro-name-check.json
+      secrets: [ "secrets.croApiKey" ]
+      externalWebhook: null          # when mode=external (signed URL)
+    permissions: [ "org:member" ]
+    required: false                  # base can mark legally required steps true
+    verify:
+      - rule: cro_name_checked_recently
+    sources: [ cro_open_services ]
+```
 
-| Mode      | Description                                           | Required fields                  |
-|-----------|-------------------------------------------------------|----------------------------------|
-| `manual`  | Portal-only human task with optional form validation. | `input_schema?`, `permissions?`  |
-| `temporal`| Temporal workflow/activity orchestration.            | `workflow`, `taskQueue`          |
-| `external`| Signed webhook invocation for customer-hosted logic. | `webhook`                        |
+**New fields:**
 
-Each execution block may also declare:
+- `execution.mode`: `manual` (UI task), `temporal` (Temporal workflow/activity), `external` (signed webhook).
+- `execution.workflow`, `execution.taskQueue`, `execution.input_schema`, `execution.secrets`, `execution.externalWebhook`.
+- `permissions`: simple strings used by RBAC (portal & admin).
+- `required`: when true in base, overlays cannot remove the step (policy lint blocks publish).
 
-* `input_schema`: Relative path to a JSON Schema (served via admin or pack assets).
-* `permissions`: Array of RBAC scopes required to view/complete the step.
-* `secret_aliases`: Vault lookups resolved server-side before execution.
+### 3.2 Inputs/Outputs Contracts
 
-### 3.2 Required Steps
+- **Inputs**: JSON Schema (Zod-compatible) referenced by `input_schema`.
+- **Outputs**: attach artifacts to step (files, JSON) with `content_type` and retention tags.
 
-Base workflows mark steps that cannot be removed with `required: true`. Policy linting ensures overlays keep these steps present.
-
-## 4. Workflow Core Library (`@airnub/workflow-core`)
-
-* JSON Schema (`schemas/workflow-definition.schema.json`) defines the DSL additions.
-* `validateWorkflow(workflow)` exposes Ajv-backed validation for authoring tools and runtime safety.
-* Helper types exported for runtime/pack tooling.
-
-## 5. Pack Model (`@airnub/workflow-packs`)
-
-### 5.1 Manifest (`pack.yaml`)
+### 3.3 Policy Metadata (optional)
 
 ```yaml
-name: Tenant X Compliance Pack
+policy:
+  lawful_basis: contract | legal_obligation | legitimate_interest | consent
+  retention: { entity: "evidence", duration: "P6Y" }
+  pii: ["name", "email"]
+```
+
+---
+
+## 4) Overlay Format & Merge
+
+**Patch format:** JSON Patch (RFC 6902) applied to the base workflow JSON representation. Supported ops: `add`, `remove`, `replace`, `move`, `copy`, `test`.
+
+**Example overlay (Tenant X inserts a screening step):**
+
+```json
+[
+  { "op": "add", "path": "/steps/-", "value": {
+      "id": "tenantX-ml-screening",
+      "kind": "action",
+      "title_i18n": { "en-IE": "ML Screening (Tenant X)" },
+      "execution": { "mode": "temporal", "workflow": "tenantX.mlScreening", "taskQueue": "tenantX-main" },
+      "requires": ["revenue-chy-exemption"],
+      "verify": [{ "rule": "ml_screening_passed" }]
+  }},
+  { "op": "add", "path": "/edges/-", "value": { "from": "revenue-chy-exemption", "to": "tenantX-ml-screening" } }
+]
+```
+
+**Merge order:** core → jurisdiction → industry → tenant overlays. Conflicts prompt admin resolution in the Packs UI (apps/admin).
+
+---
+
+## 5) Workflow Packs (distributable bundles)
+
+**Structure:**
+
+```
+pack.yaml                  # manifest
+overlay.patch.json         # JSON Patch for one or more flows
+schemas/*.json             # JSON Schemas for forms
+messages/<locale>.json     # i18n strings
+docs-templates/*.md.hbs    # optional document templates
+temporal/*.ts              # optional workflows/activities (marketplace-only)
+```
+
+**Manifest (`pack.yaml`):**
+
+```yaml
+name: tenantx-compliance
 version: 1.2.0
-compatibleWithWorkflow:
-  - setup-nonprofit-ie-charity@^2025.10
-scopes:
-  - tenant:tenant-x
-overlays:
-  - workflow: setup-nonprofit-ie-charity
-    patch: overlay.patch.json
+compatibleWith: [ "setup-nonprofit-ie@^2025.10" ]
+scope: ["tenant"]
+signing: sha256
+features: ["temporal", "docs"]
 ```
 
-### 5.2 Overlay
+**Signing & trust:**
 
-`overlay.patch.json` contains RFC 6902 JSON Patch operations applied to the target workflow. Packs may also ship `schemas/*.json`,
-`temporal/*.ts`, `docs-templates/*.md.hbs`, and localised copy under `messages/<locale>.json` (future work).
+- Checksums required; optional ed25519 signature for marketplace packs.
+- Untrusted packs are rejected or sandboxed (no code execution).
+- Only marketplace-approved packs may ship `temporal/*.ts` code; tenant private packs are overlay/schema/messages/templates only.
 
-### 5.3 Validation Pipeline
+---
 
-1. Load base workflow (YAML) and validate with `@airnub/workflow-core`.
-2. Apply overlay patch via `fast-json-patch` with structural clone.
-3. Assert required steps survive.
-4. Validate graph integrity (edges reference known steps).
-5. Ensure `input_schema` references resolve to pack assets.
-6. Surface warnings (graph/schema issues) and fail on errors.
+## 6) Runtime Algorithm (merge → validate → run)
 
-### 5.4 Impact Map
+1. **Select base**: get canonical `workflow_def` version for the run.
+2. **Apply overlays** (jurisdiction→industry→tenant) to produce `merged_workflow`.
+3. **Validate**:
+   - JSON Schema refs exist & load.
+   - Graph connectivity (no orphaned nodes); all `requires` resolvable.
+   - **Policy lints** (see §7) pass (e.g., required steps present).
+4. **Materialise** run: persist `merged_workflow_snapshot` on `workflow_runs` for immutability.
+5. **Render** steps in portal:
+   - `manual`: auto-generated form from schema; server validates; audit.
+   - `temporal`: start/query/signal via server APIs; store `orchestration_workflow_id`.
+   - `external`: call signed webhook from server; handle retries/idempotency.
 
-Packs report added, removed, and modified steps relative to the base workflow. Admin UI can reuse this to highlight merge effects.
+---
 
-### 5.5 Signature & Checksums
+## 7) Safety & Policy Lints (blocking rules)
 
-`signature.txt` may store the SHA-256 checksum of the pack directory. Validation compares this value against a computed checksum.
+- **Required steps**: Base steps with `required: true` cannot be removed or bypassed.
+- **Deadline preservation**: Overlays cannot extend statutory deadlines beyond base defaults.
+- **Data policy**: Steps touching PII must declare `policy.lawful_basis` & `retention`.
+- **Portal-only sites**: If a third-party portal has no write API, automation must be `manual + signal` (no headless scraping).
+- **Secrets**: Steps may reference secret aliases only; real secrets are resolved server-side from tenant vault.
 
-## 6. CLI (`fc-pack`)
+---
+
+## 8) Temporal & External Automation
+
+- **Temporal**: per-tenant task queues (e.g., `tenant-${tenantId}-main`). The step defines `workflow`/`taskQueue`. Our orchestrator package starts/queries/signals and writes status back to Postgres. Temporal UI is ops-only.
+- **External**: signed webhook (HMAC-SHA256) with idempotency keys; retries with exponential backoff; response schema validated.
+
+---
+
+## 9) Admin UX (apps/admin)
+
+- **Packs**: upload, validate, preview Impact Map, enable/disable per tenant.
+- **Conflicts**: three-way diff resolver; store resolved overlay variant; changelog.
+- **Policy results**: lints must pass before enable.
+- **Audit**: every action stored in `admin_actions` + diff snapshot.
+
+---
+
+## 10) Data Model Additions
 
 ```
-Usage: fc-pack <command> [options]
-
-Commands:
-  validate <packDir> --workflow <path>   Validate pack against workflow
-  impact <packDir> --workflow <path>     Show impact map after merge
-  checksum <packDir>                     Print SHA-256 checksum for signing
+workflow_packs(id, name, publisher, marketplace boolean, created_at)
+workflow_pack_versions(id, pack_id, version, manifest_json, overlay_json, checksum, created_at)
+workflow_pack_installs(id, pack_version_id, tenant_org_id, enabled boolean, created_at, disabled_at)
+workflow_overlays_resolved(id, run_id, pack_version_id, resolved_overlay_json, created_at)
 ```
 
-The CLI uses `tsx` so it runs directly against TypeScript sources. Admin automation can integrate it into CI or upload pipelines.
+- Extend `workflow_runs` with `merged_workflow_snapshot jsonb` for immutability.
+- Extend `steps` with `execution_mode text`, `orchestration_workflow_id text` (if temporal), `permissions text[]`.
 
-## 7. Runtime Expectations
+**RLS:** Only tenant admins and platform admins can install/enable packs for that tenant.
 
-* Portal resolves overlays at run start via `mergeWorkflowWithPacks`.
-* Temporal orchestrator reads `execution.taskQueue` to route jobs to tenant-specific workers.
-* External executions call signed webhooks with retries and audit logging (implementation pending).
+---
 
-## 8. Next Steps
+## 11) Developer Tooling (CLI)
 
-* Surface Impact Map + conflict resolution in Admin UI.
-* Persist merged workflows per run with audit trail entries.
-* Expand policy linting (GDPR data tags, step deadlines).
-* Add pack signing with asymmetric keys and trust anchors.
+```
+fc pack validate   # schema + policy lints + graph
+fc pack build      # bundle + checksum
+fc pack sign       # optional ed25519
+fc pack install    # POST to admin API for a tenant
+```
+
+- Simulator: `fc pack dev` spins a local preview merging base + pack + sample answers.
+
+---
+
+## 12) Observability & Audit
+
+- Correlate steps to overlays via `workflow_overlays_resolved`.
+- Structured logs include `pack_version_id`, `tenant_org_id`, `run_id`, `step_id`.
+- Expose metrics: overlay validation failures, merge conflicts, policy lint failures.
+
+---
+
+## 13) Testing & CI
+
+- **Unit:** overlay merge; required-step lint; JSON Schema validation; secret alias resolution.
+- **Integration:** portal renders a tenant temporal step and a manual step from a sample pack.
+- **E2E:** install pack → new step appears → temporal step runs on tenant queue → verify block/unblock flow.
+- **A11y/i18n:** packs may ship messages; ensure missing keys fallback to `en-IE` and log telemetry.
+
+---
+
+## 14) Security
+
+- No arbitrary code execution from tenant packs (overlay/schema/messages/templates only).
+- Marketplace packs with code run isolated workers; code review & signing mandatory.
+- All webhooks are signed; Temporal activities fetch secrets from server-side vault.
+
+---
+
+## 15) Roadmap & Enhancements
+
+- **Upgrade Wizard**: assist tenants to rebase overlays after core updates.
+- **Pack Marketplace**: vetted third-party packs with revenue share.
+- **Policy templates**: prebuilt lints per jurisdiction.
+- **Dry-run impact**: simulate overlay on real run snapshot and show affected deadlines/docs.
+
+---
+
+## 16) Acceptance Criteria (DoD)
+
+- Tenants can install a pack that adds: (a) a manual step with a JSON-schema form; (b) a temporal step using a tenant task queue.
+- Base workflows marked `required: true` steps cannot be removed; lints block it.
+- Admin can view Impact Map, resolve conflicts, and enable the pack; all audited.
+- Portal renders merged workflow; transitions audited; i18n fallbacks work; a11y checks pass.
+- Docs updated: this spec + developer guide; example pack in `examples/packs/tenantX/`.
+
+---
+
+## 17) Example Files (starter)
+
+**`pack.yaml`**
+
+```yaml
+name: tenantx-compliance
+version: 1.2.0
+compatibleWith: [ "setup-nonprofit-ie@^2025.10" ]
+scope: ["tenant"]
+signing: sha256
+```
+
+**`overlay.patch.json`**
+
+```json
+[
+  { "op": "add", "path": "/steps/-", "value": {
+    "id": "tenantX-ml-screening",
+    "kind": "action",
+    "title_i18n": { "en-IE": "ML Screening (Tenant X)" },
+    "execution": { "mode": "temporal", "workflow": "tenantX.mlScreening", "taskQueue": "tenantX-main", "input_schema": "schemas/ml.json" },
+    "verify": [{ "rule": "ml_screening_passed" }]
+  }}
+]
+```
+
+**`schemas/ml.json`** (abridged)
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "referenceId": { "type": "string" },
+    "notes": { "type": "string", "maxLength": 500 }
+  },
+  "required": ["referenceId"]
+}
+```
+
+---
+
+**End of Workflow-Agnostic Extension Model Spec (v2025-10-03).**

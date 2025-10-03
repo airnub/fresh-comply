@@ -31,25 +31,22 @@
         "mode": { "type": "string", "enum": ["manual", "temporal", "external"] },
         "workflow": { "type": "string" },
         "taskQueue": { "type": "string" },
-        "webhook": { "type": "string", "format": "uri" },
+        "externalWebhook": { "type": "string", "format": "uri" },
         "input_schema": { "type": "string" },
-        "permissions": {
+        "secrets": {
           "type": "array",
-          "items": { "type": "string" }
-        },
-        "secret_aliases": {
-          "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "uniqueItems": true
         }
       },
       "allOf": [
         {
           "if": { "properties": { "mode": { "const": "temporal" } } },
-          "then": { "required": ["workflow", "taskQueue"] }
+          "then": { "required": ["workflow"] }
         },
         {
           "if": { "properties": { "mode": { "const": "external" } } },
-          "then": { "required": ["webhook"] }
+          "then": { "required": ["externalWebhook"] }
         }
       ]
     },
@@ -84,6 +81,11 @@
         },
         "execution": { "$ref": "#/definitions/Execution" },
         "required": { "type": "boolean" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
         "requires": {
           "type": "array",
           "items": { "type": "string" },
@@ -106,7 +108,32 @@
             }
           }
         },
+        "policy": { "$ref": "#/definitions/StepPolicy" },
         "metadata": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "StepPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lawful_basis": {
+          "type": "string",
+          "enum": ["contract", "legal_obligation", "legitimate_interest", "consent"]
+        },
+        "retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entity", "duration"],
+          "properties": {
+            "entity": { "type": "string" },
+            "duration": { "type": "string" }
+          }
+        },
+        "pii": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
       }
     },
     "WorkflowEdge": {

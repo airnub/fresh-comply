@@ -11,13 +11,15 @@ export interface WorkflowPackManifest {
   name: string;
   version: string;
   description?: string;
-  compatibleWithWorkflow: string | string[];
-  scopes?: string[];
+  compatibleWith?: string | string[];
+  scope?: string[];
+  signing?: string;
+  features?: string[];
   overlays: Array<{
     workflow: string;
     patch: string;
   }>;
-  i18n?: Record<string, string>;
+  messages?: Record<string, string>;
   docs?: string[];
 }
 
