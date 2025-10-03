@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Database } from "@airnub/types/supabase";
 import {
   getSupabaseClient,
   SupabaseConfigurationError
@@ -31,10 +32,17 @@ function formatRpcError(error: { message: string; code?: string; details?: strin
   );
 }
 
+type TenantDomainRow = Database["public"]["Tables"]["tenant_domains"]["Row"];
+type DomainMutationPayload = Partial<
+  Database["public"]["Functions"]["rpc_upsert_tenant_domain"]["Returns"]
+> & {
+  removed?: boolean | null;
+};
+
 function extractRpcResult(data: unknown) {
-  const payload = (data ?? {}) as Record<string, unknown>;
+  const payload = (data ?? {}) as DomainMutationPayload;
   return {
-    domain: payload.domain ?? null,
+    domain: (payload.domain ?? null) as TenantDomainRow | null,
     audit: payload.audit_entry ?? null,
     removed: payload.removed ?? null
   };
