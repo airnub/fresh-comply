@@ -9,6 +9,11 @@
     "./dsr": "./src/dsr.ts",
     "./ics": "./src/ics.ts",
     "./supabase-service": "./src/supabase-service.ts",
+    "./security-headers": "./src/security-headers.ts",
+    "./telemetry": "./src/telemetry.ts",
     "./index": "./src/index.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0"
   }
 }

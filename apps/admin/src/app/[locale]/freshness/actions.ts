@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient, getSupabaseUser, SupabaseConfigurationError } from "../../../lib/auth/supabase-ssr";
+import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
 
 type ModerationResult = { ok: boolean; error?: string };
 
@@ -21,69 +22,91 @@ async function resolveContext() {
 }
 
 export async function approvePendingUpdate(id: string, reason: string): Promise<ModerationResult> {
-  const context = await resolveContext();
-  const now = new Date().toISOString();
-  if (!context) {
-    return { ok: true };
-  }
-
-  const { client, user } = context;
-  const { data, error } = await client
-    .from("freshness_pending_updates")
-    .update({
-      status: "approved",
-      approval_reason: reason,
-      rejection_reason: null,
-      approved_by_user_id: user?.id ?? null,
-      verified_at: now,
-      updated_at: now
-    })
-    .eq("id", id)
-    .select("workflow_keys, source_key, current_snapshot_id")
-    .maybeSingle();
-
-  if (error) {
-    console.error("Unable to approve freshness update", error);
-    return { ok: false, error: error.message };
-  }
-
-  if (data?.workflow_keys?.length) {
-    await bumpWorkflowVersions(client, data.workflow_keys);
-    if (data.source_key === "funding_radar" && data.current_snapshot_id) {
-      await linkFundingOpportunitiesToWorkflows(client, data.current_snapshot_id, data.workflow_keys);
+  return withTelemetrySpan("action.freshness.approve", {
+    attributes: {
+      "freshcomply.action": "freshness.update.approve"
     }
-  }
+  }, async (span) => {
+    annotateSpan(span, { attributes: { "freshcomply.freshness.update_id": id } });
 
-  revalidatePath("/", "layout");
-  return { ok: true };
+    const context = await resolveContext();
+    const now = new Date().toISOString();
+    if (!context) {
+      span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
+      return { ok: true };
+    }
+
+    const { client, user } = context;
+    const { data, error } = await client
+      .from("freshness_pending_updates")
+      .update({
+        status: "approved",
+        approval_reason: reason,
+        rejection_reason: null,
+        approved_by_user_id: user?.id ?? null,
+        verified_at: now,
+        updated_at: now
+      })
+      .eq("id", id)
+      .select("workflow_keys, source_key, current_snapshot_id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Unable to approve freshness update", error);
+      span.setAttribute("freshcomply.action.outcome", "update_failed");
+      return { ok: false, error: error.message };
+    }
+
+    if (data?.workflow_keys?.length) {
+      await bumpWorkflowVersions(client, data.workflow_keys);
+      if (data.source_key === "funding_radar" && data.current_snapshot_id) {
+        await linkFundingOpportunitiesToWorkflows(client, data.current_snapshot_id, data.workflow_keys);
+      }
+    }
+
+    revalidatePath("/", "layout");
+    span.setAttribute("freshcomply.action.outcome", "success");
+    return { ok: true };
+  });
 }
 
 export async function rejectPendingUpdate(id: string, reason: string): Promise<ModerationResult> {
-  const context = await resolveContext();
-  const now = new Date().toISOString();
-  if (!context) {
+  return withTelemetrySpan("action.freshness.reject", {
+    attributes: {
+      "freshcomply.action": "freshness.update.reject"
+    }
+  }, async (span) => {
+    annotateSpan(span, { attributes: { "freshcomply.freshness.update_id": id } });
+
+    const context = await resolveContext();
+    const now = new Date().toISOString();
+    if (!context) {
+      span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
+      return { ok: true };
+    }
+
+    const { client, user } = context;
+    const { error } = await client
+      .from("freshness_pending_updates")
+      .update({
+        status: "rejected",
+        rejection_reason: reason,
+        approval_reason: null,
+        approved_by_user_id: user?.id ?? null,
+        updated_at: now
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Unable to reject freshness update", error);
+      span.setAttribute("freshcomply.action.outcome", "update_failed");
+      return { ok: false, error: error.message };
+    }
+
+    revalidatePath("/", "layout");
+    span.setAttribute("freshcomply.action.outcome", "success");
     return { ok: true };
-  }
-
-  const { client, user } = context;
-  const { error } = await client
-    .from("freshness_pending_updates")
-    .update({
-      status: "rejected",
-      rejection_reason: reason,
-      approval_reason: null,
-      approved_by_user_id: user?.id ?? null,
-      updated_at: now
-    })
-    .eq("id", id);
-
-  if (error) {
-    console.error("Unable to reject freshness update", error);
-    return { ok: false, error: error.message };
-  }
-
-  revalidatePath("/", "layout");
-  return { ok: true };
+  });
 }
 
 async function bumpWorkflowVersions(client: ReturnType<typeof getSupabaseClient>, workflowKeys: string[]) {

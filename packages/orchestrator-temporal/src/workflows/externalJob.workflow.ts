@@ -142,9 +142,11 @@ export async function externalJobWorkflow(
   const watchers: Array<Promise<void>> = [];
 
   if (ingressConfig?.timeoutSeconds && ingressConfig.timeoutSeconds > 0) {
+    const timeoutSeconds = ingressConfig.timeoutSeconds;
+    const escalateReason = ingressConfig.escalateReason ?? "ingress_timeout";
     watchers.push(
       (async () => {
-        await sleep(ingressConfig.timeoutSeconds * 1000);
+        await sleep(timeoutSeconds * 1000);
         if (callbackPayload) {
           return;
         }
@@ -152,9 +154,9 @@ export async function externalJobWorkflow(
           orgId: input.orgId,
           runId: input.runId,
           stepKey: input.stepKey,
-          reason: ingressConfig.escalateReason ?? "ingress_timeout",
+          reason: escalateReason,
           metadata: {
-            timeoutSeconds: ingressConfig.timeoutSeconds,
+            timeoutSeconds,
             externalRef,
             runId: input.runId,
             stepKey: input.stepKey

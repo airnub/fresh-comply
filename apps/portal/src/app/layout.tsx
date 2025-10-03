@@ -1,6 +1,7 @@
 import "@radix-ui/themes/styles.css";
 import "./globals.css";
 import type { ReactNode } from "react";
+import { getCspNonce } from "../lib/csp";
 
 export const metadata = {
   title: "FreshComply Portal",
@@ -8,9 +9,11 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const nonce = getCspNonce();
+
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body data-csp-nonce={nonce ?? undefined}>
         {children}
       </body>
     </html>
