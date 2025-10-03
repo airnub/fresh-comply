@@ -14,7 +14,8 @@ const navigation = [
   { href: "/freshness", messageKey: "freshness" },
   { href: "/orgs", messageKey: "orgs" },
   { href: "/dsr", messageKey: "dsr" },
-  { href: "/cases", messageKey: "cases" }
+  { href: "/cases", messageKey: "cases" },
+  { href: "/step-types", messageKey: "stepTypes" }
 ] as const;
 
 export function generateStaticParams() {

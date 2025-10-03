@@ -127,5 +127,59 @@
     "redirect": "After sign-in you'll be sent to {destination}.",
     "error": "We couldn't send the link. Please try again.",
     "supabaseUnavailable": "Supabase configuration is missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable sign-in."
+  },
+  "overlayBuilder": {
+    "heading": "Tenant overlay builder",
+    "description": "Compose JSON Patch overlays with registry-backed steps and preview impact before publishing.",
+    "base": {
+      "heading": "Base workflow",
+      "hint": "These are the core steps before tenant overlays are applied.",
+      "optional": "Optional base step"
+    },
+    "add": {
+      "heading": "Add registry step",
+      "hint": "Select an approved step type, provide input defaults, and bind secret aliases.",
+      "stepType": "Step type",
+      "input": "Input JSON",
+      "inputPlaceholder": "{ } // JSON payload for the step",
+      "secret": "Secret alias",
+      "secretPlaceholder": "Select alias (optional)"
+    },
+    "actions": {
+      "insert": "Insert step",
+      "reset": "Clear overlay",
+      "persist": "Persist overlay snapshot"
+    },
+    "operations": {
+      "heading": "Overlay operations (JSON Patch)"
+    },
+    "overlay": {
+      "heading": "Overlay impact",
+      "hint": "Review step additions/removals before publishing.",
+      "count": "{count, plural, one {# overlay operation} other {# overlay operations}}",
+      "added": "Added steps",
+      "removed": "Removed steps"
+    },
+    "messages": {
+      "persistSuccess": "Overlay snapshot queued for persistence.",
+      "persistError": "Unable to persist overlay snapshot.",
+      "mergeError": "Overlay merge failed",
+      "secretRequired": "Select a secret alias before inserting this step.",
+      "secretUnavailable": "No eligible secret bindings are available for this step type."
+    },
+    "stepTypes": {
+      "manualReview": {
+        "title": "Manual review (dual control)",
+        "summary": "Collect reviewer notes and capture evidence before approving the step."
+      },
+      "temporalWebhook": {
+        "title": "Temporal webhook bridge",
+        "summary": "Trigger a tenant-specific Temporal workflow via signed webhook requests."
+      }
+    },
+    "secrets": {
+      "crmApiToken": "CRM API token resolved at runtime.",
+      "temporalQueue": "Temporal task queue signing key stored in vault."
+    }
   }
 }

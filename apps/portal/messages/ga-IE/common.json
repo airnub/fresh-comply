@@ -127,5 +127,59 @@
     "redirect": "Tar éis duit síniú isteach seolfar tú go {destination}.",
     "error": "Níor éirigh linn an nasc a sheoladh. Bain triail eile as.",
     "supabaseUnavailable": "Tá cumraíocht Supabase ar iarraidh. Socraigh NEXT_PUBLIC_SUPABASE_URL agus NEXT_PUBLIC_SUPABASE_ANON_KEY chun an síniú isteach a chumasú."
+  },
+  "overlayBuilder": {
+    "heading": "Tógálaí forleagain tionant",
+    "description": "Cum forleagain JSON Patch le céimeanna ón gclárlann agus féach ar an tionchar roimh fhoilsiú.",
+    "base": {
+      "heading": "Sreabhadh bunúsach",
+      "hint": "Seo iad na céimeanna croí sula gcuirtear forleagain tionant i bhfeidhm.",
+      "optional": "Céim bhunúsach roghnach"
+    },
+    "add": {
+      "heading": "Cuir céim ón gclárlann leis",
+      "hint": "Roghnaigh cineál céime formheasta, soláthair ionchuir réamhshocraithe, agus ceangail ailiasanna rúin.",
+      "stepType": "Cineál céime",
+      "input": "JSON ionchuir",
+      "inputPlaceholder": "{ } // Lódál JSON don chéim",
+      "secret": "Ailias rúin",
+      "secretPlaceholder": "Roghnaigh ailias (roghnach)"
+    },
+    "actions": {
+      "insert": "Cuir céim isteach",
+      "reset": "Glan forleagan",
+      "persist": "Seachad snapshot forleagain"
+    },
+    "operations": {
+      "heading": "Oibríochtaí forleagain (JSON Patch)"
+    },
+    "overlay": {
+      "heading": "Tionchar an fhorleagain",
+      "hint": "Athbhreithnigh céimeanna curtha leis nó bainte sula bhfoilseofar.",
+      "count": "{count, plural, one {# oibríocht forleagain} other {# oibríochtaí forleagain}}",
+      "added": "Céimeanna curtha leis",
+      "removed": "Céimeanna bainte"
+    },
+    "messages": {
+      "persistSuccess": "Cuireadh snapshot forleagain i scuaine le sábháil.",
+      "persistError": "Níor éirigh le snapshot forleagain a shábháil.",
+      "mergeError": "Theip ar chumasc forleagain",
+      "secretRequired": "Roghnaigh ailias rúin sula gcuirtear an chéim seo isteach.",
+      "secretUnavailable": "Níl aon cheangail rúin oiriúnacha ar fáil don chineál céime seo."
+    },
+    "stepTypes": {
+      "manualReview": {
+        "title": "Athbhreithniú láimhe (rialú dúbailte)",
+        "summary": "Bailigh nótaí athbhreithnitheora agus fianaise sula gceadaítear an chéim."
+      },
+      "temporalWebhook": {
+        "title": "Droichead webhook Temporal",
+        "summary": "Cuir sreabhadh Temporal an tionant ar siúl trí iarrataí webhook sínithe."
+      }
+    },
+    "secrets": {
+      "crmApiToken": "Comhartha API CRM réitithe ag am rith.",
+      "temporalQueue": "Eochair scuaine tasc Temporal stóráilte sa stór rúin."
+    }
   }
 }

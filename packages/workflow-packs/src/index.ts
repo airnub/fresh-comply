@@ -199,6 +199,34 @@ function ensureSchemaReferences(pack: WorkflowPack, workflow: WorkflowDefinition
   return errors;
 }
 
+function ensureAliasOnlySecrets(workflow: WorkflowDefinition): string[] {
+  const errors: string[] = [];
+  for (const step of workflow.steps) {
+    const metadata = step.metadata as Record<string, unknown> | undefined;
+    const secrets =
+      (metadata && typeof metadata === "object" && "secrets" in metadata
+        ? (((metadata as Record<string, unknown>).secrets as Record<string, { alias?: string; value?: unknown }> | undefined))
+        : undefined) ?? {};
+
+    for (const [key, binding] of Object.entries(secrets)) {
+      if (!binding || typeof binding !== "object") {
+        errors.push(`Step ${step.id} secret ${key} must reference an alias object.`);
+        continue;
+      }
+
+      if ("value" in binding && binding.value !== undefined) {
+        errors.push(`Step ${step.id} secret ${key} must not embed raw secret material.`);
+      }
+
+      if (typeof binding.alias !== "string" || binding.alias.trim().length === 0) {
+        errors.push(`Step ${step.id} secret ${key} must provide a non-empty alias.`);
+      }
+    }
+  }
+
+  return errors;
+}
+
 export function mergeWorkflowWithPack(
   base: WorkflowDefinition,
   pack: WorkflowPack
@@ -222,9 +250,10 @@ export function mergeWorkflowWithPack(
   const graphIssues = validateGraph(next);
   const requiredIssues = ensureRequiredStepsRemain(base, next);
   const schemaIssues = ensureSchemaReferences(pack, next);
+  const secretIssues = ensureAliasOnlySecrets(next);
 
   const warnings = [...graphIssues, ...schemaIssues];
-  const errors = [...requiredIssues, ...(validation.valid ? [] : validation.errors)];
+  const errors = [...requiredIssues, ...secretIssues, ...(validation.valid ? [] : validation.errors)];
 
   if (errors.length > 0) {
     throw new WorkflowPackError(errors.join("\n"));
@@ -232,6 +261,7 @@ export function mergeWorkflowWithPack(
 
   return {
     workflow: next,
+    snapshot: cloneWorkflow(next),
     impactMap: diffSteps(base, next),
     warnings
   };
@@ -241,11 +271,17 @@ export function mergeWorkflowWithPacks(
   base: WorkflowDefinition,
   packs: WorkflowPack[]
 ): MergeResult {
-  let result: MergeResult = { workflow: cloneWorkflow(base), impactMap: { addedSteps: [], removedSteps: [], changedSteps: [] }, warnings: [] };
+  let result: MergeResult = {
+    workflow: cloneWorkflow(base),
+    snapshot: cloneWorkflow(base),
+    impactMap: { addedSteps: [], removedSteps: [], changedSteps: [] },
+    warnings: []
+  };
   for (const pack of packs) {
     const merge = mergeWorkflowWithPack(result.workflow, pack);
     result = {
       workflow: merge.workflow,
+      snapshot: merge.snapshot,
       impactMap: {
         addedSteps: [...new Set([...result.impactMap.addedSteps, ...merge.impactMap.addedSteps])],
         removedSteps: [...new Set([...result.impactMap.removedSteps, ...merge.impactMap.removedSteps])],
