@@ -1,4 +1,5 @@
 import { renderBoardMinutes } from "@airnub/doc-templates/index";
+import type { DocumentBrandingMetadata } from "@airnub/doc-templates/index";
 import { persistStepProgress, type StepActivityContext } from "./util.js";
 import { withTelemetrySpan } from "@airnub/utils/telemetry";
 
@@ -7,6 +8,7 @@ export type PackBuildInput = StepActivityContext & {
   meetingDate: string;
   meetingTime: string;
   meetingLocation: string;
+  branding?: DocumentBrandingMetadata;
 };
 
 export type PackBuildResult = {
@@ -26,12 +28,15 @@ export async function buildA1Pack(
       "freshcomply.temporal.activity": "buildA1Pack"
     }
   }, async () => {
-    const minutes = renderBoardMinutes({
-      orgName: input.orgName,
-      date: input.meetingDate,
-      time: input.meetingTime,
-      location: input.meetingLocation
-    });
+    const minutes = renderBoardMinutes(
+      {
+        orgName: input.orgName,
+        date: input.meetingDate,
+        time: input.meetingTime,
+        location: input.meetingLocation
+      },
+      { branding: input.branding }
+    );
     const basePath = `supabase://documents/${input.runId}/${input.stepKey}`;
     const checksum = minutes.checksum;
     const markdownPath = `${basePath}/${minutes.filename}`;

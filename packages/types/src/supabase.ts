@@ -592,6 +592,91 @@ export type Database = {
           }
         ];
       };
+      tenant_branding: {
+        Row: {
+          tenant_org_id: string;
+          tokens: Json;
+          logo_url: string | null;
+          favicon_url: string | null;
+          typography: Json;
+          pdf_header: Json;
+          pdf_footer: Json;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          tenant_org_id: string;
+          tokens?: Json;
+          logo_url?: string | null;
+          favicon_url?: string | null;
+          typography?: Json;
+          pdf_header?: Json;
+          pdf_footer?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          tenant_org_id?: string;
+          tokens?: Json;
+          logo_url?: string | null;
+          favicon_url?: string | null;
+          typography?: Json;
+          pdf_header?: Json;
+          pdf_footer?: Json;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_branding_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: true;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      tenant_domains: {
+        Row: {
+          id: string;
+          tenant_org_id: string;
+          domain: string;
+          is_primary: boolean;
+          verified_at: string | null;
+          cert_status: "pending" | "provisioning" | "issued" | "failed" | "revoked";
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_org_id: string;
+          domain: string;
+          is_primary?: boolean;
+          verified_at?: string | null;
+          cert_status?: "pending" | "provisioning" | "issued" | "failed" | "revoked";
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_org_id?: string;
+          domain?: string;
+          is_primary?: boolean;
+          verified_at?: string | null;
+          cert_status?: "pending" | "provisioning" | "issued" | "failed" | "revoked";
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_domains_tenant_org_id_fkey";
+            columns: ["tenant_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       tenant_step_type_installs: {
         Row: {
           id: string;
@@ -1418,6 +1503,12 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      assert_tenant_membership: {
+        Args: {
+          target_tenant: string;
+        };
+        Returns: undefined;
+      };
       can_access_run: {
         Args: {
           target_run_id: string;
@@ -1429,6 +1520,68 @@ export type Database = {
           target_org_id: string;
         };
         Returns: boolean;
+      };
+      normalize_domain: {
+        Args: {
+          host: string;
+        };
+        Returns: string;
+      };
+      resolve_tenant_branding: {
+        Args: {
+          p_host: string;
+        };
+        Returns: {
+          tenant_org_id: string;
+          domain: string;
+          tokens: Json;
+          logo_url: string | null;
+          favicon_url: string | null;
+          typography: Json;
+          pdf_header: Json;
+          pdf_footer: Json;
+          updated_at: string | null;
+        }[];
+      };
+      rpc_delete_tenant_domain: {
+        Args: {
+          p_domain_id: string;
+        };
+        Returns: boolean;
+      };
+      rpc_get_tenant_branding: {
+        Args: {
+          p_tenant_org_id: string;
+        };
+        Returns: Database["public"]["Tables"]["tenant_branding"]["Row"] | null;
+      };
+      rpc_mark_tenant_domain_verified: {
+        Args: {
+          p_domain_id: string;
+          p_cert_status: string;
+          p_verified_at?: string;
+        };
+        Returns: Database["public"]["Tables"]["tenant_domains"]["Row"] | null;
+      };
+      rpc_upsert_tenant_branding: {
+        Args: {
+          p_tenant_org_id: string;
+          p_tokens: Json;
+          p_logo_url: string | null;
+          p_favicon_url: string | null;
+          p_typography: Json;
+          p_pdf_header: Json;
+          p_pdf_footer: Json;
+        };
+        Returns: Database["public"]["Tables"]["tenant_branding"]["Row"];
+      };
+      rpc_upsert_tenant_domain: {
+        Args: {
+          p_tenant_org_id: string;
+          p_domain: string;
+          p_is_primary?: boolean;
+        };
+        Returns: Database["public"]["Tables"]["tenant_domains"]["Row"];
       };
     };
     Enums: {

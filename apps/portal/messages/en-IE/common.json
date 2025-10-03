@@ -237,5 +237,63 @@
     "callType": "Call type",
     "metadata": "{domain, select, other {{domain}}} {county, select, other {· {county}}}",
     "loadError": "Funding data unavailable right now. Please try again soon."
+  },
+  "partnerAdmin": {
+    "title": "Partner admin",
+    "description": "Manage white-label branding and domains for this tenant.",
+    "nav": {
+      "branding": "Branding",
+      "domains": "Domains"
+    },
+    "branding": {
+      "heading": "Brand & theme",
+      "intro": "Configure tenant logos, colours, and typography applied across the portal and exported documents.",
+      "lastUpdated": "Last updated {date, date, medium}",
+      "fields": {
+        "logoUrl": "Logo URL",
+        "faviconUrl": "Favicon URL",
+        "primaryColor": "Primary colour",
+        "accentColor": "Accent colour",
+        "headerText": "Header text",
+        "footerText": "Portal footer text",
+        "bodyFont": "Body font family",
+        "headingFont": "Heading font family",
+        "pdfFooterText": "PDF footer note"
+      },
+      "actions": {
+        "save": "Save branding",
+        "saving": "Saving…"
+      },
+      "messages": {
+        "success": "Branding updated for this tenant.",
+        "error": "Unable to update branding."
+      }
+    },
+    "domains": {
+      "heading": "Custom domains",
+      "intro": "Manage tenant domains, track certificate status, and control the primary host.",
+      "fields": {
+        "domain": "Domain"
+      },
+      "table": {
+        "status": "Status",
+        "verifiedAt": "Verified at",
+        "actions": "Actions"
+      },
+      "actions": {
+        "add": "Add domain",
+        "verify": "Mark verified",
+        "setPrimary": "Set as primary",
+        "remove": "Remove"
+      },
+      "messages": {
+        "added": "Domain saved.",
+        "verified": "Domain verification marked complete.",
+        "removed": "Domain removed.",
+        "error": "Unable to manage domains right now.",
+        "empty": "No domains configured yet.",
+        "primary": "Primary domain updated."
+      }
+    }
   }
 }
