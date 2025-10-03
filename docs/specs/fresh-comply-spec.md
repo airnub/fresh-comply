@@ -61,6 +61,33 @@
 * **RLS policy:** A **WorkflowRun** is owned by **subject_org_id** (Company X) and is visible to its members and to Engagement members of **engager_org_id** (Company A) when Engagement is **active** and scoped to the run.
 * **Audit:** All actions record `{ actor_user_id, actor_org_id, on_behalf_of_org_id }`.
 
+### 3A) Platform Schema & RLS Hardening
+
+To guarantee tenant isolation while still enabling platform-wide registries, all multi-tenant data now lives in the `public`
+schema with strict row-level security (RLS) and **non-null** tenant keys. Platform-owned registries live in the dedicated
+`platform` schema and are only writable by privileged workers or the Admin app using the Supabase service-role key.
+
+* **Core tables:**
+  * `orgs` (tenant metadata, replacing `organisations`), `org_memberships` (membership + role), `workflow_defs`
+    (tenant-scoped definitions), `workflow_lockfiles`, and `workflow_lock_adoptions`.
+  * Platform registries: `platform.rule_sources`, `platform.rule_packs`, `platform.rule_pack_detections`, and
+    `platform.rule_pack_proposals`.
+* **Helper functions:** Schema `app` exposes `current_user_id()`, `default_org_id()`, `set_org_id(org_id)` trigger helper,
+  `is_org_member(target_org_id uuid)` and `is_platform_admin()` (reads `auth.jwt()->>'role' = 'platform_admin'`).
+* **Policies:**
+  * `orgs`: `SELECT` limited to members via `is_org_member(id)` or platform admins; `INSERT/UPDATE` allowed to owners/admins
+    only.
+  * `org_memberships`: members can read their own rows; writes require owner/admin within the org or a platform admin.
+  * `workflow_defs`: `SELECT/INSERT/UPDATE/DELETE` allowed when `is_org_member(org_id)` is true or when JWT role resolves to
+    platform admin.
+  * `platform.*` tables are readable through server RPCs but **never** writable from browser clients.
+* **Indexes:** Every tenant table uses leading `(org_id, …)` indexes (e.g., `create index on workflow_defs(org_id, key)`)
+  to match RLS predicates and avoid sequential scans.
+* **Backfill & migrations:** Legacy records with `NULL` tenant/org fields are migrated either by inferring the org from
+  related rows or by moving the row into the `platform` schema where appropriate.
+* **Service role guidance:** Only backend services (Admin app API routes, cron workers, Temporal activities) use the
+  Supabase service role key. Browser clients rely on end-user JWTs and therefore always pass through RLS.
+
 ---
 
 ## 4) Workflow DSL & Runtime
@@ -231,6 +258,26 @@ Tables: organisations, users, memberships, engagements, workflow_defs, workflow_
 * **Watchers:** cron jobs fetch → diff (including CRO company profiles + next ARD); on change produce **Impact Map** (rules/steps/templates affected); human review; publish **workflow_def.version+1**.
 * **UI:** Every rule shows **Verified on {date}** + **Re‑verify** button.
 * **Audit:** store verification events with source snapshot hashes.
+
+### 14A) Freshness Lockfile Lifecycle
+
+The Freshness Engine now issues an immutable lockfile every time a workflow definition is created or a run is instantiated.
+The lockfile pins the exact `platform.rule_pack` version plus source digests so that downstream executions remain stable until
+an operator explicitly adopts a newer pack.
+
+1. **Capture:** On workflow creation/run, backend writes to `workflow_lockfiles` including `{ org_id, workflow_def_id,
+   rule_pack_id, rule_pack_version, source_hashes, captured_at }`.
+2. **Watchers:** Temporal cron tasks recompute content hashes for `platform.rule_sources`. Diffs create
+   `platform.rule_pack_detections` referencing impacted packs and generate `platform.rule_pack_proposals` containing a proposed
+   semver bump and changelog.
+3. **Moderation:** Admin app lists proposals with context diffs, allowing `platform_admin` to approve. Approval publishes a new
+   row in `platform.rule_packs` and closes the proposal/detection.
+4. **Tenant awareness:** When a tenant’s active lockfile references an older rule pack, portal surfaces a **Preview changes →
+   Adopt** banner. Preview view compares old vs new pack metadata and highlights impacted steps/templates.
+5. **Adoption:** Accepting the update writes to `workflow_lock_adoptions` (with `{ actor_user_id, adopted_at, from_version,
+   to_version, strategy }`) and runs a DSL-aware migration routine that updates stored step schemas safely.
+6. **Testing:** Unit tests ensure lockfiles persist the exact `rule_pack_version` at run time and stay unchanged after newer
+   packs are published.
 
 ---
 
