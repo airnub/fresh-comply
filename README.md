@@ -28,3 +28,15 @@ pnpm run dev:stack     # temporal + deps (if needed)
 pnpm run dev:worker    # temporal worker (if using Temporal features)
 pnpm run dev:admin     # admin app on :3100
 ```
+
+## Repository Audit
+
+Generate a compliance-oriented snapshot of the monorepo's configuration, docs, and APIs:
+
+```bash
+pnpm audit
+# or
+pnpm tsx scripts/audit.ts
+```
+
+The command prints a summary table to the console and writes both JSON and Markdown reports under `reports/` with timestamped filenames.
