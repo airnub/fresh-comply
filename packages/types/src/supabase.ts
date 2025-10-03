@@ -2331,7 +2331,10 @@ export type Database = {
           p_domain: string;
           p_is_primary?: boolean;
         };
-        Returns: Json;
+        Returns: {
+          domain: Database["public"]["Tables"]["tenant_domains"]["Row"];
+          audit_entry: Json | null;
+        };
       };
     };
     Enums: {
