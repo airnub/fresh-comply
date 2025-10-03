@@ -9,6 +9,7 @@ declare
   user_two constant uuid := '00000000-0000-0000-0000-000000000902';
   v_source_id uuid;
   v_change_event_id uuid;
+  v_platform_source_id uuid;
   v_moderation_id uuid;
   v_adoption_id uuid;
   v_count integer;
@@ -37,6 +38,10 @@ begin
   insert into source_registry (tenant_org_id, name, url, parser, jurisdiction, category)
   values (tenant_one, 'CRO Guidance', 'https://example.test/cro', 'html', 'ie', 'cro')
   returning id into v_source_id;
+
+  insert into source_registry (tenant_org_id, name, url, parser, jurisdiction, category)
+  values (null, 'Platform CRO Guidance', 'https://example.test/platform-cro', 'html', 'ie', 'platform')
+  returning id into v_platform_source_id;
 
   insert into source_snapshot (tenant_org_id, source_id, content_hash, parsed_facts, storage_ref)
   values (tenant_one, v_source_id, 'hash-1', '{"facts":[]}'::jsonb, 's3://bucket/object');
@@ -72,10 +77,31 @@ begin
   perform set_config('request.jwt.claim.sub', user_one::text, true);
   perform set_config('request.jwt.claim.tenant_org_id', tenant_one::text, true);
 
-  select count(*) into v_count from source_registry;
+  select count(*)
+  into v_count
+  from source_registry
+  where tenant_org_id = tenant_one;
   if v_count <> 1 then
     raise exception 'Tenant member should read own source registry entries';
   end if;
+
+  select count(*)
+  into v_count
+  from source_registry
+  where tenant_org_id is null;
+  if v_count <> 1 then
+    raise exception 'Tenant member should read platform-scoped source registry entries';
+  end if;
+
+  begin
+    update source_registry
+    set parser = 'xml'
+    where id = v_platform_source_id;
+    raise exception 'Tenant member should not modify platform-scoped source registry entries';
+  exception
+    when sqlstate '42501' then
+      null;
+  end;
 
   select count(*) into v_count from moderation_queue;
   if v_count <> 1 then
@@ -101,9 +127,20 @@ begin
   perform set_config('request.jwt.claim.sub', user_two::text, true);
   perform set_config('request.jwt.claim.tenant_org_id', tenant_two::text, true);
 
-  select count(*) into v_count from source_registry;
+  select count(*)
+  into v_count
+  from source_registry
+  where tenant_org_id = tenant_one;
   if v_count <> 0 then
     raise exception 'Cross-tenant read should be blocked by RLS';
+  end if;
+
+  select count(*)
+  into v_count
+  from source_registry
+  where tenant_org_id is null;
+  if v_count <> 1 then
+    raise exception 'Platform entries should be visible to all tenants';
   end if;
 
   begin

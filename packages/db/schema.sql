@@ -317,7 +317,7 @@ create table funding_opportunity_workflows (
 
 create table source_registry (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   name text not null,
   url text not null,
   parser text not null,
@@ -331,7 +331,7 @@ create index source_registry_tenant_idx on source_registry(tenant_org_id);
 
 create table source_snapshot (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   source_id uuid not null references source_registry(id) on delete cascade,
   fetched_at timestamptz not null default now(),
   content_hash text not null,
@@ -346,7 +346,7 @@ create index source_snapshot_tenant_idx on source_snapshot(tenant_org_id);
 
 create table change_event (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   source_id uuid not null references source_registry(id) on delete cascade,
   from_hash text,
   to_hash text not null,
@@ -361,7 +361,7 @@ create index change_event_tenant_idx on change_event(tenant_org_id, detected_at 
 
 create table rule_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   rule_id text not null,
   version text not null,
   logic_jsonb jsonb not null,
@@ -377,7 +377,7 @@ create index rule_versions_tenant_idx on rule_versions(tenant_org_id);
 
 create table template_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   template_id text not null,
   version text not null,
   storage_ref text not null,
@@ -392,7 +392,7 @@ create index template_versions_tenant_idx on template_versions(tenant_org_id);
 
 create table workflow_def_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   workflow_def_id uuid not null references workflow_defs(id) on delete cascade,
   version text not null,
   graph_jsonb jsonb not null,
@@ -408,7 +408,7 @@ create index workflow_def_versions_tenant_idx on workflow_def_versions(tenant_or
 
 create table workflow_pack_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   pack_id text not null,
   version text not null,
   overlay_jsonb jsonb not null,
@@ -423,7 +423,7 @@ create index workflow_pack_versions_tenant_idx on workflow_pack_versions(tenant_
 
 create table moderation_queue (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   change_event_id uuid references change_event(id) on delete set null,
   proposal jsonb not null,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'amended')),
@@ -441,7 +441,7 @@ create index moderation_queue_change_event_idx on moderation_queue(change_event_
 
 create table release_notes (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  tenant_org_id uuid references organisations(id),
   scope text not null,
   ref_id text not null,
   from_version text,
@@ -782,6 +782,7 @@ create policy "Tenant members read source registry" on source_registry
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -794,6 +795,7 @@ create policy "Tenant members read source snapshots" on source_snapshot
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -806,6 +808,7 @@ create policy "Tenant members read change events" on change_event
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -818,6 +821,7 @@ create policy "Tenant members read rule versions" on rule_versions
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -830,6 +834,7 @@ create policy "Tenant members read template versions" on template_versions
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -842,6 +847,7 @@ create policy "Tenant members read workflow def versions" on workflow_def_versio
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -854,6 +860,7 @@ create policy "Tenant members read workflow pack versions" on workflow_pack_vers
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -866,6 +873,7 @@ create policy "Tenant members view moderation queue" on moderation_queue
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
@@ -878,6 +886,7 @@ create policy "Tenant members read release notes" on release_notes
   for select
   using (
     auth.role() = 'service_role'
+    or tenant_org_id is null
     or public.is_member_of_org(tenant_org_id)
   );
 
