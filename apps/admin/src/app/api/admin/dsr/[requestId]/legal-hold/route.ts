@@ -6,7 +6,7 @@ import { requiresSecondApproval } from "../../../../../../lib/rbac";
 const schema = z.object({
   reason: z.string().min(1, "Reason code is required"),
   enabled: z.boolean(),
-  approvedBy: z.string().uuid("Second approver id must be a UUID").optional(),
+  secondActorId: z.string().uuid("Second approver id must be a UUID").optional(),
 });
 
 export async function POST(request: Request, { params }: { params: { requestId: string } }) {
@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: { requestId: 
   }
 
   const requiresSecond = requiresSecondApproval("legal_hold_toggle");
-  const secondActorId = parsed.approvedBy ?? null;
+  const secondActorId = parsed.secondActorId ?? null;
 
   if (requiresSecond && !secondActorId) {
     return NextResponse.json({ error: "Legal hold changes require a second approver" }, { status: 400 });
