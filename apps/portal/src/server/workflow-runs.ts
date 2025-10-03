@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { materialize } from "@airnub/engine/engine";
+import { maxSatisfying } from "semver";
 import type {
   MaterializeContext,
   MaterializeDataSource,
@@ -148,7 +149,7 @@ function createSupabaseMaterializeContext(
       } satisfies WorkflowOverlayVersionRecord;
     },
     async getRuleVersion(ruleId, selector) {
-      const version = resolveSelectorVersion(ruleId, selector);
+      const version = await resolveSelectorVersion(client, tenantOrgId, "rule", ruleId, selector);
       const { data: row, error } = await client
         .from("rule_versions")
         .select("id, rule_id, version, checksum, sources")
@@ -172,7 +173,7 @@ function createSupabaseMaterializeContext(
       } satisfies RuleVersionRecord;
     },
     async getTemplateVersion(templateId, selector) {
-      const version = resolveSelectorVersion(templateId, selector);
+      const version = await resolveSelectorVersion(client, tenantOrgId, "template", templateId, selector);
       const { data: row, error } = await client
         .from("template_versions")
         .select("id, template_id, version, checksum")
@@ -218,12 +219,57 @@ function normaliseSelectors(value: unknown): Record<string, RuleVersionSelector 
   }, {});
 }
 
-function resolveSelectorVersion(id: string, selector: RuleVersionSelector | TemplateVersionSelector): string {
+async function resolveSelectorVersion(
+  client: SupabaseClient<Database>,
+  tenantOrgId: string,
+  kind: "rule" | "template",
+  id: string,
+  selector: RuleVersionSelector | TemplateVersionSelector
+): Promise<string> {
   if (typeof selector === "string") {
     return selector;
   }
-  if (selector && typeof selector === "object" && typeof selector.version === "string") {
-    return selector.version;
+  if (selector && typeof selector === "object") {
+    if (typeof selector.version === "string") {
+      return selector.version;
+    }
+    if (typeof selector.range === "string") {
+      if (kind === "rule") {
+        const { data, error } = await client
+          .from("rule_versions")
+          .select("version")
+          .eq("tenant_org_id", tenantOrgId)
+          .eq("rule_id", id);
+        if (error) {
+          throw new Error(`Unable to load rule versions for ${id}: ${error.message}`);
+        }
+        const candidates = (data ?? [])
+          .map((row) => row.version)
+          .filter((value): value is string => typeof value === "string");
+        const resolved = maxSatisfying(candidates, selector.range, { includePrerelease: true });
+        if (!resolved) {
+          throw new Error(`No rule version for ${id} satisfies range ${selector.range}`);
+        }
+        return resolved;
+      }
+
+      const { data, error } = await client
+        .from("template_versions")
+        .select("version")
+        .eq("tenant_org_id", tenantOrgId)
+        .eq("template_id", id);
+      if (error) {
+        throw new Error(`Unable to load template versions for ${id}: ${error.message}`);
+      }
+      const candidates = (data ?? [])
+        .map((row) => row.version)
+        .filter((value): value is string => typeof value === "string");
+      const resolved = maxSatisfying(candidates, selector.range, { includePrerelease: true });
+      if (!resolved) {
+        throw new Error(`No template version for ${id} satisfies range ${selector.range}`);
+      }
+      return resolved;
+    }
   }
   throw new Error(`Unsupported version selector for ${id}`);
 }
