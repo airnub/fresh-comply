@@ -1,5 +1,5 @@
 {
-  "name": "airnub-site codespace",
+  "name": "fresh-comply codespace",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
@@ -13,15 +13,16 @@
   "hostRequirements": { "cpus": 2, "memory": "4gb", "storage": "16gb" },
 
   "containerEnv": {
-    "PNPM_HOME": "/home/node/.pnpm",
-    "PATH": "${containerEnv:PATH}:/home/node/.pnpm",
-    "AUTO_START_SUPABASE": "false",
+    "PNPM_HOME": "/home/vscode/.local/share/pnpm",
+    "PATH": "${containerEnv:PATH}:/home/vscode/.local/share/pnpm",
+    "PNPM_STORE_PATH": "/home/vscode/.pnpm-store",
+    "AUTO_START_SUPABASE": "true",
     "SUPABASE_VERSION": "latest",
     "NODE_OPTIONS": "--max-old-space-size=4096"
   },
 
   "mounts": [
-    "type=cache,source=pnpm-store,target=/home/node/.pnpm-store",
+    "type=cache,source=pnpm-store,target=/home/vscode/.pnpm-store",
     "type=cache,source=next-cache,target=${containerWorkspaceFolder}/.next/cache"
   ],
 
@@ -34,8 +35,8 @@
 
   "forwardPorts": [3000, 3001, 54321, 54322, 54323],
   "portsAttributes": {
-    "3000": { "label": "Airnub app (Next.js)", "onAutoForward": "openBrowser" },
-    "3001": { "label": "Speckit app (Next.js)", "onAutoForward": "openBrowser" },
+    "3000": { "label": "Fresh Comply portal (Next.js)", "onAutoForward": "openBrowser" },
+    "3001": { "label": "Fresh Comply admin (Next.js)", "onAutoForward": "openBrowser" },
     "54321": { "label": "Supabase API" },
     "54322": { "label": "Supabase Postgres" },
     "54323": { "label": "Supabase Studio" }
