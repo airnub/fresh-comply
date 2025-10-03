@@ -1567,6 +1567,7 @@ export type Database = {
         Row: {
           id: string;
           tenant_org_id: string;
+          tenant_id: string;
           actor_user_id: string | null;
           actor_org_id: string | null;
           on_behalf_of_org_id: string | null;
@@ -1581,12 +1582,14 @@ export type Database = {
           meta_json: Json;
           prev_hash: string;
           row_hash: string;
+          chain_position: number;
           created_at: string;
           inserted_at: string;
         };
         Insert: {
           id?: string;
           tenant_org_id: string;
+          tenant_id?: string;
           actor_user_id?: string | null;
           actor_org_id?: string | null;
           on_behalf_of_org_id?: string | null;
@@ -1601,12 +1604,14 @@ export type Database = {
           meta_json?: Json;
           prev_hash?: string;
           row_hash?: string;
+          chain_position?: number;
           created_at?: string;
           inserted_at?: string;
         };
         Update: {
           id?: string;
           tenant_org_id?: string;
+          tenant_id?: string;
           actor_user_id?: string | null;
           actor_org_id?: string | null;
           on_behalf_of_org_id?: string | null;
@@ -1621,6 +1626,7 @@ export type Database = {
           meta_json?: Json;
           prev_hash?: string;
           row_hash?: string;
+          chain_position?: number;
           created_at?: string;
           inserted_at?: string;
         };
@@ -1663,6 +1669,13 @@ export type Database = {
           {
             foreignKeyName: "audit_log_subject_org_id_fkey";
             columns: ["subject_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "audit_log_tenant_id_fkey";
+            columns: ["tenant_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];

@@ -176,6 +176,7 @@ create table documents(
 create table audit_log(
   id uuid primary key default gen_random_uuid(),
   tenant_org_id uuid not null references organisations(id),
+  tenant_id uuid not null references organisations(id),
   actor_user_id uuid references users(id),
   actor_org_id uuid references organisations(id),
   on_behalf_of_org_id uuid references organisations(id),
@@ -190,11 +191,16 @@ create table audit_log(
   meta_json jsonb not null default '{}'::jsonb,
   prev_hash text not null default repeat('0', 64),
   row_hash text not null,
+  chain_position bigint not null,
   created_at timestamptz not null default now(),
   inserted_at timestamptz not null default now()
 );
 
-create unique index audit_log_row_hash_key on audit_log(row_hash);
+create unique index audit_log_tenant_chain_position_key on audit_log(tenant_id, chain_position);
+create unique index audit_log_tenant_row_hash_key on audit_log(tenant_id, row_hash);
+comment on column audit_log.tenant_id is 'Tenant scope for hash chain enforcement.';
+comment on column audit_log.chain_position is 'Monotonic position within the tenant-specific audit hash chain.';
+comment on trigger audit_log_block_mutations on audit_log is 'Prevents UPDATE or DELETE on the append-only audit ledger.';
 
 create table dsr_requests (
   id uuid primary key default gen_random_uuid(),
@@ -1051,33 +1057,50 @@ set search_path = public
 as $$
 declare
   v_prev_hash text;
+  v_prev_position bigint;
 begin
   new.created_at := coalesce(new.created_at, now());
   new.inserted_at := coalesce(new.inserted_at, now());
   new.meta_json := coalesce(new.meta_json, '{}'::jsonb);
   new.target_kind := coalesce(new.target_kind, new.entity);
+  new.tenant_id := coalesce(new.tenant_id, new.tenant_org_id);
 
-  select row_hash
-    into v_prev_hash
+  if new.tenant_id is null then
+    raise exception 'tenant_id is required for audit chain';
+  end if;
+
+  select row_hash, chain_position
+    into v_prev_hash, v_prev_position
   from audit_log
-  where tenant_org_id = new.tenant_org_id
-  order by inserted_at desc, created_at desc, id desc
+  where tenant_id = new.tenant_id
+  order by chain_position desc
   limit 1
   for update;
 
   if v_prev_hash is null then
     v_prev_hash := repeat('0', 64);
+    v_prev_position := 0;
   end if;
 
   if new.prev_hash is null then
     new.prev_hash := v_prev_hash;
   elsif new.prev_hash <> v_prev_hash then
-    raise exception 'Invalid prev_hash for tenant %', new.tenant_org_id;
+    raise exception 'Invalid prev_hash for tenant %', new.tenant_id;
+  end if;
+
+  if new.chain_position is null then
+    new.chain_position := v_prev_position + 1;
+  elsif new.chain_position <> v_prev_position + 1 then
+    raise exception 'Invalid chain_position % for tenant % (expected %)',
+      new.chain_position,
+      new.tenant_id,
+      v_prev_position + 1;
   end if;
 
   new.row_hash := encode(
     digest(
       jsonb_build_object(
+        'tenant_id', new.tenant_id,
         'tenant_org_id', new.tenant_org_id,
         'actor_user_id', new.actor_user_id,
         'actor_org_id', new.actor_org_id,
@@ -1092,6 +1115,7 @@ begin
         'lawful_basis', new.lawful_basis,
         'meta_json', new.meta_json,
         'prev_hash', new.prev_hash,
+        'chain_position', new.chain_position,
         'created_at', to_char(new.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
         'inserted_at', to_char(new.inserted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
       )::text,
@@ -1227,6 +1251,7 @@ $$;
 create trigger audit_log_before_insert
   before insert on audit_log
   for each row execute function compute_audit_log_hash();
+comment on trigger audit_log_before_insert on audit_log is 'Computes prev_hash, row_hash, and chain_position for tenant-scoped audit ledger.';
 
 create trigger admin_actions_before_insert
   before insert on admin_actions
@@ -1247,6 +1272,7 @@ as $$
 begin
   insert into audit_log(
     tenant_org_id,
+    tenant_id,
     actor_user_id,
     actor_org_id,
     subject_org_id,
@@ -1257,6 +1283,7 @@ begin
     meta_json
   )
   values (
+    new.tenant_org_id,
     new.tenant_org_id,
     coalesce(new.reviewer_id, new.created_by),
     new.tenant_org_id,
@@ -1284,6 +1311,7 @@ as $$
 begin
   insert into audit_log(
     tenant_org_id,
+    tenant_id,
     actor_user_id,
     actor_org_id,
     subject_org_id,
@@ -1295,6 +1323,7 @@ begin
     meta_json
   )
   values (
+    new.tenant_org_id,
     new.tenant_org_id,
     new.actor_id,
     new.tenant_org_id,
@@ -1413,6 +1442,7 @@ begin
 
   insert into audit_log(
     tenant_org_id,
+    tenant_id,
     actor_user_id,
     actor_org_id,
     on_behalf_of_org_id,
@@ -1427,6 +1457,7 @@ begin
     meta_json
   )
   values(
+    v_tenant_org_id,
     v_tenant_org_id,
     actor_id,
     actor_org_id,
@@ -1547,6 +1578,7 @@ begin
 
   insert into audit_log(
     tenant_org_id,
+    tenant_id,
     actor_user_id,
     actor_org_id,
     on_behalf_of_org_id,
@@ -1561,6 +1593,7 @@ begin
     meta_json
   )
   values(
+    v_action.tenant_org_id,
     v_action.tenant_org_id,
     actor_id,
     actor_org_id,

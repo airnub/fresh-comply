@@ -144,6 +144,7 @@ async function main() {
         .eq("id", request.id);
       await client.from("audit_log").insert({
         tenant_org_id: request.tenant_org_id,
+        tenant_id: request.tenant_org_id,
         actor_org_id: request.tenant_org_id,
         on_behalf_of_org_id: request.subject_org_id ?? null,
         subject_org_id: request.subject_org_id ?? null,
@@ -183,6 +184,7 @@ async function main() {
         .eq("id", request.id);
       await client.from("audit_log").insert({
         tenant_org_id: request.tenant_org_id,
+        tenant_id: request.tenant_org_id,
         actor_org_id: request.tenant_org_id,
         on_behalf_of_org_id: request.subject_org_id ?? null,
         subject_org_id: request.subject_org_id ?? null,
