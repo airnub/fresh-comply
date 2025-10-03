@@ -1,109 +1,16 @@
 import { Card, Flex, Grid, Heading, Text } from "@radix-ui/themes";
 import { getTranslations } from "next-intl/server";
-import { DataTable } from "../../../components/DataTable";
-import { getSupabaseUser } from "../../../lib/auth/supabase-ssr";
-import { requireRole, type AdminRole } from "../../../lib/rbac";
-
-const registry = [
-  {
-    id: "stp-temporal-webhook",
-    slug: "temporal.webhook",
-    title: "Temporal Webhook Bridge",
-    category: "automation",
-    latestVersion: "1.4.0",
-    summary: "Bridges tenant webhooks with managed Temporal workflows.",
-    publishedVersions: 3,
-  },
-  {
-    id: "stp-manual-review",
-    slug: "manual.review",
-    title: "Manual Review with Evidence",
-    category: "governance",
-    latestVersion: "2.1.0",
-    summary: "Collect reviewer notes and ensure dual-control sign-off.",
-    publishedVersions: 4,
-  },
-];
-
-const versionLedger = [
-  {
-    id: "stv-1",
-    stepType: "temporal.webhook",
-    version: "1.4.0",
-    status: "published",
-    publishedAt: "2025-10-01",
-    schemaSlug: "schemas/webhook-input@1",
-  },
-  {
-    id: "stv-2",
-    stepType: "manual.review",
-    version: "2.1.0",
-    status: "published",
-    publishedAt: "2025-09-14",
-    schemaSlug: "schemas/review-checklist@2",
-  },
-  {
-    id: "stv-3",
-    stepType: "manual.review",
-    version: "2.2.0",
-    status: "draft",
-    publishedAt: "—",
-    schemaSlug: "schemas/review-checklist@3",
-  },
-];
-
-const tenantInstalls = [
-  {
-    id: "install-1",
-    tenant: "Company X",
-    orgSlug: "company-x",
-    stepTypeVersion: "temporal.webhook@1.4.0",
-    status: "enabled",
-    installedAt: "2025-10-05",
-  },
-  {
-    id: "install-2",
-    tenant: "Acme Foundation",
-    orgSlug: "acme-foundation",
-    stepTypeVersion: "manual.review@2.1.0",
-    status: "enabled",
-    installedAt: "2025-09-18",
-  },
-];
-
-const secretBindings = [
-  {
-    id: "secret-1",
-    tenant: "Company X",
-    alias: "secrets.crm.apiToken",
-    provider: "HashiCorp Vault",
-    externalId: "kv/data/company-x/crm",
-  },
-  {
-    id: "secret-2",
-    tenant: "Acme Foundation",
-    alias: "secrets.temporal.taskQueueKey",
-    provider: "AWS Secrets Manager",
-    externalId: "arn:aws:secretsmanager:eu-west-1:123456789:key",
-  },
-];
-
-const overlayActivity = [
-  {
-    id: "snapshot-1",
-    workflow: "setup-nonprofit-ie-charity",
-    tenant: "Company X",
-    overlays: 2,
-    createdAt: "2025-10-06",
-  },
-  {
-    id: "snapshot-2",
-    workflow: "setup-nonprofit-ie-charity",
-    tenant: "Acme Foundation",
-    overlays: 1,
-    createdAt: "2025-09-22",
-  },
-];
+import { DataTable } from "@/components/DataTable";
+import { StepTypeActions } from "./step-type-actions";
+import { getSupabaseUser } from "@/lib/auth/supabase-ssr";
+import { requireRole, type AdminRole } from "@/lib/rbac";
+import {
+  loadOverlaySnapshots,
+  loadSecretBindings,
+  loadStepTypeRegistry,
+  loadStepTypeVersions,
+  loadTenantInstalls,
+} from "./loaders";
 
 export default async function StepTypesPage() {
   const t = await getTranslations({ namespace: "stepTypes" });
@@ -118,21 +25,40 @@ export default async function StepTypesPage() {
     console.warn("Supabase unavailable for step types RBAC", error);
   }
 
+  const [registry, versions, installs, secrets, overlays] = await Promise.all([
+    loadStepTypeRegistry(),
+    loadStepTypeVersions(),
+    loadTenantInstalls(),
+    loadSecretBindings(),
+    loadOverlaySnapshots(),
+  ]);
+
   return (
     <Flex direction="column" gap="5">
       <section>
         <Heading size="8">{t("heading")}</Heading>
-        <Text size="3" color="gray">{t("subheading")}</Text>
+        <Text size="3" color="gray">
+          {t("subheading")}
+        </Text>
       </section>
+
+      <StepTypeActions
+        registry={registry}
+        versions={versions}
+        tenantInstalls={installs}
+        secretBindings={secrets}
+      />
 
       <Grid columns={{ initial: "1", md: "2" }} gap="4">
         {registry.map((item) => (
           <Card key={item.id} variant="surface">
             <Flex direction="column" gap="3">
               <Heading size="4">{item.title}</Heading>
-              <Text size="2" color="gray">
-                {item.summary}
-              </Text>
+              {item.summary ? (
+                <Text size="2" color="gray">
+                  {item.summary}
+                </Text>
+              ) : null}
               <Flex gap="3" align="center" wrap="wrap">
                 <Text size="2" weight="medium">
                   {t("registry.slug", { slug: item.slug })}
@@ -141,10 +67,10 @@ export default async function StepTypesPage() {
                   {t("registry.category", { category: item.category })}
                 </Text>
                 <Text size="2" color="gray">
-                  {t("registry.latest", { version: item.latestVersion })}
+                  {t("registry.latest", { version: item.latest_version })}
                 </Text>
                 <Text size="2" color="gray">
-                  {t("registry.published", { count: item.publishedVersions })}
+                  {t("registry.published", { count: item.published_versions })}
                 </Text>
               </Flex>
             </Flex>
@@ -178,7 +104,14 @@ export default async function StepTypesPage() {
               { key: "schemaSlug", header: t("versions.columns.schema") },
               { key: "publishedAt", header: t("versions.columns.publishedAt") },
             ]}
-            data={versionLedger}
+            data={versions.map((entry) => ({
+              id: entry.id,
+              stepType: entry.step_type_slug,
+              version: entry.version,
+              status: entry.status,
+              schemaSlug: entry.schema_slug ?? "—",
+              publishedAt: entry.published_at ?? "—",
+            }))}
           />
         </Flex>
       </Card>
@@ -207,7 +140,13 @@ export default async function StepTypesPage() {
                 },
                 { key: "installedAt", header: t("installs.columns.installedAt") },
               ]}
-              data={tenantInstalls}
+              data={installs.map((entry) => ({
+                id: entry.id,
+                tenant: entry.tenant_name,
+                stepTypeVersion: entry.step_type_version,
+                status: entry.status,
+                installedAt: entry.installed_at ?? "—",
+              }))}
             />
           </Flex>
         </Card>
@@ -227,7 +166,13 @@ export default async function StepTypesPage() {
                 { key: "provider", header: t("secrets.columns.provider") },
                 { key: "externalId", header: t("secrets.columns.externalId") },
               ]}
-              data={secretBindings}
+              data={secrets.map((entry) => ({
+                id: entry.id,
+                tenant: entry.tenant_name,
+                alias: entry.alias,
+                provider: entry.provider,
+                externalId: entry.external_id,
+              }))}
             />
           </Flex>
         </Card>
@@ -248,7 +193,13 @@ export default async function StepTypesPage() {
               { key: "overlays", header: t("overlays.columns.count") },
               { key: "createdAt", header: t("overlays.columns.createdAt") },
             ]}
-            data={overlayActivity}
+            data={overlays.map((entry) => ({
+              id: entry.id,
+              workflow: entry.workflow_slug,
+              tenant: entry.tenant_name,
+              overlays: entry.overlay_count,
+              createdAt: entry.created_at,
+            }))}
           />
         </Flex>
       </Card>
