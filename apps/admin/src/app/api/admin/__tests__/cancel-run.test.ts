@@ -27,6 +27,9 @@ describe("cancel run handler", () => {
       userId: "00000000-0000-0000-0000-000000000001",
       email: "actor@example.com",
       role: "platform_admin",
+      tenantOrgId: "10000000-0000-0000-0000-000000000000",
+      actorOrgId: "10000000-0000-0000-0000-000000000000",
+      onBehalfOfOrgId: null,
     });
   });
 
@@ -66,6 +69,9 @@ describe("cancel run handler", () => {
       run_id: "run-9",
       reason: "Need to stop",
       second_actor_id: "00000000-0000-0000-0000-000000000002",
+      tenant_org_id: "10000000-0000-0000-0000-000000000000",
+      actor_org_id: "10000000-0000-0000-0000-000000000000",
+      on_behalf_of_org_id: null,
     });
   });
 });

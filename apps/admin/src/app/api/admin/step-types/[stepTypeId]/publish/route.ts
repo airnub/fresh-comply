@@ -33,6 +33,13 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
     return jsonError(422, "Version identifier is required");
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_publish_step_type_version", {
       reason: payload.reason,
@@ -40,6 +47,9 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
       step_type_id: stepTypeId,
       version_id: payload.version,
       changelog: payload.changelog ?? null,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({

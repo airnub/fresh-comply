@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { Database } from "@airnub/types";
 import { getSupabaseUser } from "../../../lib/auth/supabase-ssr";
 import { getSupabaseServiceRoleClient } from "../../../lib/auth/supabase-service-role";
@@ -10,6 +10,14 @@ export interface AdminApiContext {
   userId: string;
   email: string;
   role: AdminRole;
+  tenantOrgId: string | null;
+  actorOrgId: string | null;
+  onBehalfOfOrgId: string | null;
+}
+
+function readOrgId(user: User, key: string): string | null {
+  const value = (user.app_metadata?.[key] ?? user.user_metadata?.[key]) as unknown;
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 interface RpcResponse<T> {
@@ -40,7 +48,22 @@ export async function resolveAdminContext(allowedRoles?: AdminRole[]): Promise<A
     return jsonError(403, "Forbidden");
   }
 
-  return { userId: user.id, email: user.email ?? "unknown", role };
+  const tenantOrgId = readOrgId(user, "tenant_org_id");
+  const actorOrgId = readOrgId(user, "actor_org_id") ?? tenantOrgId;
+  const onBehalfOfOrgId = readOrgId(user, "on_behalf_of_org_id");
+
+  if (!tenantOrgId && !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
+  return {
+    userId: user.id,
+    email: user.email ?? "unknown",
+    role,
+    tenantOrgId,
+    actorOrgId,
+    onBehalfOfOrgId,
+  };
 }
 
 export function getAdminServiceRoleClient(): SupabaseClient<Database> {

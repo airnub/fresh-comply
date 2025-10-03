@@ -102,7 +102,7 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
       const { data: requestRow, error: insertError } = await supabase
         .from("dsr_requests")
         .insert(insertPayload)
-        .select("id, tenant_org_id, requester_email, requester_name, received_at")
+        .select("id, tenant_org_id, subject_org_id, requester_email, requester_name, received_at")
         .maybeSingle();
 
       if (insertError || !requestRow) {
@@ -112,16 +112,22 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
         return response;
       }
 
-      await supabase.from("audit_log").insert({
-        actor_org_id: requestRow.tenant_org_id,
-        action: "dsr.request.received",
-        meta_json: {
-          request_id: requestRow.id,
-          type,
-          status: "received",
-          received_at: requestRow.received_at
-        }
-      });
+      await supabase
+        .from("audit_log")
+        .insert({
+          tenant_org_id: requestRow.tenant_org_id,
+          actor_org_id: requestRow.tenant_org_id,
+          on_behalf_of_org_id: requestRow.subject_org_id ?? null,
+          subject_org_id: requestRow.subject_org_id ?? null,
+          entity: "dsr_request",
+          action: "dsr.request.received",
+          meta_json: {
+            request_id: requestRow.id,
+            type,
+            status: "received",
+            received_at: requestRow.received_at
+          }
+        });
 
       await supabase.from("dsr_request_jobs").insert([
         {
@@ -154,15 +160,21 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
             .update({ status: "acknowledged", ack_sent_at: ackSentAt, updated_at: ackSentAt })
             .eq("id", requestRow.id);
 
-          await supabase.from("audit_log").insert({
-            actor_org_id: requestRow.tenant_org_id,
-            action: "dsr.request.acknowledged",
-            meta_json: {
-              request_id: requestRow.id,
-              type,
-              ack_sent_at: ackSentAt
-            }
-          });
+          await supabase
+            .from("audit_log")
+            .insert({
+              tenant_org_id: requestRow.tenant_org_id,
+              actor_org_id: requestRow.tenant_org_id,
+              on_behalf_of_org_id: requestRow.subject_org_id ?? null,
+              subject_org_id: requestRow.subject_org_id ?? null,
+              entity: "dsr_request",
+              action: "dsr.request.acknowledged",
+              meta_json: {
+                request_id: requestRow.id,
+                type,
+                ack_sent_at: ackSentAt
+              }
+            });
           span.addEvent("dsr.acknowledged", {
             requestId: requestRow.id,
             ackSentAt

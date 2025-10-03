@@ -44,7 +44,7 @@ function normalizeEmail(email: string) {
 async function loadRequest(client: ReturnType<typeof getSupabaseClient>, id: string) {
   const { data, error } = await client
     .from("dsr_requests")
-    .select("id, tenant_org_id, status, due_at")
+    .select("id, tenant_org_id, subject_org_id, status, due_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -136,8 +136,12 @@ export async function reassignDsrRequest(id: string, email: string, reason: stri
 
     if (service) {
       await service.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_user_id: user?.id ?? null,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.subject_org_id ?? null,
+        subject_org_id: request.subject_org_id ?? null,
+        entity: "dsr_request",
         action: "dsr.request.reassigned",
         meta_json: {
           request_id: id,
@@ -189,8 +193,12 @@ export async function completeDsrRequest(id: string, reason: string): Promise<Ds
     const service = resolveServiceClient();
     if (service) {
       await service.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_user_id: user?.id ?? null,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.subject_org_id ?? null,
+        subject_org_id: request.subject_org_id ?? null,
+        entity: "dsr_request",
         action: "dsr.request.completed",
         meta_json: {
           request_id: id,
@@ -255,8 +263,12 @@ export async function togglePauseDsrRequest(id: string, reason: string): Promise
     const service = resolveServiceClient();
     if (service) {
       await service.from("audit_log").insert({
+        tenant_org_id: request.tenant_org_id,
         actor_user_id: user?.id ?? null,
         actor_org_id: request.tenant_org_id,
+        on_behalf_of_org_id: request.subject_org_id ?? null,
+        subject_org_id: request.subject_org_id ?? null,
+        entity: "dsr_request",
         action: nextStatus === "paused" ? "dsr.request.paused" : "dsr.request.resumed",
         meta_json: {
           request_id: id,

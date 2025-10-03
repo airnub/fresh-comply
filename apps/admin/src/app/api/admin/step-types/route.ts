@@ -18,11 +18,21 @@ export async function POST(request: Request) {
     return parsed;
   }
 
+  const tenantOrgId = context.tenantOrgId ?? context.actorOrgId;
+  const actorOrgId = context.actorOrgId ?? context.tenantOrgId;
+
+  if (!tenantOrgId || !actorOrgId) {
+    return jsonError(403, "Tenant context unavailable");
+  }
+
   try {
     const result = await callAdminRpc<Record<string, unknown>>("admin_create_step_type", {
       reason: parsed.reason,
       actor_id: context.userId,
       step_type: parsed.stepType,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: actorOrgId,
+      on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
 
     return NextResponse.json({
