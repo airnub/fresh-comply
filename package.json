@@ -15,7 +15,10 @@
     "dev:admin": "next dev -p 3100 apps/admin",
     "build:admin": "next build apps/admin",
     "start:admin": "next start -p 3100 apps/admin",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "dev:docs": "pnpm --filter @airnub/docs-site start",
+    "build:docs": "pnpm --filter @airnub/docs-site build",
+    "deploy:docs": "pnpm --filter @airnub/docs-site deploy"
   },
   "devDependencies": {
     "turbo": "^2.0.0"
