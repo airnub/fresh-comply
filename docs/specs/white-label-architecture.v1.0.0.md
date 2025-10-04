@@ -30,9 +30,9 @@ status: Stable
 - **Client Organisation (Company X)** → Operates its workflows, users, artefacts, and filings; full visibility on steps and deadlines.
 
 **Isolation (Supabase RLS)**
-- Every row stores `tenant_org_id` and (when relevant) `subject_org_id`.
+- Every row stores `org_id` (owning tenant/client) and, when relevant, `subject_org_id`; provider hierarchies reference `parent_org_id` on `public.orgs`.
 - Policies only allow:
-  - Tenant users to read/write their tenant data and the client runs they **engage** (`engager_org_id = tenant_org_id`).
+  - Tenant users to read/write their tenant data and the client runs they **engage** (`engager_org_id = org_id`).
   - Client users to read/write their own `subject_org_id` data.
   - Platform admins via server-minted `{ role: 'platform_admin' }` (or boolean override) tokens; service-role keys stay server-only via `public.is_platform_service()` and are audited.
 
@@ -45,7 +45,7 @@ status: Stable
 
 **Custom Domains**
 - Table: `tenant_domains(tenant_id, domain, verified_at, cert_status)`.
-- Next.js **Middleware** resolves `Host` → `tenant_org_id`, loads branding, and injects it server‑side. All tenants share the same app binary.
+- Next.js **Middleware** resolves `Host` → `org_id` (provider portal root), loads branding, and injects it server‑side. All tenants share the same app binary.
 - Automated certificate issuance (ACME) with DNS validation; status visible in Partner Admin.
 
 **Brand Theming**
@@ -111,9 +111,9 @@ Stripe Connect + Billing recommended; invoices, tax/VAT handling, and payouts ar
 
 ## 7) Audit Trail & DSR
 
-- **Append-only ledgers**: `audit_log` (tenant event stream) and `admin_actions` (platform-admin mutations) capture `{ id, tenant_org_id, subject_org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, action, payload jsonb, created_at, prev_hash, curr_hash }` with immutable retention windows that satisfy [SOC 2 audit evidence requirements](./fresh-comply-spec.md#soc-2-compliance-requirements).
-- **Hash-chain enforcement**: Postgres `BEFORE INSERT` trigger sets `curr_hash = sha256(prev_hash || row_digest)` and verifies `prev_hash` equals the latest committed hash per `(tenant_org_id, stream_key)`; `UPDATE`/`DELETE` are blocked via RLS and constraint triggers so the chain cannot be rewritten.
-- **RLS views**: expose tenant-safe `audit_log_view` / `admin_actions_view` filtering by `tenant_org_id` and enriching actor metadata; platform-only variants can traverse cross-tenant `subject_org_id` for DSR and incident response. The [Admin App Spec](./admin-app-spec.md) consumes the platform view for moderation tooling.
+- **Append-only ledgers**: `audit_log` (tenant event stream) and `admin_actions` (platform-admin mutations) capture `{ id, org_id, parent_org_id, subject_org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, action, payload jsonb, created_at, prev_hash, curr_hash }` with immutable retention windows that satisfy [SOC 2 audit evidence requirements](./fresh-comply-spec.md#soc-2-compliance-requirements).
+- **Hash-chain enforcement**: Postgres `BEFORE INSERT` trigger sets `curr_hash = sha256(prev_hash || row_digest)` and verifies `prev_hash` equals the latest committed hash per `(org_id, stream_key)`; `UPDATE`/`DELETE` are blocked via RLS and constraint triggers so the chain cannot be rewritten.
+- **RLS views**: expose tenant-safe `audit_log_view` / `admin_actions_view` filtering by `org_id` and enriching actor metadata; platform-only variants can traverse cross-tenant `subject_org_id` for DSR and incident response. The [Admin App Spec](./admin-app-spec.md) consumes the platform view for moderation tooling.
 - **RPC write-through pattern**: all admin surfaces and automated workflows call `rpc_append_audit_entry(actor, action, payload)` which writes to `admin_actions`, returns the hash link, and emits NOTIFY for workers that append to `audit_log` so UI latency stays low.
 - **DSR lifecycle coverage**: DSR intake, acknowledgement, hold, fulfillment, and closure events append to `audit_log` with legal basis, SLA timestamps, and export bundle references; exports include the latest hash signature to prove integrity during regulator handoffs.
 
@@ -128,10 +128,10 @@ tenant_branding(tenant_id, tokens jsonb, logo_url, favicon_url, pdf_footer, typo
 tenant_secret_bindings(id, tenant_id, alias, provider, provider_ref, created_at)
 
 -- Existing tables extend with tenant context where not present
-organisations(subject_org_id, tenant_org_id, ...)
-engagements(actor_org_id, on_behalf_of_org_id, tenant_org_id, ...)
+organisations(id, parent_org_id, type, ...)
+engagements(actor_org_id, on_behalf_of_org_id, org_id, ...)
 steps(..., execution_mode, orchestration_workflow_id, external_ref, artifacts jsonb)
-workflow_runs(..., tenant_org_id, merged_workflow_snapshot jsonb)
+workflow_runs(..., org_id, merged_workflow_snapshot jsonb)
 
 -- Step Type Registry (global) + tenant installs
 a) step_types(id, slug, latest_version, ...)

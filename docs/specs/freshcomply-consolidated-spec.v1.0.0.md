@@ -17,7 +17,7 @@ status: Stable
 
 ## 1. Tenancy Model (public schema)
 
-- Every tenant-scoped table stores a hard, non-null `org_id` or `tenant_org_id` column that points at `public.organisations(id)`.
+- Every tenant-scoped table stores a hard, non-null `org_id` column that points at `public.organisations(id)`; parent relationships use `parent_org_id` on `public.organisations`.
 - Supabase Row Level Security (RLS) is enabled on all tenant tables. Policies rely on membership helpers instead of nullable org columns.
 - `app.is_org_member(target_org uuid)` gatekeeps tenant operations. It returns `true` when:
   - the request comes from the Supabase service role,
@@ -28,8 +28,8 @@ status: Stable
 
 ### Tenancy guarantees
 
-- Inserts/updates must provide a tenant id; migrations enforce `NOT NULL` on `org_id`/`tenant_org_id` and add covering indexes for lookup performance.
-- RPCs that accept `tenant_org_id` call `public.assert_tenant_membership` to reject null context and unauthorized access.
+- Inserts/updates must provide a tenant id; migrations enforce `NOT NULL` on `org_id` (and `parent_org_id` where applicable) and add covering indexes for lookup performance.
+- RPCs that accept `org_id` call `public.assert_tenant_membership` to reject null context and unauthorized access.
 - Temporal workflows, document generation, and DSR processing all reference the tenant id so that downstream audit entries and webhooks carry the correct scope.
 
 ## 2. Platform Schema (global assets)
@@ -58,14 +58,14 @@ create or replace function app.is_org_member(target_org uuid) returns boolean;
 
 1. Create helper functions first (`app` schema) so subsequent migrations can rely on them idempotently.
 2. Introduce new `platform.*` tables, copy shared rows from public tables, and delete legacy NULL-tenant rows.
-3. Rename `tenant_org_id` to `org_id` when scoping to the owning tenant for clarity; immediately enforce `NOT NULL` + indexes.
+3. Ensure tenancy columns use `org_id` when scoping to the owning tenant for clarity; immediately enforce `NOT NULL` + indexes.
 4. Rebuild RLS policies to use `app.is_org_member()` and `app.is_platform_admin()`—never fall back to `... IS NULL` guards.
 5. Add read-only views/RPCs when tenants need catalog access (e.g., `public.v_step_types`).
 6. Write regression migrations that assert no NULL tenant keys remain before tightening constraints (see 202510040001_tenant_overlay_install_scope.sql).
 
 ## 5. CI Guardrails
 
-- `.github/workflows/policy-rls.yml` fails if any SQL file reintroduces `org_id IS NULL` / `tenant_org_id IS NULL` checks in policies.
+- `.github/workflows/policy-rls.yml` fails if any SQL file reintroduces `org_id IS NULL` / `parent_org_id IS NULL` checks in policies.
 - The same workflow blocks client bundles from calling `supabase.from('platform.*').insert/update/upsert/delete`.
 - `packages/db/check-rls.mjs` validates `schema.sql` includes RLS enablement and lacks forbidden NULL tenancy gates.
 

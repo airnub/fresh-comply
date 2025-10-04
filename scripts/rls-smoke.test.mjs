@@ -190,7 +190,7 @@ assertRegex(
 );
 
 // Negative coverage: forbid tenancy gates that rely on IS NULL checks within migrations
-if (/create\s+policy[\s\S]{0,200}(tenant_org_id|org_id)\s+is\s+null/i.test(migrationSql)) {
+if (/create\s+policy[\s\S]{0,200}(org_id|parent_org_id)\s+is\s+null/i.test(migrationSql)) {
   throw new Error("Migrations must not rely on tenancy columns with IS NULL guards inside policies.");
 }
 

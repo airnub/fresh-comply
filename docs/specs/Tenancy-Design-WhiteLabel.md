@@ -31,7 +31,7 @@ review_cycle: Quarterly
 | Layer | Description | Primary Identifier | Example Actors |
 | --- | --- | --- | --- |
 | **Platform** | Airlab/Airnub operations environment for moderation, registries, observability, and incident response. | `platform_admin` service claims | Platform SRE, Compliance Officer |
-| **Provider (Partner Org)** | Accounting firm or reseller offering FreshComply under its brand. Hosts multiple client organizations. | `tenant_org_id` (provider) | Partner admin, Partner staff |
+| **Provider (Partner Org)** | Accounting firm or reseller offering FreshComply under its brand. Hosts multiple client organizations. | `org_id` (provider) | Partner admin, Partner staff |
 | **Client Organisation** | End-customer using workflows, document generation, and filings. | `subject_org_id` | Client owner, client collaborator |
 | **End-user Actor** | Individual user authenticated via Supabase Auth or external SSO. | `app_user_id` | Staff, auditors, platform reviewers |
 
@@ -39,10 +39,10 @@ review_cycle: Quarterly
 
 1. **Auth** issues JWT claims with `org_memberships` for tenant and client orgs, plus optional `platform_admin = true`.
 2. **Realm resolution** middleware examines request context:
-   - **Host-based** (`*.freshcomply.app` or custom domain) resolves to `tenant_org_id` using `platform.resolve_tenant_by_domain(host)` RPC.
+   - **Host-based** (`*.freshcomply.app` or custom domain) resolves to `org_id` using `platform.resolve_tenant_by_domain(host)` RPC.
    - **Path-based** fallback for internal tooling: `/platform/*` enforces `platform_admin` and bypasses tenant theming.
-3. **Session context** stores `{ tenant_org_id, subject_org_id?, acting_org_id }`. Client-level resources (workflows, records) always include `subject_org_id` and the resolved `tenant_org_id`.
-4. **Acting on behalf** captured via `engagements(actor_org_id, on_behalf_of_org_id, tenant_org_id, ...)` and per-request header `X-FC-On-Behalf-Of` so audit trails show delegation.
+3. **Session context** stores `{ org_id, parent_org_id?, subject_org_id?, acting_org_id }`. Client-level resources (workflows, records) always include `subject_org_id` and the resolved `org_id`.
+4. **Acting on behalf** captured via `engagements(actor_org_id, on_behalf_of_org_id, org_id, ...)` and per-request header `X-FC-On-Behalf-Of` so audit trails show delegation.
 
 ### Role Helpers
 
@@ -70,13 +70,13 @@ review_cycle: Quarterly
 ### Shared Public Schema (`public.*`)
 
 - Houses tenant-scoped operational data.
-- **Required Columns:** `tenant_org_id UUID NOT NULL`, `created_by`, `created_at`, `updated_at`.
+- **Required Columns:** `org_id UUID NOT NULL`, `created_by`, `created_at`, `updated_at`.
 - **Example Tables:** `organisations`, `workflow_runs`, `run_steps`, `documents`, `audit_log`, `tenant_branding`, `tenant_domains`, `tenant_secret_bindings`.
 - **Policy Template:**
   ```sql
   create policy tenant_rw on public.<table>
-    using (app.has_org_access(tenant_org_id))
-    with check (app.has_org_access(tenant_org_id));
+    using (app.has_org_access(org_id))
+    with check (app.has_org_access(org_id));
 
   create policy platform_ro on public.<table>
     using (app.is_platform_admin());
@@ -96,7 +96,7 @@ review_cycle: Quarterly
 
 1. Incoming request host matched against `platform.realm_domains`.
 2. Verified domains populate `tenant_domains(tenant_id, domain, verified_at, cert_status)`.
-3. Middleware attaches `tenant_org_id` to request, sets `x-tenant-org-id` header for internal API calls, and caches branding tokens.
+3. Middleware attaches `org_id` to request, sets `x-tenant-org-id` header for internal API calls, and caches branding tokens.
 4. Unknown domains return `HTTP 404` (no fallback to default tenant) to prevent host header abuse.
 
 ### Branding Tokens
@@ -145,12 +145,12 @@ review_cycle: Quarterly
 - **Tenant Registration:**
   1. Provider signs MSA → platform admin inserts record in `platform.tenants`.
   2. Automated workflow provisions `tenant_branding` defaults, invites provider admins, and creates DNS onboarding tasks.
-  3. Provider accepts invitation → `tenant_org_id` created in `public.organisations` with `type = 'provider'`.
+  3. Provider accepts invitation → `org_id` created in `public.organisations` with `type = 'provider'`.
 
 - **Client Provisioning:**
   1. Provider admin calls `/api/provider/clients` with metadata.
-  2. API creates `public.organisations` row (`type = 'client'`, `tenant_org_id = provider_org_id`).
-  3. Temporal workflow seeds baseline overlays and documents to `tenant_org_id` context.
+  2. API creates `public.organisations` row (`type = 'client'`, `parent_org_id = provider_org_id`).
+  3. Temporal workflow seeds baseline overlays and documents to `org_id` context.
 
 - **Offboarding:**
   - Soft-delete flag `deactivated_at` on tenant/client records; RLS denies new writes, but data retained for 7 years unless legal hold requires longer.
@@ -164,8 +164,8 @@ review_cycle: Quarterly
 
 ## 7. Observability & Audit
 
-- **Tracing:** All spans include `tenant_org_id`, `subject_org_id`, `acting_org_id`, and `platform_request_id` attributes. Ingestion pipeline rejects spans missing tenant context.
-- **Logging:** Structured JSON logs with `tenant_org_id` appended server-side. Provider logs accessible only to provider admins via scoped search index.
+- **Tracing:** All spans include `org_id`, `parent_org_id`, `subject_org_id`, `acting_org_id`, and `platform_request_id` attributes. Ingestion pipeline rejects spans missing tenant context.
+- **Logging:** Structured JSON logs with `org_id` (and `parent_org_id` when applicable) appended server-side. Provider logs accessible only to provider admins via scoped search index.
 - **Audit Trails:**
   - `public.audit_log` for tenant and client actions (append-only via trigger enforced hash chain).
   - `platform.admin_actions` for platform-level mutations. Write-only via RPC `platform.append_admin_action(actor, action, payload)`.
@@ -176,7 +176,7 @@ review_cycle: Quarterly
 
 ## 8. Security Controls
 
-- **RLS Gate Reviews:** Automated CI script ensures new tables include `tenant_org_id` and policies referencing `app.has_org_access`. Failing to include both blocks merges.
+- **RLS Gate Reviews:** Automated CI script ensures new tables include `org_id` and policies referencing `app.has_org_access`. Failing to include both blocks merges.
 - **Service Roles:**
   - `svc_portal` (provider/client portal) → `role = service`, limited to tenant queries via RPC.
   - `svc_platform_admin` → restricted to admin app; obtains SCIM-managed credentials rotated every 90 days.
@@ -191,7 +191,7 @@ review_cycle: Quarterly
 1. **Foundational Tenancy (Sprint 1–2)**
    - Implement `platform.tenants`, `platform.realm_domains`, `tenant_branding`, `tenant_domains` tables.
    - Add middleware for host resolution and tenancy context injection.
-   - Migrate existing tenant data to ensure `tenant_org_id` is populated and `NOT NULL`.
+   - Migrate existing tenant data to ensure `org_id` is populated and `NOT NULL`.
 
 2. **Provider Admin Surfaces (Sprint 3–4)**
    - Build `/provider/settings/branding`, `/provider/settings/domains`, `/provider/clients` pages.

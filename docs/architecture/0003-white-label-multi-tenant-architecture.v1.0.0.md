@@ -26,7 +26,7 @@ Partners such as accounting firms want to offer FreshComply under their own bran
 
 ## Consequences
 
-- Introduce explicit tenant hierarchy (`platform → partner → client`) with Supabase RLS enforcing row ownership via `tenant_org_id` and `subject_org_id`.
+- Introduce explicit tenant hierarchy (`platform → partner → client`) with Supabase RLS enforcing row ownership via `org_id` and `subject_org_id`.
 - Add per-tenant configuration for branding, documents, and outbound communications, including custom domains, DKIM/SPF verification, and PDF/email theming.
 - Route Temporal workflows through tenant-specific task queues (`tenant-{id}-main`) and tag spans/logs with tenant metadata for observability.
 - Manage external integrations via tenant-scoped secret aliases and hardened webhook ingress that verifies HMAC signatures, timestamps, and replay protection.
