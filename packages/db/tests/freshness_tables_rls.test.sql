@@ -10,10 +10,11 @@ declare
   v_source_id uuid;
   v_change_event_id uuid;
   v_platform_source_id uuid;
+  v_rule_pack_id uuid;
+  v_detection_id uuid;
   v_moderation_id uuid;
   v_adoption_id uuid;
   v_count integer;
-  audit_rows integer;
 begin
   perform set_config('request.jwt.claim.role', 'service_role', true);
 
@@ -35,24 +36,77 @@ begin
     (user_two, tenant_two, 'admin')
   on conflict do nothing;
 
-  insert into source_registry (tenant_org_id, name, url, parser, jurisdiction, category)
+  insert into source_registry (org_id, name, url, parser, jurisdiction, category)
   values (tenant_one, 'CRO Guidance', 'https://example.test/cro', 'html', 'ie', 'cro')
   returning id into v_source_id;
 
-  insert into source_registry (tenant_org_id, name, url, parser, jurisdiction, category)
-  values (null, 'Platform CRO Guidance', 'https://example.test/platform-cro', 'html', 'ie', 'platform')
+  begin
+    insert into source_registry (org_id, name, url, parser, jurisdiction, category)
+    values (null, 'Invalid Source', 'https://example.test/invalid', 'html', 'ie', 'invalid');
+    raise exception 'source_registry.org_id should reject NULL values';
+  exception
+    when not_null_violation then
+      null;
+  end;
+
+  insert into platform.rule_sources (name, url, parser, jurisdiction, category)
+  values ('Platform CRO Guidance', 'https://example.test/platform-cro', 'html', 'ie', 'platform')
   returning id into v_platform_source_id;
 
-  insert into source_snapshot (tenant_org_id, source_id, content_hash, parsed_facts, storage_ref)
+  insert into platform.rule_packs (pack_key, version, title, summary, manifest, checksum, created_by)
+  values (
+    'freshness_pack',
+    '1.0.0',
+    'Freshness Pack',
+    'Initial platform pack',
+    '{}'::jsonb,
+    'sha-1',
+    user_one
+  )
+  returning id into v_rule_pack_id;
+
+  insert into platform.rule_pack_detections (
+    rule_pack_id,
+    rule_pack_key,
+    current_version,
+    proposed_version,
+    severity,
+    diff,
+    created_by,
+    notes
+  )
+  values (
+    v_rule_pack_id,
+    'freshness_pack',
+    '1.0.0',
+    '1.1.0',
+    'minor',
+    jsonb_build_object('changes', 'diff'),
+    user_one,
+    'Automated watcher'
+  )
+  returning id into v_detection_id;
+
+  insert into platform.rule_pack_detection_sources (detection_id, rule_source_id, change_summary)
+  values (v_detection_id, v_platform_source_id, jsonb_build_object('field', 'deadline'));
+
+  select count(*)
+  into v_count
+  from platform.rule_pack_detection_sources
+  where detection_id = v_detection_id;
+
+  if v_count <> 1 then
+    raise exception 'Detection should reference exactly one rule source';
+  end if;
+
+  insert into source_snapshot (org_id, source_id, content_hash, parsed_facts, storage_ref)
   values (tenant_one, v_source_id, 'hash-1', '{"facts":[]}'::jsonb, 's3://bucket/object');
 
-  insert into change_event (tenant_org_id, source_id, from_hash, to_hash, severity, notes)
+  insert into change_event (org_id, source_id, from_hash, to_hash, severity, notes)
   values (tenant_one, v_source_id, 'hash-0', 'hash-1', 'minor', 'Detected diff')
   returning id into v_change_event_id;
 
-  select count(*) into audit_rows from audit_log;
-
-  insert into moderation_queue (tenant_org_id, change_event_id, proposal, status, classification, created_by)
+  insert into moderation_queue (org_id, change_event_id, proposal, status, classification, created_by)
   values (
     tenant_one,
     v_change_event_id,
@@ -80,24 +134,24 @@ begin
   select count(*)
   into v_count
   from source_registry
-  where tenant_org_id = tenant_one;
+  where org_id = tenant_one;
   if v_count <> 1 then
     raise exception 'Tenant member should read own source registry entries';
   end if;
 
-  select count(*)
-  into v_count
-  from source_registry
-  where tenant_org_id is null;
-  if v_count <> 1 then
-    raise exception 'Tenant member should read platform-scoped source registry entries';
-  end if;
+  begin
+    perform 1 from platform.rule_sources;
+    raise exception 'Tenant member should not read platform rule sources';
+  exception
+    when sqlstate '42501' then
+      null;
+  end;
 
   begin
-    update source_registry
+    update platform.rule_sources
     set parser = 'xml'
     where id = v_platform_source_id;
-    raise exception 'Tenant member should not modify platform-scoped source registry entries';
+    raise exception 'Tenant member should not modify platform rule sources';
   exception
     when sqlstate '42501' then
       null;
@@ -108,9 +162,7 @@ begin
     raise exception 'Tenant member should read moderation queue entries';
   end if;
 
-  select count(*) into audit_rows from audit_log;
-
-  insert into adoption_records (tenant_org_id, scope, ref_id, from_version, to_version, mode, actor_id)
+  insert into adoption_records (org_id, scope, ref_id, from_version, to_version, mode, actor_id)
   values (tenant_one, 'rule', 'rbo_deadline', '1.0.0', '1.1.0', 'manual', user_one)
   returning id into v_adoption_id;
 
@@ -130,21 +182,21 @@ begin
   select count(*)
   into v_count
   from source_registry
-  where tenant_org_id = tenant_one;
+  where org_id = tenant_one;
   if v_count <> 0 then
     raise exception 'Cross-tenant read should be blocked by RLS';
   end if;
 
-  select count(*)
-  into v_count
-  from source_registry
-  where tenant_org_id is null;
-  if v_count <> 1 then
-    raise exception 'Platform entries should be visible to all tenants';
-  end if;
+  begin
+    perform 1 from platform.rule_pack_detections;
+    raise exception 'Tenant member should not read platform detections';
+  exception
+    when sqlstate '42501' then
+      null;
+  end;
 
   begin
-    insert into adoption_records (tenant_org_id, scope, ref_id, to_version, mode, actor_id)
+    insert into adoption_records (org_id, scope, ref_id, to_version, mode, actor_id)
     values (tenant_one, 'workflow', 'setup', '2.0.0', 'manual', user_two);
     raise exception 'Cross-tenant insert should have been blocked';
   exception
