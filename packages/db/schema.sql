@@ -1458,6 +1458,17 @@ create index platform_rule_pack_detection_sources_source_idx
 
 create schema if not exists app;
 
+create or replace function app.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb,
+    '{}'::jsonb
+  );
+$$;
+
 create or replace function app.current_user_id()
 returns uuid
 language sql
@@ -1471,7 +1482,18 @@ returns boolean
 language sql
 stable
 as $$
-  select coalesce(auth.jwt()->>'role', '') = 'platform_admin';
+  with claims as (
+    select app.jwt() as payload
+  )
+  select
+    coalesce(payload->>'role', '') = 'platform_admin'
+    or case jsonb_typeof(payload->'is_platform_admin')
+      when 'boolean' then (payload->'is_platform_admin')::boolean
+      when 'string' then lower(payload->>'is_platform_admin') in ('true','t','1','yes','y','on')
+      when 'number' then (payload->>'is_platform_admin')::numeric <> 0
+      else false
+    end
+  from claims;
 $$;
 
 create or replace function public.current_tenant_org_id()
@@ -1479,10 +1501,14 @@ returns uuid
 language sql
 stable
 as $$
+  with claims as (
+    select app.jwt() as payload
+  )
   select case
-    when auth.jwt() ? 'tenant_org_id' then nullif(auth.jwt()->>'tenant_org_id', '')::uuid
+    when payload ? 'tenant_org_id' then nullif(payload->>'tenant_org_id', '')::uuid
     else null
-  end;
+  end
+  from claims;
 $$;
 
 create or replace function public.jwt_has_org(target_org_id uuid)
@@ -1490,9 +1516,13 @@ returns boolean
 language sql
 stable
 as $$
+  with claims as (
+    select app.jwt() as payload
+  )
   select exists (
     select 1
-    from jsonb_array_elements_text(coalesce(auth.jwt()->'org_ids', '[]'::jsonb)) as org_id(value)
+    from claims,
+         jsonb_array_elements_text(coalesce(payload->'org_ids', '[]'::jsonb)) as org_id(value)
     where value = target_org_id::text
   );
 $$;
@@ -1502,10 +1532,14 @@ returns boolean
 language sql
 stable
 as $$
+  with claims as (
+    select app.jwt() as payload
+  )
   select auth.role() = 'service_role'
     or exists (
       select 1
-      from jsonb_array_elements_text(coalesce(auth.jwt()->'role_paths', '[]'::jsonb)) as role_path(value)
+      from claims,
+           jsonb_array_elements_text(coalesce(payload->'role_paths', '[]'::jsonb)) as role_path(value)
       where value like 'platform:service%'
     );
 $$;
