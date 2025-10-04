@@ -4,11 +4,19 @@ export type ExecutionMode =
   | "external:webhook"
   | "external:websocket";
 
-export interface ManualStepExecution {
+export interface ExecutionOverlayMetadata {
+  input_schema?: string;
+  permissions?: string[];
+  secret_aliases?: string[];
+  secrets?: string[];
+  externalWebhook?: Record<string, unknown>;
+}
+
+export interface ManualStepExecution extends ExecutionOverlayMetadata {
   mode: "manual";
 }
 
-export interface TemporalStepExecution {
+export interface TemporalStepExecution extends ExecutionOverlayMetadata {
   mode: "temporal";
   workflow?: string;
   taskQueue?: string;
@@ -36,7 +44,7 @@ export interface WebhookExecutionConfig {
   signing?: WebhookSigningConfig;
 }
 
-export interface WebhookStepExecution {
+export interface WebhookStepExecution extends ExecutionOverlayMetadata {
   mode: "external:webhook";
   config: WebhookExecutionConfig;
 }
@@ -51,7 +59,7 @@ export interface WebsocketExecutionConfig {
   tenantId?: string;
 }
 
-export interface WebsocketStepExecution {
+export interface WebsocketStepExecution extends ExecutionOverlayMetadata {
   mode: "external:websocket";
   config: WebsocketExecutionConfig;
 }

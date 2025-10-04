@@ -8,6 +8,9 @@
     "fc-pack": "bin/fc-pack.mjs"
   },
   "files": ["src", "bin"],
+  "scripts": {
+    "test": "tsx --test src/index.test.ts"
+  },
   "dependencies": {
     "@airnub/workflow-core": "workspace:*",
     "ajv": "^8.17.1",
