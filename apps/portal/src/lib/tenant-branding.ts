@@ -1,4 +1,5 @@
 import type { DocumentBrandingMetadata } from "@airnub/doc-templates";
+import { getServiceSupabaseClient } from "@airnub/utils/supabase-service";
 
 export interface TenantBrandingTokens {
   themeId?: string;
@@ -32,6 +33,8 @@ export interface TenantBrandingPayload {
   pdfHeader?: TenantPdfMetadata | null;
   pdfFooter?: TenantPdfMetadata | null;
   updatedAt?: string | null;
+  realmId?: string | null;
+  providerOrgId?: string | null;
 }
 
 const DEFAULT_CSS_VARIABLES: Record<string, string> = {
@@ -69,7 +72,9 @@ export const DEFAULT_TENANT_BRANDING: TenantBrandingPayload = {
   },
   pdfFooter: {
     text: "FreshComply — Compliance Simplified"
-  }
+  },
+  realmId: null,
+  providerOrgId: null
 };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -184,7 +189,9 @@ function coalesceBranding(row: Partial<TenantBrandingPayload> | null | undefined
     typography: (row.typography as TenantTypographySettings | null | undefined) ?? DEFAULT_TENANT_BRANDING.typography,
     pdfHeader: (row.pdfHeader as TenantPdfMetadata | null | undefined) ?? DEFAULT_TENANT_BRANDING.pdfHeader,
     pdfFooter: (row.pdfFooter as TenantPdfMetadata | null | undefined) ?? DEFAULT_TENANT_BRANDING.pdfFooter,
-    updatedAt: row.updatedAt ?? DEFAULT_TENANT_BRANDING.updatedAt
+    updatedAt: row.updatedAt ?? DEFAULT_TENANT_BRANDING.updatedAt,
+    realmId: row.realmId ?? DEFAULT_TENANT_BRANDING.realmId ?? null,
+    providerOrgId: row.providerOrgId ?? DEFAULT_TENANT_BRANDING.providerOrgId ?? null
   };
 }
 
@@ -248,33 +255,73 @@ export async function resolveTenantBranding(host: string | null | undefined): Pr
   }
 
   try {
-    const { url, anonKey } = ensureSupabaseEnv();
-    const response = await fetch(`${url}/rest/v1/rpc/resolve_tenant_branding`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`
-      },
-      body: JSON.stringify({ p_host: normalizedHost })
-    });
+    if (typeof window !== "undefined") {
+      // Browser execution falls back to the public REST endpoint.
+      const { url, anonKey } = ensureSupabaseEnv();
+      const response = await fetch(`${url}/rest/v1/realms?host=eq.${encodeURIComponent(normalizedHost)}`, {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`
+        }
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to resolve tenant branding (${response.status})`);
+      if (!response.ok) {
+        throw new Error(`Failed to resolve realm (${response.status})`);
+      }
+
+      const payload = (await response.json()) as Array<Record<string, unknown>>;
+      const realmRow = payload?.[0];
+      const realmTheme = decodeJsonPayload(realmRow?.theme) ?? {};
+      const themeRecord = realmTheme as Record<string, unknown>;
+      const branding = coalesceBranding({
+        tenantOrgId: (realmRow?.org_id as string | undefined) ?? DEFAULT_TENANT_BRANDING.tenantOrgId,
+        providerOrgId: (realmRow?.provider_org_id as string | undefined) ?? null,
+        realmId: (realmRow?.id as string | undefined) ?? null,
+        domain: normalizedHost,
+        tokens: decodeJsonPayload(themeRecord["tokens"]) as TenantBrandingTokens | undefined,
+        logoUrl: (themeRecord["logoUrl"] as string | undefined) ?? null,
+        faviconUrl: (themeRecord["faviconUrl"] as string | undefined) ?? null,
+        typography: decodeJsonPayload(themeRecord["typography"]) as TenantTypographySettings | undefined,
+        pdfHeader: decodeJsonPayload(themeRecord["pdfHeader"]) as TenantPdfMetadata | undefined,
+        pdfFooter: decodeJsonPayload(themeRecord["pdfFooter"]) as TenantPdfMetadata | undefined,
+        updatedAt: (realmRow?.updated_at as string | undefined) ?? null
+      });
+
+      brandingCache.set(normalizedHost, { data: branding, expiresAt: now() + CACHE_TTL_MS });
+      return branding;
     }
 
-    const payload = (await response.json()) as Array<Record<string, unknown>>;
-    const row = payload?.[0];
+    const supabase = getServiceSupabaseClient();
+    const { data, error } = await supabase
+      .from("realms")
+      .select("id, host, org_id, provider_org_id, theme, updated_at")
+      .eq("host", normalizedHost)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to resolve realm via service client: ${error.message}`);
+    }
+
+    if (!data) {
+      const fallback = DEFAULT_TENANT_BRANDING;
+      brandingCache.set(normalizedHost, { data: fallback, expiresAt: now() + CACHE_TTL_MS });
+      return fallback;
+    }
+
+    const realmTheme = decodeJsonPayload(data.theme) ?? {};
+    const themeRecord = realmTheme as Record<string, unknown>;
     const branding = coalesceBranding({
-      tenantOrgId: (row?.tenant_org_id as string | undefined) ?? DEFAULT_TENANT_BRANDING.tenantOrgId,
-      domain: (row?.domain as string | undefined) ?? normalizedHost,
-      tokens: decodeJsonPayload(row?.tokens) as TenantBrandingTokens | undefined,
-      logoUrl: (row?.logo_url as string | undefined) ?? null,
-      faviconUrl: (row?.favicon_url as string | undefined) ?? null,
-      typography: decodeJsonPayload(row?.typography) as TenantTypographySettings | undefined,
-      pdfHeader: decodeJsonPayload(row?.pdf_header) as TenantPdfMetadata | undefined,
-      pdfFooter: decodeJsonPayload(row?.pdf_footer) as TenantPdfMetadata | undefined,
-      updatedAt: (row?.updated_at as string | undefined) ?? null
+      tenantOrgId: data.org_id ?? DEFAULT_TENANT_BRANDING.tenantOrgId,
+      providerOrgId: data.provider_org_id ?? null,
+      realmId: data.id ?? null,
+      domain: normalizedHost,
+      tokens: decodeJsonPayload(themeRecord["tokens"]) as TenantBrandingTokens | undefined,
+      logoUrl: (themeRecord["logoUrl"] as string | undefined) ?? null,
+      faviconUrl: (themeRecord["faviconUrl"] as string | undefined) ?? null,
+      typography: decodeJsonPayload(themeRecord["typography"]) as TenantTypographySettings | undefined,
+      pdfHeader: decodeJsonPayload(themeRecord["pdfHeader"]) as TenantPdfMetadata | undefined,
+      pdfFooter: decodeJsonPayload(themeRecord["pdfFooter"]) as TenantPdfMetadata | undefined,
+      updatedAt: data.updated_at ?? null
     });
 
     brandingCache.set(normalizedHost, { data: branding, expiresAt: now() + CACHE_TTL_MS });

@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS billing_prices (
 
 CREATE TABLE IF NOT EXISTS billing_tenants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
   stripe_customer_id text UNIQUE,
   billing_mode billing_tenant_mode NOT NULL DEFAULT 'direct',
   partner_org_id uuid REFERENCES organisations(id),
@@ -50,12 +50,12 @@ CREATE TABLE IF NOT EXISTS billing_tenants (
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT billing_tenants_tenant_unique UNIQUE (tenant_org_id)
+  CONSTRAINT billing_tenants_tenant_unique UNIQUE (org_id)
 );
 
 CREATE TABLE IF NOT EXISTS billing_subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
   billing_tenant_id uuid REFERENCES billing_tenants(id) ON DELETE SET NULL,
   stripe_subscription_id text NOT NULL UNIQUE,
   status billing_subscription_status NOT NULL,
@@ -72,8 +72,8 @@ CREATE TABLE IF NOT EXISTS billing_subscriptions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS billing_tenants_tenant_idx ON billing_tenants(tenant_org_id);
-CREATE INDEX IF NOT EXISTS billing_subscriptions_tenant_idx ON billing_subscriptions(tenant_org_id);
+CREATE INDEX IF NOT EXISTS billing_tenants_tenant_idx ON billing_tenants(org_id);
+CREATE INDEX IF NOT EXISTS billing_subscriptions_tenant_idx ON billing_subscriptions(org_id);
 CREATE INDEX IF NOT EXISTS billing_subscriptions_status_idx ON billing_subscriptions(status);
 CREATE INDEX IF NOT EXISTS billing_prices_active_idx ON billing_prices(is_active);
 
@@ -98,7 +98,7 @@ CREATE POLICY IF NOT EXISTS "Service role manages billing tenants" ON billing_te
 CREATE POLICY IF NOT EXISTS "Tenant members read billing tenants" ON billing_tenants
   FOR SELECT USING (
     auth.role() = 'service_role'
-    OR public.is_member_of_org(tenant_org_id)
+    OR public.is_member_of_org(org_id)
   );
 
 CREATE POLICY IF NOT EXISTS "Service role manages billing subscriptions" ON billing_subscriptions
@@ -108,7 +108,7 @@ CREATE POLICY IF NOT EXISTS "Service role manages billing subscriptions" ON bill
 CREATE POLICY IF NOT EXISTS "Tenant members read billing subscriptions" ON billing_subscriptions
   FOR SELECT USING (
     auth.role() = 'service_role'
-    OR public.is_member_of_org(tenant_org_id)
+    OR public.is_member_of_org(org_id)
   );
 
 CREATE OR REPLACE FUNCTION public.rpc_upsert_billing_price(
@@ -187,7 +187,7 @@ GRANT EXECUTE ON FUNCTION public.rpc_upsert_billing_price(
 ) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.rpc_upsert_billing_tenant(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_stripe_customer_id text,
   p_billing_mode billing_tenant_mode DEFAULT 'direct',
   p_partner_org_id uuid DEFAULT NULL,
@@ -202,14 +202,14 @@ AS $$
 DECLARE
   v_tenant billing_tenants;
 BEGIN
-  IF p_tenant_org_id IS NULL THEN
+  IF p_org_id IS NULL THEN
     RAISE EXCEPTION 'Tenant organisation id is required' USING errcode = '23514';
   END IF;
 
-  PERFORM public.assert_tenant_membership(p_tenant_org_id);
+  PERFORM public.assert_tenant_membership(p_org_id);
 
   INSERT INTO billing_tenants AS bt (
-    tenant_org_id,
+    org_id,
     stripe_customer_id,
     billing_mode,
     partner_org_id,
@@ -218,7 +218,7 @@ BEGIN
     updated_at
   )
   VALUES (
-    p_tenant_org_id,
+    p_org_id,
     NULLIF(p_stripe_customer_id, ''),
     COALESCE(p_billing_mode, 'direct'),
     p_partner_org_id,
@@ -226,7 +226,7 @@ BEGIN
     COALESCE(p_metadata, '{}'::jsonb),
     now()
   )
-  ON CONFLICT (tenant_org_id) DO UPDATE
+  ON CONFLICT (org_id) DO UPDATE
     SET stripe_customer_id = EXCLUDED.stripe_customer_id,
         billing_mode = EXCLUDED.billing_mode,
         partner_org_id = EXCLUDED.partner_org_id,
@@ -249,7 +249,7 @@ GRANT EXECUTE ON FUNCTION public.rpc_upsert_billing_tenant(
 ) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.rpc_upsert_billing_subscription(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_billing_tenant_id uuid DEFAULT NULL,
   p_stripe_subscription_id text,
   p_status billing_subscription_status,
@@ -272,7 +272,7 @@ DECLARE
   v_subscription billing_subscriptions;
   v_billing_tenant_id uuid;
 BEGIN
-  IF p_tenant_org_id IS NULL THEN
+  IF p_org_id IS NULL THEN
     RAISE EXCEPTION 'Tenant organisation id is required' USING errcode = '23514';
   END IF;
 
@@ -280,7 +280,7 @@ BEGIN
     RAISE EXCEPTION 'Stripe subscription id is required' USING errcode = '23514';
   END IF;
 
-  PERFORM public.assert_tenant_membership(p_tenant_org_id);
+  PERFORM public.assert_tenant_membership(p_org_id);
 
   IF p_billing_tenant_id IS NOT NULL THEN
     v_billing_tenant_id := p_billing_tenant_id;
@@ -288,13 +288,13 @@ BEGIN
     SELECT id
       INTO v_billing_tenant_id
     FROM billing_tenants
-    WHERE tenant_org_id = p_tenant_org_id
+    WHERE org_id = p_org_id
     ORDER BY updated_at DESC
     LIMIT 1;
   END IF;
 
   INSERT INTO billing_subscriptions AS bs (
-    tenant_org_id,
+    org_id,
     billing_tenant_id,
     stripe_subscription_id,
     status,
@@ -310,7 +310,7 @@ BEGIN
     updated_at
   )
   VALUES (
-    p_tenant_org_id,
+    p_org_id,
     v_billing_tenant_id,
     p_stripe_subscription_id,
     p_status,
@@ -326,7 +326,7 @@ BEGIN
     now()
   )
   ON CONFLICT (stripe_subscription_id) DO UPDATE
-    SET tenant_org_id = EXCLUDED.tenant_org_id,
+    SET org_id = EXCLUDED.org_id,
         billing_tenant_id = EXCLUDED.billing_tenant_id,
         status = EXCLUDED.status,
         stripe_price_id = EXCLUDED.stripe_price_id,
@@ -363,7 +363,7 @@ GRANT EXECUTE ON FUNCTION public.rpc_upsert_billing_subscription(
 
 CREATE OR REPLACE VIEW billing_subscription_overview AS
 SELECT
-  bt.tenant_org_id,
+  bt.org_id,
   bt.billing_mode,
   bt.stripe_customer_id,
   bt.partner_org_id,

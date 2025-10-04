@@ -23,7 +23,7 @@ begin
     true
   );
 
-  insert into organisations (id, tenant_org_id, name, slug)
+  insert into organisations (id, org_id, name, slug)
   values
     (tenant_one, tenant_one, 'Tenant One', 'tenant-one'),
     (tenant_two, tenant_two, 'Tenant Two', 'tenant-two')
@@ -81,13 +81,13 @@ begin
     jsonb_build_object(
       'role', 'authenticated',
       'sub', user_one::text,
-      'tenant_org_id', tenant_one::text,
+      'org_id', tenant_one::text,
       'org_ids', jsonb_build_array(tenant_one::text)
     )::text,
     true
   );
   perform set_config('request.jwt.claim.sub', user_one::text, true);
-  perform set_config('request.jwt.claim.tenant_org_id', tenant_one::text, true);
+  perform set_config('request.jwt.claim.org_id', tenant_one::text, true);
 
   -- Tenant member can create resources for their org
   insert into tenant_secret_bindings (org_id, alias, provider, external_id)

@@ -33,7 +33,7 @@ as $$
   from claims;
 $$;
 
-create or replace function public.current_tenant_org_id()
+create or replace function public.current_org_id()
 returns uuid
 language sql
 stable
@@ -42,7 +42,7 @@ as $$
     select app.jwt() as payload
   )
   select case
-    when payload ? 'tenant_org_id' then nullif(payload->>'tenant_org_id', '')::uuid
+    when payload ? 'org_id' then nullif(payload->>'org_id', '')::uuid
     else null
   end
   from claims;

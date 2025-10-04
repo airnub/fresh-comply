@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       reason: parsed.reason,
       actor_id: context.userId,
       step_type: parsed.stepType,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

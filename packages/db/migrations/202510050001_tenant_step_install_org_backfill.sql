@@ -4,10 +4,10 @@ begin;
 perform pg_advisory_xact_lock(hashtext('tenant_step_type_installs.org_id.backfill'));
 
 with install_audit as (
-  select distinct on (target_id) target_id, tenant_org_id
+  select distinct on (target_id) target_id, org_id
   from audit_log
   where target_id is not null
-    and tenant_org_id is not null
+    and org_id is not null
     and (
       target_kind in ('tenant_step_type_install', 'tenant_step_type_installs')
       or entity = 'tenant_step_type_installs'
@@ -15,7 +15,7 @@ with install_audit as (
   order by target_id, created_at desc
 )
 update tenant_step_type_installs tsi
-set org_id = install_audit.tenant_org_id
+set org_id = install_audit.org_id
 from install_audit
 where tsi.id = install_audit.target_id
   and tsi.org_id is null;

@@ -24,6 +24,12 @@ function resolveServiceEnv() {
 }
 
 export function getServiceSupabaseClient(): ServiceSupabaseClient {
+  if (typeof window !== "undefined") {
+    throw new SupabaseServiceConfigurationError(
+      "Service Supabase client must only be instantiated on the server."
+    );
+  }
+
   const { url, serviceKey } = resolveServiceEnv();
   return createClient<Database>(url, serviceKey, {
     auth: { persistSession: false }

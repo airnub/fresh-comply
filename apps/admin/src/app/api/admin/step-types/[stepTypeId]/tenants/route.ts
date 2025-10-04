@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
       org_slug: install.org_slug,
       version_id: install.version_id ?? null,
       follow_latest: install.follow_latest ?? false,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

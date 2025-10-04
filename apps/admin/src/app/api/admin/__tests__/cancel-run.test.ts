@@ -70,7 +70,7 @@ describe("cancel run handler", () => {
       run_id: "run-9",
       reason: "Need to stop",
       second_actor_id: "00000000-0000-0000-0000-000000000002",
-      tenant_org_id: "10000000-0000-0000-0000-000000000000",
+      org_id: "10000000-0000-0000-0000-000000000000",
       actor_org_id: "10000000-0000-0000-0000-000000000000",
       on_behalf_of_org_id: null,
     });
@@ -150,7 +150,7 @@ describe("confirm admin action handler", () => {
     expect(callAdminRpcMock).toHaveBeenLastCalledWith("rpc_confirm_admin_action", {
       action_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
       actor_id: "00000000-0000-0000-0000-000000000002",
-      tenant_org_id: "10000000-0000-0000-0000-000000000000",
+      org_id: "10000000-0000-0000-0000-000000000000",
       actor_org_id: "10000000-0000-0000-0000-000000000000",
       on_behalf_of_org_id: null,
     });

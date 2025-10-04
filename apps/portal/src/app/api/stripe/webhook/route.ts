@@ -78,16 +78,16 @@ async function resolveTenantContext(
   if (params.tenantOrgId) {
     const { data, error } = await supabase
       .from("billing_tenants")
-      .select("id, tenant_org_id")
-      .eq("tenant_org_id", params.tenantOrgId)
+      .select("id, org_id")
+      .eq("org_id", params.tenantOrgId)
       .maybeSingle();
 
     if (error) {
       throw new Error(`Unable to resolve billing tenant: ${error.message}`);
     }
 
-    if (data?.tenant_org_id) {
-      return { tenantOrgId: data.tenant_org_id, billingTenantId: data.id ?? null };
+    if (data?.org_id) {
+      return { tenantOrgId: data.org_id, billingTenantId: data.id ?? null };
     }
 
     return { tenantOrgId: params.tenantOrgId, billingTenantId: null };
@@ -96,7 +96,7 @@ async function resolveTenantContext(
   if (params.customerId) {
     const { data, error } = await supabase
       .from("billing_tenants")
-      .select("id, tenant_org_id")
+      .select("id, org_id")
       .eq("stripe_customer_id", params.customerId)
       .maybeSingle();
 
@@ -104,8 +104,8 @@ async function resolveTenantContext(
       throw new Error(`Unable to resolve billing tenant by customer id: ${error.message}`);
     }
 
-    if (data?.tenant_org_id) {
-      return { tenantOrgId: data.tenant_org_id, billingTenantId: data.id ?? null };
+    if (data?.org_id) {
+      return { tenantOrgId: data.org_id, billingTenantId: data.id ?? null };
     }
   }
 
@@ -114,14 +114,14 @@ async function resolveTenantContext(
 
 async function upsertStripeCustomer(customer: Stripe.Customer, supabase: ServiceSupabaseClient) {
   const metadata = customer.metadata ?? {};
-  const tenantOrgId = normalizeTenantOrgId(metadata.tenant_org_id ?? metadata.tenantOrgId);
+  const tenantOrgId = normalizeTenantOrgId(metadata.org_id ?? metadata.tenantOrgId);
 
   if (!tenantOrgId) {
     return;
   }
 
   const { error } = await supabase.rpc("rpc_upsert_billing_tenant", {
-    p_tenant_org_id: tenantOrgId,
+    p_org_id: tenantOrgId,
     p_stripe_customer_id: customer.id,
     p_billing_mode: coerceBillingMode(metadata.billing_mode ?? metadata.billingMode),
     p_partner_org_id: toUuid(metadata.partner_org_id ?? metadata.partnerOrgId),
@@ -146,7 +146,7 @@ async function upsertStripeSubscription(
   supabase: ServiceSupabaseClient
 ) {
   const metadata = subscription.metadata ?? {};
-  const explicitTenantOrgId = normalizeTenantOrgId(metadata.tenant_org_id ?? metadata.tenantOrgId);
+  const explicitTenantOrgId = normalizeTenantOrgId(metadata.org_id ?? metadata.tenantOrgId);
   const context = await resolveTenantContext(supabase, {
     tenantOrgId: explicitTenantOrgId,
     customerId: typeof subscription.customer === "string" ? subscription.customer : null
@@ -171,7 +171,7 @@ async function upsertStripeSubscription(
   })();
 
   const { error } = await supabase.rpc("rpc_upsert_billing_subscription", {
-    p_tenant_org_id: context.tenantOrgId,
+    p_org_id: context.tenantOrgId,
     p_billing_tenant_id: context.billingTenantId,
     p_stripe_subscription_id: subscription.id,
     p_status: subscription.status,

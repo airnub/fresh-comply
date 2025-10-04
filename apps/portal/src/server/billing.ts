@@ -20,7 +20,7 @@ export async function loadTenantBillingOverview(): Promise<TenantBillingOverview
     const { data, error } = await supabase
       .from("billing_subscription_overview")
       .select("*")
-      .eq("tenant_org_id", branding.tenantOrgId)
+      .eq("org_id", branding.tenantOrgId)
       .maybeSingle();
 
     if (error) {

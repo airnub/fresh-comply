@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: { runId: stri
       reason: parsed.reason,
       signal: parsed.signal,
       payload: parsed.payload,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

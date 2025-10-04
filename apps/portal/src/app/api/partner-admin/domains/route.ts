@@ -72,7 +72,7 @@ export function createDomainRoutes({
       try {
         const supabase = getClient();
         const { data, error } = await supabase.rpc("rpc_upsert_tenant_domain", {
-          p_tenant_org_id: tenantBranding.tenantOrgId,
+          p_org_id: tenantBranding.tenantOrgId,
           p_domain: payload.domain,
           p_is_primary: payload.isPrimary ?? false
         });
@@ -133,7 +133,7 @@ export function createDomainRoutes({
           }
 
           const { data, error } = await supabase.rpc("rpc_upsert_tenant_domain", {
-            p_tenant_org_id: tenantBranding.tenantOrgId,
+            p_org_id: tenantBranding.tenantOrgId,
             p_domain: payload.domain,
             p_is_primary: true
           });

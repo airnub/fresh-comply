@@ -111,7 +111,7 @@ function seedSupabase() {
   (getSupabaseClient as unknown as vi.Mock).mockReturnValue(client);
   (getSupabaseUser as unknown as vi.Mock).mockResolvedValue({
     id: USER_ID,
-    app_metadata: { tenant_org_id: TENANT_ID },
+    app_metadata: { org_id: TENANT_ID },
     user_metadata: {},
   });
 

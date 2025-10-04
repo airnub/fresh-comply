@@ -49,7 +49,7 @@ export function createBrandingRoute({
       try {
         const supabase = getClient();
         const { data, error } = await supabase.rpc("rpc_upsert_tenant_branding", {
-          p_tenant_org_id: tenantBranding.tenantOrgId,
+          p_org_id: tenantBranding.tenantOrgId,
           p_tokens: payload.tokens ?? {},
           p_logo_url: payload.logoUrl ?? null,
           p_favicon_url: payload.faviconUrl ?? null,

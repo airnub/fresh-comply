@@ -78,7 +78,7 @@ test("POST claims domain and emits audit metadata", async () => {
           data: {
             domain: {
               id: "domain-1",
-              tenant_org_id: tenantBrandingStub.tenantOrgId,
+              org_id: tenantBrandingStub.tenantOrgId,
               domain: "tenant.example.com",
               is_primary: false,
               cert_status: "pending",
@@ -119,7 +119,7 @@ test("POST claims domain and emits audit metadata", async () => {
     assert.equal(json.ok, true);
     assert.deepEqual(json.domain, {
       id: "domain-1",
-      tenant_org_id: tenantBrandingStub.tenantOrgId,
+      org_id: tenantBrandingStub.tenantOrgId,
       domain: "tenant.example.com",
       is_primary: false,
       cert_status: "pending",
@@ -146,7 +146,7 @@ test("PATCH verifies domain and returns audit entry", async () => {
             data: {
               domain: {
                 id: params.p_domain_id,
-                tenant_org_id: tenantBrandingStub.tenantOrgId,
+                org_id: tenantBrandingStub.tenantOrgId,
                 domain: "tenant.example.com",
                 is_primary: false,
                 cert_status: "issued",
