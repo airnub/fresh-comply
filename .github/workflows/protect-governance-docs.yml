@@ -1,0 +1,27 @@
+name: Protect Governance Docs
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Detect changes to locked docs
+        id: changes
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" | tr '\n' ' ')
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+          echo "$CHANGED"
+      - name: Fail if locked docs changed without allow-spec-edit
+        if: >
+          (contains(steps.changes.outputs.changed, 'docs/specs/FreshComply-Spec.md') ||
+           contains(steps.changes.outputs.changed, 'docs/agents.md') ||
+           contains(steps.changes.outputs.changed, 'docs/architecture/ARD.md'))
+           && !contains(join(fromJSON(toJSON(github.event.pull_request.labels)).*.name, ','), 'allow-spec-edit')
+        run: |
+          echo "Locked docs changed but PR lacks 'allow-spec-edit' label." >&2
+          exit 1
