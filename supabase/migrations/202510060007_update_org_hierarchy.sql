@@ -141,7 +141,7 @@ begin
         on m.org_id = provider.id
        and m.user_id = subject
        and m.status = 'active'
-       and m.role in ('provider_admin', 'org_admin')
+       and m.role = 'provider_admin'
   );
 end;
 $$;
