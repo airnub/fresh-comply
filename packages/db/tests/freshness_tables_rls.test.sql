@@ -15,6 +15,9 @@ declare
   v_snapshot_id uuid;
   v_moderation_id uuid;
   v_adoption_id uuid;
+  v_admin_source_id uuid;
+  v_admin_adoption_id uuid;
+  v_text text;
   v_count integer;
 begin
   perform set_config(
@@ -217,6 +220,83 @@ begin
     raise exception 'Adoption record insert did not append audit log entry';
   end if;
 
+  -- Platform administrators should bypass tenant-level RLS
+  perform set_config('request.jwt.claim.role', 'platform_admin', true);
+  perform set_config('request.jwt.claim.sub', user_one::text, true);
+
+  insert into source_registry (org_id, name, url, parser, jurisdiction, category)
+  values (tenant_two, 'Admin Source', 'https://example.test/admin-source', 'html', 'ie', 'platform-admin')
+  returning id into v_admin_source_id;
+
+  select count(*)
+  into v_count
+  from source_registry
+  where id = v_admin_source_id
+    and org_id = tenant_two;
+
+  if v_count <> 1 then
+    raise exception 'Platform admin should read and insert cross-tenant source registry rows';
+  end if;
+
+  update source_registry
+  set parser = 'xml'
+  where id = v_admin_source_id;
+
+  select parser into v_text
+  from source_registry
+  where id = v_admin_source_id;
+
+  if v_text <> 'xml' then
+    raise exception 'Platform admin update on tenant sources should succeed';
+  end if;
+
+  perform 1
+  from platform.rule_sources
+  where id = v_platform_source_id;
+
+  update platform.rule_sources
+  set parser = 'json'
+  where id = v_platform_source_id;
+
+  select parser into v_text
+  from platform.rule_sources
+  where id = v_platform_source_id;
+
+  if v_text <> 'json' then
+    raise exception 'Platform admin should be able to update platform rule sources';
+  end if;
+
+  perform 1
+  from platform.rule_pack_detections
+  where id = v_detection_id;
+
+  update platform.rule_pack_detections
+  set severity = 'major'
+  where id = v_detection_id;
+
+  select severity into v_text
+  from platform.rule_pack_detections
+  where id = v_detection_id;
+
+  if v_text <> 'major' then
+    raise exception 'Platform admin should be able to update platform rule pack detections';
+  end if;
+
+  insert into adoption_records (org_id, scope, ref_id, from_version, to_version, mode, actor_id)
+  values (tenant_two, 'rule', 'admin_rule', '1.0.0', '1.2.0', 'manual', user_one)
+  returning id into v_admin_adoption_id;
+
+  select count(*)
+  into v_count
+  from adoption_records
+  where id = v_admin_adoption_id
+    and org_id = tenant_two;
+
+  if v_count <> 1 then
+    raise exception 'Platform admin should be able to manage adoption records for any tenant';
+  end if;
+
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
   perform set_config(
     'request.jwt.claims',
     jsonb_build_object(
