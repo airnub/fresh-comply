@@ -72,7 +72,7 @@ FreshComply enables multi-tenant compliance with:
   - Enable RLS; allow **admin** read/write; tenant access via **views/RPCs** only.
 
 ## 7) Change Control & CI
-- CI blocks: any RLS that checks `org_id IS NULL` or `tenant_org_id IS NULL`
+- CI blocks: any RLS that checks `org_id IS NULL` or `parent_org_id IS NULL`
 - CI blocks: any client/browser path attempting to **write** to `platform.*`
 - PR template: explicit checkbox “This PR edits locked governance docs” (must be labeled)
 - Branch protections: main is protected; 2 approvals required for locked files

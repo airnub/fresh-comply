@@ -11,7 +11,7 @@ jobs:
           set -euo pipefail
           mapfile -d '' matches < <(
             grep -RPzl --include='*.sql' \
-              'create\s+policy[\s\S]{0,200}(org_id|tenant_org_id)\s+is\s+null' \
+              'create\s+policy[\s\S]{0,200}(org_id|parent_org_id)\s+is\s+null' \
               packages/db/migrations supabase/migrations || true
           )
 
