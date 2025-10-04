@@ -10,7 +10,7 @@
 2. **No authentication middleware or helpers detected.**
    - There are no Next.js middleware, server components, or API routes instantiating a Supabase client or handling auth session cookies.【f0e6ee†L1-L2】
 3. **Database/RLS configuration missing.**
-   - The project contains specifications referencing Supabase and RLS in documentation, but there is no actual database package or SQL migration defining tables, enabling RLS, or creating policies.【F:docs/specs/fresh-comply-spec.md†L13-L34】
+   - The project contains specifications referencing Supabase and RLS in documentation, but there is no actual database package or SQL migration defining tables, enabling RLS, or creating policies.【F:docs/specs/FreshComply-Consolidated-Spec.md†L13-L34】
 
 ## Risk Assessment
 - **Status:** Requirements not implemented.

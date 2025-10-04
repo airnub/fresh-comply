@@ -18,7 +18,7 @@
 5) **Multi‑tenant**: organisations, memberships, **engagements** (act on behalf), workflow runs, steps, documents, notifications, audit log, calendar events; RLS policies for Supabase.  
 6) **Document factory**: Handlebars/MDX → Markdown/PDF (board minutes, TR2 helper, policy stubs).  
 7) **Notifications**: in‑app (realtime) + email (SMTP), daily digests & overdue escalations.  
-8) **Docs**: `AGENTS.md` (root), `docs/ROADMAP.md`, `docs/specs/fresh-comply-spec.md` (detailed spec).  
+8) **Docs**: `AGENTS.md` (root), `docs/ROADMAP.md`, `docs/specs/FreshComply-Consolidated-Spec.md` (detailed spec).  
 
 **Acceptance Criteria**
 - `pnpm i && pnpm dev` starts the portal and loads a demo **workflow run** with visible steps, assignees, due dates, and a **timeline** + **task board** view.  
@@ -26,7 +26,7 @@
 - "Re‑verify" button on a rule works in dev mode (stubbed, marks `last_verified_at`).  
 - A demo **doc** (Board Minute) renders to Markdown and downloadable PDF.  
 - ICS feed endpoint returns at least one calendar item.  
-- `AGENTS.md` links to `docs/specs/fresh-comply-spec.md`.  
+- `AGENTS.md` links to `docs/specs/FreshComply-Consolidated-Spec.md`.  
 
 ---
 
@@ -443,7 +443,7 @@ pnpm build
 ```
 
 ## Specs
-See **[Fresh-Comply Product Spec](docs/specs/fresh-comply-spec.md)** for architecture, data model, DSL, and roadmap.
+See **[Fresh-Comply Product Spec](docs/specs/FreshComply-Consolidated-Spec.md)** for architecture, data model, DSL, and roadmap.
 ```
 
 ### `docs/ROADMAP.md`
@@ -467,7 +467,7 @@ See **[Fresh-Comply Product Spec](docs/specs/fresh-comply-spec.md)** for archite
 - ROS integration exploration (cert onboarding) or guided filing polish
 ```
 
-### `docs/specs/fresh-comply-spec.md`
+### `docs/specs/FreshComply-Consolidated-Spec.md`
 ```md
 # FreshComply — Product Spec (v2025-10-02)
 
@@ -520,7 +520,7 @@ Time to CRO-ready pack (<60m); RBO within 5 months; eTax Clearance within 30 day
 6) Add `packages/doc-templates` with 1–2 templates and a simple renderer (Node script OK).  
 7) Add `packages/db` with SQL schema + demo seeds.  
 8) Implement API routes: `/api/ics` and `/api/reverify`.  
-9) Create docs: `AGENTS.md`, `docs/ROADMAP.md`, `docs/specs/fresh-comply-spec.md`.  
+9) Create docs: `AGENTS.md`, `docs/ROADMAP.md`, `docs/specs/FreshComply-Consolidated-Spec.md`.  
 10) Provide a `README.md` snippet in root explaining `pnpm i`, `pnpm dev`.
 
 ---

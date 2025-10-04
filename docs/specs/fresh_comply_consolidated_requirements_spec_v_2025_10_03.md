@@ -90,7 +90,7 @@ steps:
 These are integrated as:
 - `packages/workflows/…` (flow definitions)
 - `packages/doc-templates/…` (constitution seeds, minutes, policy stubs)
-- `docs/specs/fresh-comply-spec.md` (expanded per §7–§12)
+- `docs/specs/FreshComply-Consolidated-Spec.md` (expanded per §7–§12)
 
 ---
 

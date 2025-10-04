@@ -1,5 +1,8 @@
 # FreshComply — Consolidated Requirements & Spec (v2025-10-03 • Full Update)
 
+> [!WARNING]
+> Archived 2025-10-04 — Superseded by [docs/specs/FreshComply-Consolidated-Spec.md](../../specs/FreshComply-Consolidated-Spec.md).
+
 **Repo:** `@airnub/fresh-comply`
 **Version:** 2025‑10‑03
 **Owner:** @airnub
@@ -148,7 +151,7 @@ These are integrated as:
 
 * `packages/workflows/…` (flow definitions)
 * `packages/doc-templates/…` (constitution seeds, minutes, policy stubs)
-* `docs/specs/fresh-comply-spec.md` (expanded per §7–§12)
+* `docs/specs/FreshComply-Consolidated-Spec.md` (expanded per §7–§12)
 
 ---
 
