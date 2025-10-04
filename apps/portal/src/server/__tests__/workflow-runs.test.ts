@@ -40,61 +40,62 @@ test("createWorkflowRun materialises lockfile and stores snapshot", async () => 
       workflow_defs: [
         {
           id: WORKFLOW_DEF_ID,
+          org_id: TENANT_ID,
           key: baseGraph.id,
           version: baseGraph.version,
-        title: "Demo",
-        dsl_json: baseGraph
-      }
-    ],
-    workflow_def_versions: [
-      {
-        id: "definition-version-1",
-        tenant_org_id: TENANT_ID,
-        workflow_def_id: WORKFLOW_DEF_ID,
-        version: baseGraph.version,
-        checksum: "wf-checksum",
-        graph_jsonb: baseGraph,
-        rule_ranges: { "rule.deadline": { version: "2.0.0" } },
-        template_ranges: { constitution: { version: "3.1.0" } }
-      }
-    ],
-    workflow_pack_versions: [
-      {
-        id: "overlay-version-1",
-        tenant_org_id: TENANT_ID,
-        pack_id: "tenant-pack",
-        version: "1.2.0",
-        checksum: "overlay-checksum",
-        overlay_jsonb: overlayOperations
-      }
-    ],
-    rule_versions: [
-      {
-        id: "rule-version-1",
-        tenant_org_id: TENANT_ID,
-        rule_id: "rule.deadline",
-        version: "2.0.0",
-        checksum: "rule-checksum",
-        sources: [
-          {
-            source_key: "cro_open_services",
-            snapshot_id: "snapshot-1",
-            fingerprint: "fingerprint-1"
-          }
-        ]
-      }
-    ],
-    template_versions: [
-      {
-        id: "template-version-1",
-        tenant_org_id: TENANT_ID,
-        template_id: "constitution",
-        version: "3.1.0",
-        checksum: "template-checksum",
-        storage_ref: "s3://templates/constitution"
-      }
-    ]
-  });
+          title: "Demo",
+          dsl_json: baseGraph
+        }
+      ],
+      workflow_def_versions: [
+        {
+          id: "definition-version-1",
+          org_id: TENANT_ID,
+          workflow_def_id: WORKFLOW_DEF_ID,
+          version: baseGraph.version,
+          checksum: "wf-checksum",
+          graph_jsonb: baseGraph,
+          rule_ranges: { "rule.deadline": { version: "2.0.0" } },
+          template_ranges: { constitution: { version: "3.1.0" } }
+        }
+      ],
+      workflow_pack_versions: [
+        {
+          id: "overlay-version-1",
+          org_id: TENANT_ID,
+          pack_id: "tenant-pack",
+          version: "1.2.0",
+          checksum: "overlay-checksum",
+          overlay_jsonb: overlayOperations
+        }
+      ],
+      rule_versions: [
+        {
+          id: "rule-version-1",
+          org_id: TENANT_ID,
+          rule_id: "rule.deadline",
+          version: "2.0.0",
+          checksum: "rule-checksum",
+          sources: [
+            {
+              source_key: "cro_open_services",
+              snapshot_id: "snapshot-1",
+              fingerprint: "fingerprint-1"
+            }
+          ]
+        }
+      ],
+      template_versions: [
+        {
+          id: "template-version-1",
+          org_id: TENANT_ID,
+          template_id: "constitution",
+          version: "3.1.0",
+          checksum: "template-checksum",
+          storage_ref: "s3://templates/constitution"
+        }
+      ]
+    });
 
     const overlays: OverlayReference[] = [{ id: "tenant-pack", version: "1.2.0" }];
     const result = await createWorkflowRun(client, {
@@ -138,6 +139,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
       workflow_defs: [
         {
           id: WORKFLOW_DEF_ID,
+          org_id: TENANT_ID,
           key: baseGraph.id,
           version: baseGraph.version,
           title: "Demo",
@@ -147,7 +149,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
       workflow_def_versions: [
         {
           id: "definition-version-range",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           workflow_def_id: WORKFLOW_DEF_ID,
           version: baseGraph.version,
           checksum: "wf-range-checksum",
@@ -159,7 +161,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
       workflow_pack_versions: [
         {
           id: "overlay-version-range",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           pack_id: "tenant-pack",
           version: "1.3.0",
           checksum: "overlay-range-checksum",
@@ -169,7 +171,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
       rule_versions: [
         {
           id: "rule-version-1",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           rule_id: "rule.deadline",
           version: "1.5.0",
           checksum: "rule-checksum-1",
@@ -177,7 +179,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
         },
         {
           id: "rule-version-2",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           rule_id: "rule.deadline",
           version: "2.0.0",
           checksum: "rule-checksum-2",
@@ -185,7 +187,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
         },
         {
           id: "rule-version-3",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           rule_id: "rule.deadline",
           version: "2.5.0",
           checksum: "rule-checksum-3",
@@ -195,7 +197,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
       template_versions: [
         {
           id: "template-version-1",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           template_id: "constitution",
           version: "2.9.0",
           checksum: "template-checksum-1",
@@ -203,7 +205,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
         },
         {
           id: "template-version-2",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           template_id: "constitution",
           version: "3.0.0",
           checksum: "template-checksum-2",
@@ -211,7 +213,7 @@ test("createWorkflowRun resolves range selectors to latest satisfying versions",
         },
         {
           id: "template-version-3",
-          tenant_org_id: TENANT_ID,
+          org_id: TENANT_ID,
           template_id: "constitution",
           version: "3.2.0",
           checksum: "template-checksum-3",

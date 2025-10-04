@@ -10,6 +10,8 @@ import type { Json } from "@airnub/types/supabase";
 
 type PendingUpdate = {
   id: string;
+  proposalId: string;
+  detectionId: string;
   sourceKey: string;
   summary: string;
   detectedAt: string;
@@ -40,11 +42,18 @@ type PlatformDetectionRow = Database["platform"]["Tables"]["rule_pack_detections
   } & Database["platform"]["Tables"]["rule_pack_detection_sources"]["Row"])[] | null;
 };
 
+type PlatformProposalRow = Database["platform"]["Tables"]["rule_pack_proposals"]["Row"] & {
+  detection?: PlatformDetectionRow | null;
+  rule_pack?: { title: string | null } | null;
+};
+
 function buildFallback(): PendingUpdate[] {
   const detectedAt = new Date().toISOString();
   return [
     {
-      id: "demo-cro",
+      id: "demo-proposal",
+      proposalId: "demo-proposal",
+      detectionId: "demo-detection",
       sourceKey: "cro_open_services",
       summary: "CRO Open Services 1.2.0 → 1.2.1",
       detectedAt,
@@ -76,28 +85,41 @@ export async function getPendingFreshnessUpdates(): Promise<PendingUpdate[]> {
     const supabase = getSupabaseServiceRoleClient();
     const { data, error } = await supabase
       .schema("platform")
-      .from("rule_pack_detections")
+      .from("rule_pack_proposals")
       .select(
         `
           id,
+          detection_id,
           rule_pack_key,
           current_version,
           proposed_version,
-          severity,
           status,
-          diff,
-          detected_at,
-          notes,
-          rule_packs:rule_pack_id(title),
-          detection_sources:rule_pack_detection_sources(
-            rule_source_id,
-            change_summary,
-            rule_source:rule_sources(name)
-          )
+          changelog,
+          review_notes,
+          updated_at,
+          detection:rule_pack_detections(
+            id,
+            rule_pack_key,
+            current_version,
+            proposed_version,
+            severity,
+            status,
+            diff,
+            detected_at,
+            notes,
+            rule_pack_id,
+            rule_packs:rule_pack_id(title),
+            detection_sources:rule_pack_detection_sources(
+              rule_source_id,
+              change_summary,
+              rule_source:rule_sources(name)
+            )
+          ),
+          rule_pack:rule_packs!rule_pack_proposals_rule_pack_id_fkey(title)
         `
       )
-      .in("status", ["open", "in_review"])
-      .order("detected_at", { ascending: false });
+      .in("status", ["pending", "in_review", "approved"])
+      .order("updated_at", { ascending: false });
 
     if (error) {
       throw error;
@@ -107,7 +129,7 @@ export async function getPendingFreshnessUpdates(): Promise<PendingUpdate[]> {
       return [];
     }
 
-    return data.map(mapPlatformDetectionToPendingUpdate).filter(Boolean) as PendingUpdate[];
+    return data.map(mapPlatformProposalToPendingUpdate).filter(Boolean) as PendingUpdate[];
   } catch (error) {
     if (
       !(
@@ -121,12 +143,13 @@ export async function getPendingFreshnessUpdates(): Promise<PendingUpdate[]> {
   }
 }
 
-function mapPlatformDetectionToPendingUpdate(row: PlatformDetectionRow | null): PendingUpdate | null {
-  if (!row) return null;
+function mapPlatformProposalToPendingUpdate(row: PlatformProposalRow | null): PendingUpdate | null {
+  if (!row?.detection) return null;
 
-  const diffRecord = toRecord(row.diff);
+  const detection = row.detection;
+  const diffRecord = toRecord(detection.diff);
   const workflows = diffRecord ? extractWorkflows(diffRecord) : [];
-  const summary = resolveDetectionSummary(row, diffRecord);
+  const summary = resolveDetectionSummary(detection, diffRecord);
   const current = resolveSnapshot(diffRecord, "current");
   const previous = resolveSnapshot(diffRecord, "previous");
   const verifiedAt = extractTimestamp(
@@ -139,20 +162,22 @@ function mapPlatformDetectionToPendingUpdate(row: PlatformDetectionRow | null): 
 
   return {
     id: row.id,
-    sourceKey: row.rule_pack_key,
+    proposalId: row.id,
+    detectionId: detection.id,
+    sourceKey: detection.rule_pack_key,
     summary,
-    detectedAt: row.detected_at ?? new Date().toISOString(),
+    detectedAt: detection.detected_at ?? new Date().toISOString(),
     status: mapDetectionStatus(row.status),
     workflows,
     diff: extractSourceDiff(diffRecord),
     current,
     previous,
-    severity: row.severity ?? undefined,
-    packTitle: row.rule_packs?.title ?? null,
-    proposedVersion: row.proposed_version ?? undefined,
-    currentVersion: row.current_version ?? null,
-    sources: (row.detection_sources ?? []).map(mapDetectionSource),
-    notes: row.notes ?? null,
+    severity: detection.severity ?? undefined,
+    packTitle: row.rule_pack?.title ?? detection.rule_packs?.title ?? null,
+    proposedVersion: row.proposed_version ?? detection.proposed_version ?? undefined,
+    currentVersion: row.current_version ?? detection.current_version ?? null,
+    sources: (detection.detection_sources ?? []).map(mapDetectionSource),
+    notes: row.review_notes ?? detection.notes ?? null,
     verifiedAt,
   } satisfies PendingUpdate;
 }
@@ -242,10 +267,12 @@ function resolveSnapshot(diff: Record<string, unknown> | null, key: "current" | 
 function mapDetectionStatus(status: string | null | undefined): PendingUpdate["status"] {
   switch (status) {
     case "approved":
+    case "published":
+    case "superseded":
       return "approved";
     case "rejected":
       return "rejected";
-    case "superseded":
+    case "amended":
       return "amended";
     default:
       return "pending";

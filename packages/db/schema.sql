@@ -35,16 +35,20 @@ create table engagements(
 
 create table workflow_defs(
   id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organisations(id),
   key text not null,
   version text not null,
   title text not null,
   dsl_json jsonb not null,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  unique(org_id, id)
 );
+
+create index workflow_defs_org_key_idx on workflow_defs(org_id, key);
 
 create table workflow_runs(
   id uuid primary key default gen_random_uuid(),
-  workflow_def_id uuid references workflow_defs(id),
+  workflow_def_id uuid,
   subject_org_id uuid references organisations(id),
   engager_org_id uuid references organisations(id),
   tenant_org_id uuid not null references organisations(id),
@@ -53,7 +57,9 @@ create table workflow_runs(
   orchestration_workflow_id text,
   created_by_user_id uuid references users(id),
   merged_workflow_snapshot jsonb,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  constraint workflow_runs_workflow_def_fk
+    foreign key (tenant_org_id, workflow_def_id) references workflow_defs(org_id, id)
 );
 
 create table steps(
@@ -81,41 +87,10 @@ create table json_schemas(
   created_at timestamptz default now()
 );
 
-create table step_types(
-  id uuid primary key default gen_random_uuid(),
-  slug text unique not null,
-  title text not null,
-  category text,
-  summary text,
-  latest_version text,
-  created_by uuid references users(id),
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-create table step_type_versions(
-  id uuid primary key default gen_random_uuid(),
-  step_type_id uuid references step_types(id) on delete cascade,
-  version text not null,
-  definition jsonb not null,
-  input_schema_id uuid references json_schemas(id),
-  output_schema_id uuid references json_schemas(id),
-  status text check (status in ('draft','published','deprecated')) default 'draft',
-  created_by uuid references users(id),
-  created_at timestamptz default now(),
-  published_at timestamptz,
-  unique(step_type_id, version)
-);
-
-alter table steps
-  add constraint steps_step_type_version_id_fkey
-  foreign key (step_type_version_id)
-  references step_type_versions(id);
-
 create table tenant_step_type_installs(
   id uuid primary key default gen_random_uuid(),
   org_id uuid references organisations(id) on delete cascade,
-  step_type_version_id uuid references step_type_versions(id) on delete cascade,
+  step_type_version_id uuid,
   installed_at timestamptz default now(),
   status text check (status in ('enabled','disabled')) default 'enabled',
   unique(org_id, step_type_version_id)
@@ -136,15 +111,17 @@ create index tenant_secret_bindings_org_alias_idx on tenant_secret_bindings(org_
 
 create table tenant_workflow_overlays(
   id uuid primary key default gen_random_uuid(),
-  org_id uuid not null references organisations(id) on delete cascade,
-  workflow_def_id uuid references workflow_defs(id) on delete cascade,
+  org_id uuid references organisations(id) on delete cascade,
+  workflow_def_id uuid not null,
   title text not null,
   patch jsonb not null,
   status text check (status in ('draft','published','archived')) default 'draft',
   created_by uuid references users(id),
   updated_at timestamptz default now(),
   created_at timestamptz default now(),
-  unique(org_id, workflow_def_id, title)
+  unique(org_id, workflow_def_id, title),
+  constraint tenant_workflow_overlays_workflow_def_fk
+    foreign key (org_id, workflow_def_id) references workflow_defs(org_id, id) on delete cascade
 );
 
 create index tenant_workflow_overlays_org_workflow_idx on tenant_workflow_overlays(org_id, workflow_def_id);
@@ -1106,6 +1083,38 @@ left join billing_prices bp on bp.stripe_price_id = coalesce(bs.stripe_price_id,
 
 grant select on billing_subscription_overview to authenticated, service_role;
 
+create or replace view v_step_types as
+select
+  st.id,
+  st.slug,
+  st.title,
+  st.category,
+  st.summary,
+  st.latest_version,
+  st.created_by,
+  st.created_at,
+  st.updated_at
+from platform.step_types st;
+
+create or replace view v_step_type_versions as
+select
+  stv.id,
+  stv.step_type_id,
+  st.slug as step_type_slug,
+  stv.version,
+  stv.definition,
+  stv.input_schema_id,
+  stv.output_schema_id,
+  stv.status,
+  stv.created_by,
+  stv.created_at,
+  stv.published_at
+from platform.step_type_versions stv
+join platform.step_types st on st.id = stv.step_type_id;
+
+grant select on v_step_types to authenticated, service_role;
+grant select on v_step_type_versions to authenticated, service_role;
+
 create table dsr_requests (
   id uuid primary key default gen_random_uuid(),
   tenant_org_id uuid not null references organisations(id),
@@ -1303,7 +1312,7 @@ create index template_versions_org_idx on template_versions(org_id);
 create table workflow_def_versions (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references organisations(id),
-  workflow_def_id uuid not null references workflow_defs(id) on delete cascade,
+  workflow_def_id uuid not null,
   version text not null,
   graph_jsonb jsonb not null,
   rule_ranges jsonb not null default '{}'::jsonb,
@@ -1311,7 +1320,9 @@ create table workflow_def_versions (
   checksum text not null,
   created_by uuid references users(id),
   created_at timestamptz not null default now(),
-  unique(workflow_def_id, version)
+  unique(workflow_def_id, version),
+  constraint workflow_def_versions_workflow_def_fk
+    foreign key (org_id, workflow_def_id) references workflow_defs(org_id, id) on delete cascade
 );
 
 create index workflow_def_versions_org_idx on workflow_def_versions(org_id);
@@ -1384,6 +1395,42 @@ create index adoption_records_scope_idx on adoption_records(org_id, scope, ref_i
 create index adoption_records_run_idx on adoption_records(run_id);
 
 create schema if not exists platform;
+
+create table platform.step_types (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  category text,
+  summary text,
+  latest_version text,
+  created_by uuid references users(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table platform.step_type_versions (
+  id uuid primary key default gen_random_uuid(),
+  step_type_id uuid not null references platform.step_types(id) on delete cascade,
+  version text not null,
+  definition jsonb not null,
+  input_schema_id uuid references json_schemas(id),
+  output_schema_id uuid references json_schemas(id),
+  status text check (status in ('draft','published','deprecated')) default 'draft',
+  created_by uuid references users(id),
+  created_at timestamptz default now(),
+  published_at timestamptz,
+  unique(step_type_id, version)
+);
+
+alter table steps
+  add constraint steps_step_type_version_id_fkey
+  foreign key (step_type_version_id)
+  references platform.step_type_versions(id);
+
+alter table tenant_step_type_installs
+  add constraint tenant_step_type_installs_step_type_version_id_fkey
+  foreign key (step_type_version_id)
+  references platform.step_type_versions(id) on delete cascade;
 
 create table platform.rule_sources (
   id uuid primary key default gen_random_uuid(),
@@ -1459,6 +1506,32 @@ create table platform.rule_pack_detection_sources (
 
 create index platform_rule_pack_detection_sources_source_idx
   on platform.rule_pack_detection_sources(rule_source_id);
+
+create table platform.rule_pack_proposals (
+  id uuid primary key default gen_random_uuid(),
+  detection_id uuid not null references platform.rule_pack_detections(id) on delete cascade,
+  rule_pack_id uuid references platform.rule_packs(id) on delete set null,
+  rule_pack_key text not null,
+  current_version text,
+  proposed_version text not null,
+  changelog jsonb not null default '{}'::jsonb,
+  status text not null default 'pending'
+    check (status in ('pending','in_review','approved','rejected','amended','published','superseded')),
+  review_notes text,
+  created_by uuid references users(id),
+  approved_by uuid references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  approved_at timestamptz,
+  published_at timestamptz,
+  unique(detection_id)
+);
+
+create index platform_rule_pack_proposals_status_idx
+  on platform.rule_pack_proposals(status);
+
+create index platform_rule_pack_proposals_pack_idx
+  on platform.rule_pack_proposals(rule_pack_key, proposed_version);
 
 create schema if not exists app;
 
@@ -1611,8 +1684,6 @@ alter table documents enable row level security;
 alter table audit_log enable row level security;
 alter table admin_actions enable row level security;
 alter table json_schemas enable row level security;
-alter table step_types enable row level security;
-alter table step_type_versions enable row level security;
 alter table tenant_step_type_installs enable row level security;
 alter table tenant_secret_bindings enable row level security;
 alter table tenant_workflow_overlays enable row level security;
@@ -1630,11 +1701,14 @@ alter table workflow_pack_versions enable row level security;
 alter table moderation_queue enable row level security;
 alter table release_notes enable row level security;
 alter table adoption_records enable row level security;
+alter table platform.step_types enable row level security;
+alter table platform.step_type_versions enable row level security;
 alter table platform.rule_sources enable row level security;
 alter table platform.rule_source_snapshots enable row level security;
 alter table platform.rule_packs enable row level security;
 alter table platform.rule_pack_detections enable row level security;
 alter table platform.rule_pack_detection_sources enable row level security;
+alter table platform.rule_pack_proposals enable row level security;
 
 create policy "Members read organisations" on organisations
   for select
@@ -1700,14 +1774,14 @@ create policy "Service role manages engagements" on engagements
   using (public.is_platform_service())
   with check (public.is_platform_service());
 
-create policy "Authenticated can view workflow definitions" on workflow_defs
+create policy "Org members read workflow definitions" on workflow_defs
   for select
-  using (auth.role() in ('authenticated', 'service_role'));
+  using (app.is_org_member(org_id) or app.is_platform_admin());
 
-create policy "Service role manages workflow definitions" on workflow_defs
+create policy "Org members manage workflow definitions" on workflow_defs
   for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  using (app.is_org_member(org_id) or app.is_platform_admin())
+  with check (app.is_org_member(org_id) or app.is_platform_admin());
 
 create policy "Members access workflow runs" on workflow_runs
   for select
@@ -1964,6 +2038,16 @@ create policy "Tenant members insert adoption records" on adoption_records
     or app.is_org_member(org_id)
   );
 
+create policy "Platform services manage step types" on platform.step_types
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy "Platform services manage step type versions" on platform.step_type_versions
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
 create policy "Platform services manage rule sources" on platform.rule_sources
   for all
   using (public.is_platform_service() or app.is_platform_admin())
@@ -1989,30 +2073,17 @@ create policy "Platform services manage rule pack detection sources" on platform
   using (public.is_platform_service() or app.is_platform_admin())
   with check (public.is_platform_service() or app.is_platform_admin());
 
+create policy "Platform services manage rule pack proposals" on platform.rule_pack_proposals
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
 create policy "Service role manages json schemas" on json_schemas
   for all
   using (auth.role() = 'service_role')
   with check (auth.role() = 'service_role');
 
 create policy "Admins read json schemas" on json_schemas
-  for select
-  using (auth.role() in ('service_role', 'authenticated'));
-
-create policy "Service role manages step types" on step_types
-  for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
-
-create policy "Admins read step types" on step_types
-  for select
-  using (auth.role() in ('service_role', 'authenticated'));
-
-create policy "Service role manages step type versions" on step_type_versions
-  for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
-
-create policy "Admins read step type versions" on step_type_versions
   for select
   using (auth.role() in ('service_role', 'authenticated'));
 
