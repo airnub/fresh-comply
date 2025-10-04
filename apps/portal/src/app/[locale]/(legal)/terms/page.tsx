@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 
-const TERMS_DOC_URL = "https://github.com/airnub/fresh-comply/blob/main/docs/LEGAL/TERMS.md";
+const TERMS_DOC_URL = "https://github.com/airnub/fresh-comply/blob/main/docs/compliance/terms.v1.0.0.md";
 
 export default async function TermsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

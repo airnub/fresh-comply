@@ -1,0 +1,38 @@
+name: Docs SemVer Guard
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce filename pattern
+        run: |
+          set -e
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          BAD=$(git diff --name-only "$BASE" "$HEAD" \
+            | grep '^docs/' \
+            | grep -E '\.md$' \
+            | grep -vE '^docs/INDEX.md$' \
+            | grep -vE '^docs/(specs|architecture|agents|guides|getting-started|runbooks|policies|compliance|rfcs)/[a-z0-9-]+\.v[0-9]+\.[0-9]+\.[0-9]+\.md$' || true)
+          if [ -n "$BAD" ]; then
+            echo "Files violating SemVer naming:"
+            echo "$BAD"
+            exit 1
+          fi
+      - name: Enforce front-matter
+        run: |
+          set -e
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          FAIL=0
+          for f in $(git diff --name-only "$BASE" "$HEAD" | grep '^docs/' | grep -E '\.md$' | grep -v '^docs/INDEX.md$'); do
+            head -n 20 "$f" | grep -q '^---$' || { echo "Missing front-matter: $f"; FAIL=1; }
+            head -n 50 "$f" | grep -q '^version:' || { echo "Missing version in front-matter: $f"; FAIL=1; }
+            head -n 50 "$f" | grep -q '^status:' || { echo "Missing status in front-matter: $f"; FAIL=1; }
+          done
+          exit $FAIL

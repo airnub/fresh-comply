@@ -11,7 +11,7 @@ pnpm db:env:local
 pnpm dev
 ```
 
-This spins up the local Supabase stack, syncs generated keys into `.env.local`, and starts the FreshComply portal and admin apps in parallel. See the [Local development guide](docs/getting-started/local-development.md), [Codespaces guide](docs/getting-started/codespaces.md), and [Supabase workflow guide](docs/guides/supabase.md) for the full walkthrough and troubleshooting steps.
+This spins up the local Supabase stack, syncs generated keys into `.env.local`, and starts the FreshComply portal and admin apps in parallel. See the [Local development guide](docs/getting-started/local-development.v0.1.0.md), [Codespaces guide](docs/getting-started/codespaces.v0.1.0.md), and [Supabase workflow guide](docs/guides/supabase.v0.1.0.md) for the full walkthrough and troubleshooting steps.
 
 If you only need the portal, run `pnpm --filter ./apps/portal dev` instead of the aggregated `pnpm dev` task.
 

@@ -1,7 +1,7 @@
 # FreshComply — Consolidated Requirements & Spec (v2025-10-03 • Full Update)
 
 > [!WARNING]
-> Archived 2025-10-04 — Superseded by [docs/specs/FreshComply-Consolidated-Spec.md](../../specs/FreshComply-Consolidated-Spec.md).
+> Archived 2025-10-04 — Superseded by [docs/specs/freshcomply-consolidated-spec.v1.0.0.md](../../specs/freshcomply-consolidated-spec.v1.0.0.md).
 
 **Repo:** `@airnub/fresh-comply`
 **Version:** 2025‑10‑03
@@ -15,8 +15,8 @@
 > * *Live Workflow — Irish Non‑Profit Setup (Product Spec v2025‑10‑02)*
 > * *@airnub/fresh‑comply — Coding Agent Prompt & Repo Scaffolding (v2025‑10‑02)*
 > * *Follow‑on Coding Agent Prompt — i18n, Theme, A11y, GDPR (v2025‑10‑02)*
-> * *FreshComply Admin App — Back Office Spec (see docs/specs/admin-app-spec.md)*
-> * *Workflow Extension Packs — Specification (see docs/specs/extensions.md)*
+> * *FreshComply Admin App — Back Office Spec (see docs/specs/admin-app-spec.v1.0.0.md)*
+> * *Workflow Extension Packs — Specification (see docs/specs/extensions.v1.0.0.md)*
 
 ---
 
@@ -151,7 +151,7 @@ These are integrated as:
 
 * `packages/workflows/…` (flow definitions)
 * `packages/doc-templates/…` (constitution seeds, minutes, policy stubs)
-* `docs/specs/FreshComply-Consolidated-Spec.md` (expanded per §7–§12)
+* `docs/specs/freshcomply-consolidated-spec.v1.0.0.md` (expanded per §7–§12)
 
 ---
 
@@ -227,7 +227,7 @@ These are integrated as:
 * **Data Subject Rights (DSR):** `/api/dsr/*` intake for access/export/rectification/erasure/restriction/objection/portability; queue + SLA; confirmation emails.
 * **Retention & Deletion:** soft‑delete → scheduled hard‑delete; policy tables per entity; user‑initiated exports (ZIP/JSON/CSV).
 * **DPA:** standard processor DPA with annexes; **Subprocessors registry** & change‑notice policy; SCC annex placeholders.
-* **Records:** `docs/LEGAL/ROPA.yaml` maintained; admin UI read‑only later.
+* **Records:** `docs/compliance/ROPA.yaml` maintained; admin UI read‑only later.
 * **Security:** TLS; encryption at rest; least‑privilege RBAC; admin action audit; secrets in vault; Temporal workers read via service credentials; workflow code never touches raw secrets; session via `@supabase/ssr`. (See [§11.1 SOC 2 Compliance Requirements](./fresh-comply-spec.md#soc-2-compliance-requirements) for the canonical control set.)
 * **Breach Response:** defined in `INCIDENT‑RESPONSE.md` (72‑hour notification flow).
 * **Consent:** Cookie banner with categories; server‑gated scripts; consent stored in cookie + DB.
@@ -236,7 +236,7 @@ These are integrated as:
 
 FreshComply must maintain **SOC 2 Type II** readiness across the Trust Services Criteria in scope (Security, Availability, Confidentiality). The platform team owns the control library and evidence plan.
 
-* **Control Ownership:** Map every policy/technical control to a control ID with owner, automation status, and evidence cadence; publish in `docs/LEGAL/soc2-control-matrix.md` (or successor) and keep it versioned.
+* **Control Ownership:** Map every policy/technical control to a control ID with owner, automation status, and evidence cadence; publish in `docs/compliance/soc2-control-matrix.md` (or successor) and keep it versioned.
 * **Change Management:** All production-impacting changes flow through Git-based review with two-person approval on protected branches; emergency fixes require documented post-mortem within 24 hours.
 * **Access Management:** Quarterly access reviews for Supabase, Temporal, CI/CD, and third-party SaaS; enforce SSO/MFA for admins; document joiner/mover/leaver workflows with timestamps and approvers.
 * **Audit Logging & Retention:** Centralise structured logs for admin/API actions, Temporal events, and infrastructure via append-only storage retained ≥ 1 year; ensure logs are immutable and queryable for auditors.

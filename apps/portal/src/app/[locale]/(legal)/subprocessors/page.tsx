@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 
-const SUBPROCESSORS_DOC_URL = "https://github.com/airnub/fresh-comply/blob/main/docs/LEGAL/SUBPROCESSORS.md";
+const SUBPROCESSORS_DOC_URL = "https://github.com/airnub/fresh-comply/blob/main/docs/compliance/subprocessors.v1.0.0.md";
 
 export default async function SubprocessorsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
