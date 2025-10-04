@@ -54,6 +54,7 @@ function seedSupabase() {
     workflow_defs: [
       {
         id: "workflow-def-1",
+        org_id: TENANT_ID,
         key: "setup-nonprofit-ie",
         version: "1.2.3",
         title: "Workflow",

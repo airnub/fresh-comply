@@ -103,7 +103,7 @@ function createSupabaseMaterializeContext(
         .select("id, workflow_def_id, version, checksum, graph_jsonb, rule_ranges, template_ranges")
         .eq("workflow_def_id", definition.id)
         .eq("version", version)
-        .eq("tenant_org_id", tenantOrgId)
+        .eq("org_id", tenantOrgId)
         .maybeSingle();
 
       if (versionError) {
@@ -128,7 +128,7 @@ function createSupabaseMaterializeContext(
       const { data: row, error } = await client
         .from("workflow_pack_versions")
         .select("id, pack_id, version, checksum, overlay_jsonb")
-        .eq("tenant_org_id", tenantOrgId)
+        .eq("org_id", tenantOrgId)
         .eq("pack_id", ref.id)
         .eq("version", ref.version)
         .maybeSingle();
@@ -153,7 +153,7 @@ function createSupabaseMaterializeContext(
       const { data: row, error } = await client
         .from("rule_versions")
         .select("id, rule_id, version, checksum, sources")
-        .eq("tenant_org_id", tenantOrgId)
+        .eq("org_id", tenantOrgId)
         .eq("rule_id", ruleId)
         .eq("version", version)
         .maybeSingle();
@@ -177,7 +177,7 @@ function createSupabaseMaterializeContext(
       const { data: row, error } = await client
         .from("template_versions")
         .select("id, template_id, version, checksum")
-        .eq("tenant_org_id", tenantOrgId)
+        .eq("org_id", tenantOrgId)
         .eq("template_id", templateId)
         .eq("version", version)
         .maybeSingle();
@@ -238,7 +238,7 @@ async function resolveSelectorVersion(
         const { data, error } = await client
           .from("rule_versions")
           .select("version")
-          .eq("tenant_org_id", tenantOrgId)
+          .eq("org_id", tenantOrgId)
           .eq("rule_id", id);
         if (error) {
           throw new Error(`Unable to load rule versions for ${id}: ${error.message}`);
@@ -256,7 +256,7 @@ async function resolveSelectorVersion(
       const { data, error } = await client
         .from("template_versions")
         .select("version")
-        .eq("tenant_org_id", tenantOrgId)
+        .eq("org_id", tenantOrgId)
         .eq("template_id", id);
       if (error) {
         throw new Error(`Unable to load template versions for ${id}: ${error.message}`);
