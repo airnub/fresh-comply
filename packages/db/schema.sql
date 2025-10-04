@@ -98,6 +98,9 @@ create table tenant_step_type_installs(
 
 create index tenant_step_type_installs_org_idx on tenant_step_type_installs(org_id);
 
+alter table tenant_step_type_installs
+  alter column org_id set not null;
+
 create table tenant_secret_bindings(
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references organisations(id) on delete cascade,
