@@ -271,12 +271,15 @@ export async function resolveTenantBranding(
     if (typeof window !== "undefined") {
       // Browser execution falls back to the public REST endpoint.
       const { url, anonKey } = ensureSupabaseEnv();
-      const response = await fetch(`${url}/rest/v1/realms?host=eq.${encodeURIComponent(normalizedHost)}`, {
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`
+      const response = await fetch(
+        `${url}/rest/v1/realms?domain=eq.${encodeURIComponent(normalizedHost)}`,
+        {
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`
+          }
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to resolve realm (${response.status})`);
@@ -287,7 +290,7 @@ export async function resolveTenantBranding(
       const realmTheme = decodeJsonPayload(realmRow?.theme) ?? {};
       const themeRecord = realmTheme as Record<string, unknown>;
       const branding = coalesceBranding({
-        tenantOrgId: (realmRow?.org_id as string | undefined) ?? DEFAULT_TENANT_BRANDING.tenantOrgId,
+        tenantOrgId: DEFAULT_TENANT_BRANDING.tenantOrgId,
         providerOrgId: (realmRow?.provider_org_id as string | undefined) ?? null,
         realmId: (realmRow?.id as string | undefined) ?? null,
         domain: normalizedHost,
@@ -307,8 +310,8 @@ export async function resolveTenantBranding(
     const supabase = getServiceSupabaseClient();
     const { data, error } = await supabase
       .from("realms")
-      .select("id, host, org_id, provider_org_id, theme, updated_at")
-      .eq("host", normalizedHost)
+      .select("id, domain, provider_org_id, theme, updated_at")
+      .eq("domain", normalizedHost)
       .maybeSingle();
 
     if (error) {
@@ -346,7 +349,7 @@ export async function resolveTenantBranding(
     const realmTheme = decodeJsonPayload(data.theme) ?? {};
     const themeRecord = realmTheme as Record<string, unknown>;
     const branding = coalesceBranding({
-      tenantOrgId: data.org_id ?? DEFAULT_TENANT_BRANDING.tenantOrgId,
+      tenantOrgId: DEFAULT_TENANT_BRANDING.tenantOrgId,
       providerOrgId: data.provider_org_id ?? null,
       realmId: data.id ?? null,
       domain: normalizedHost,

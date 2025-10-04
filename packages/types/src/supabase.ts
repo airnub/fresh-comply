@@ -201,6 +201,80 @@ export type Database = {
           }
         ];
       };
+      org_memberships: {
+        Row: {
+          org_id: string;
+          user_id: string;
+          role: "member" | "org_admin" | "provider_admin" | "platform_admin";
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          org_id: string;
+          user_id: string;
+          role: "member" | "org_admin" | "provider_admin" | "platform_admin";
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          user_id?: string;
+          role?: "member" | "org_admin" | "provider_admin" | "platform_admin";
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "org_memberships_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "org_memberships_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      orgs: {
+        Row: {
+          id: string;
+          name: string;
+          type: "platform" | "provider" | "customer";
+          parent_org_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          type: "platform" | "provider" | "customer";
+          parent_org_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          type?: "platform" | "provider" | "customer";
+          parent_org_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orgs_parent_org_id_fkey";
+            columns: ["parent_org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       release_notes: {
         Row: {
           id: string;
@@ -1233,6 +1307,41 @@ export type Database = {
             columns: ["step_type_version_id"];
             isOneToOne: false;
             referencedRelation: "platform.step_type_versions";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      realms: {
+        Row: {
+          id: string;
+          domain: string;
+          provider_org_id: string;
+          theme: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          domain: string;
+          provider_org_id: string;
+          theme?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          domain?: string;
+          provider_org_id?: string;
+          theme?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "realms_provider_org_id_fkey";
+            columns: ["provider_org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
             referencedColumns: ["id"];
           }
         ];
