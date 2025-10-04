@@ -106,7 +106,7 @@ function readEnv(name: string): string | undefined {
 
 function ensureSupabaseEnv() {
   const url = readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? readEnv("SUPABASE_URL");
-  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? readEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? readEnv("SUPABASE_ANON_KEY");
 
   if (!url || !anonKey) {
     throw new Error("Supabase URL and anon key must be configured for tenant branding resolution.");
@@ -243,7 +243,20 @@ export function getTenantBrandingFromHeaders(headers: Headers | ReadonlyHeaders 
 
 type ReadonlyHeaders = Pick<Headers, "get">;
 
-export async function resolveTenantBranding(host: string | null | undefined): Promise<TenantBrandingPayload> {
+type ResolveTenantBrandingCredentials = {
+  supabaseUrl: string;
+  accessToken: string;
+};
+
+export type ResolveTenantBrandingOptions = {
+  credentials?: ResolveTenantBrandingCredentials;
+  fetchImpl?: typeof fetch;
+};
+
+export async function resolveTenantBranding(
+  host: string | null | undefined,
+  options?: ResolveTenantBrandingOptions
+): Promise<TenantBrandingPayload> {
   const normalizedHost = normalizeHost(host);
   if (!normalizedHost) {
     return DEFAULT_TENANT_BRANDING;
@@ -301,6 +314,28 @@ export async function resolveTenantBranding(host: string | null | undefined): Pr
     if (error) {
       throw new Error(`Failed to resolve realm via service client: ${error.message}`);
     }
+    const credentials: ResolveTenantBrandingCredentials =
+      options?.credentials ??
+      (() => {
+        const { url, anonKey } = ensureSupabaseEnv();
+        return { supabaseUrl: url, accessToken: anonKey } satisfies ResolveTenantBrandingCredentials;
+      })();
+
+    const fetcher = options?.fetchImpl ?? globalThis.fetch;
+
+    if (!fetcher) {
+      throw new Error("A fetch implementation must be provided to resolve tenant branding.");
+    }
+
+    const response = await fetcher(`${credentials.supabaseUrl}/rest/v1/rpc/resolve_tenant_branding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: credentials.accessToken,
+        Authorization: `Bearer ${credentials.accessToken}`
+      },
+      body: JSON.stringify({ p_host: normalizedHost })
+    });
 
     if (!data) {
       const fallback = DEFAULT_TENANT_BRANDING;
