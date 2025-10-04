@@ -499,11 +499,11 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "workflow_def_versions_workflow_def_id_fkey";
-            columns: ["workflow_def_id"];
+            foreignKeyName: "workflow_def_versions_workflow_def_fk";
+            columns: ["org_id", "workflow_def_id"];
             isOneToOne: false;
             referencedRelation: "workflow_defs";
-            referencedColumns: ["id"];
+            referencedColumns: ["org_id", "id"];
           }
         ];
       };
@@ -889,6 +889,7 @@ export type Database = {
       workflow_defs: {
         Row: {
           id: string;
+          org_id: string;
           key: string;
           version: string;
           title: string;
@@ -897,6 +898,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          org_id: string;
           key: string;
           version: string;
           title: string;
@@ -905,13 +907,22 @@ export type Database = {
         };
         Update: {
           id?: string;
+          org_id?: string;
           key?: string;
           version?: string;
           title?: string;
           dsl_json?: Json;
           created_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "workflow_defs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organisations";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       workflow_runs: {
         Row: {
@@ -983,11 +994,11 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "workflow_runs_workflow_def_id_fkey";
-            columns: ["workflow_def_id"];
+            foreignKeyName: "workflow_runs_workflow_def_fk";
+            columns: ["tenant_org_id", "workflow_def_id"];
             isOneToOne: false;
             referencedRelation: "workflow_defs";
-            referencedColumns: ["id"];
+            referencedColumns: ["org_id", "id"];
           }
         ];
       };
@@ -1314,11 +1325,11 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "tenant_workflow_overlays_workflow_def_id_fkey";
-            columns: ["workflow_def_id"];
+            foreignKeyName: "tenant_workflow_overlays_workflow_def_fk";
+            columns: ["org_id", "workflow_def_id"];
             isOneToOne: false;
             referencedRelation: "workflow_defs";
-            referencedColumns: ["id"];
+            referencedColumns: ["org_id", "id"];
           }
         ];
       };
@@ -2418,6 +2429,110 @@ export type Database = {
             columns: ["rule_source_id"];
             isOneToOne: false;
             referencedRelation: "rule_sources";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      rule_pack_proposals: {
+        Row: {
+          id: string;
+          detection_id: string;
+          rule_pack_id: string | null;
+          rule_pack_key: string;
+          current_version: string | null;
+          proposed_version: string;
+          changelog: Json;
+          status:
+            | "pending"
+            | "in_review"
+            | "approved"
+            | "rejected"
+            | "amended"
+            | "published"
+            | "superseded";
+          review_notes: string | null;
+          created_by: string | null;
+          approved_by: string | null;
+          created_at: string;
+          updated_at: string;
+          approved_at: string | null;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          detection_id: string;
+          rule_pack_id?: string | null;
+          rule_pack_key: string;
+          current_version?: string | null;
+          proposed_version: string;
+          changelog?: Json;
+          status?:
+            | "pending"
+            | "in_review"
+            | "approved"
+            | "rejected"
+            | "amended"
+            | "published"
+            | "superseded";
+          review_notes?: string | null;
+          created_by?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          approved_at?: string | null;
+          published_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          detection_id?: string;
+          rule_pack_id?: string | null;
+          rule_pack_key?: string;
+          current_version?: string | null;
+          proposed_version?: string;
+          changelog?: Json;
+          status?:
+            | "pending"
+            | "in_review"
+            | "approved"
+            | "rejected"
+            | "amended"
+            | "published"
+            | "superseded";
+          review_notes?: string | null;
+          created_by?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          approved_at?: string | null;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_pack_proposals_detection_id_fkey";
+            columns: ["detection_id"];
+            isOneToOne: true;
+            referencedRelation: "rule_pack_detections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_proposals_rule_pack_id_fkey";
+            columns: ["rule_pack_id"];
+            isOneToOne: false;
+            referencedRelation: "rule_packs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_proposals_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_proposals_approved_by_fkey";
+            columns: ["approved_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
             referencedColumns: ["id"];
           }
         ];

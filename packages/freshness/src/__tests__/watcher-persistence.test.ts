@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { pollSource } from "../watcher.js";
+import { pollSource, publishApprovedProposal } from "../watcher.js";
 import { SOURCES } from "../sources.js";
 import { createInMemorySupabase } from "../testing/inMemorySupabase.js";
 
@@ -102,6 +102,12 @@ describe("pollSource persistence", () => {
     expect(detections[0].severity).toBe("info");
     expect(detections[0].diff?.summary).toBe(event?.summary);
 
+    const proposals = getTableRows("platform.rule_pack_proposals");
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].detection_id).toBe(detections[0].id);
+    expect(proposals[0].status).toBe("pending");
+    expect(proposals[0].proposed_version).toBe(detections[0].proposed_version);
+
     const detectionSources = getTableRows("platform.rule_pack_detection_sources");
     expect(detectionSources).toHaveLength(1);
     expect(detectionSources[0].rule_source_id).toBe(ruleSourceId);
@@ -109,5 +115,77 @@ describe("pollSource persistence", () => {
     expect(changeSummary.sourceKey).toBe("cro_open_services");
     expect(changeSummary.snapshots?.current?.snapshotId).toBe(event?.current.snapshotId);
     expect(changeSummary.workflows).toEqual(["setup-nonprofit-ie"]);
+  });
+
+  it("publishes approved proposals", async () => {
+    const detectionId = "00000000-0000-0000-0000-000000000777";
+    const proposalId = "00000000-0000-0000-0000-000000000888";
+    const basePackId = "00000000-0000-0000-0000-000000000999";
+
+    const { client, getTableRows } = createInMemorySupabase({
+      "platform.rule_packs": [
+        {
+          id: basePackId,
+          pack_key: "platform.ie.rules",
+          version: "1.0.0",
+          title: "IE Compliance Pack",
+          summary: "Initial pack",
+          manifest: {},
+          checksum: "sha-base",
+          status: "published",
+          created_at: new Date().toISOString()
+        }
+      ],
+      "platform.rule_pack_detections": [
+        {
+          id: detectionId,
+          rule_pack_id: basePackId,
+          rule_pack_key: "platform.ie.rules",
+          current_version: "1.0.0",
+          proposed_version: "1.1.0",
+          severity: "minor",
+          status: "in_review",
+          diff: { summary: "Change" },
+          detected_at: new Date().toISOString(),
+          notes: "Watcher summary"
+        }
+      ],
+      "platform.rule_pack_proposals": [
+        {
+          id: proposalId,
+          detection_id: detectionId,
+          rule_pack_id: basePackId,
+          rule_pack_key: "platform.ie.rules",
+          current_version: "1.0.0",
+          proposed_version: "1.1.0",
+          changelog: { summary: "Change" },
+          status: "approved",
+          review_notes: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ]
+    });
+
+    const detection = await publishApprovedProposal(client.schema("platform"), {
+      proposalId,
+      reviewNotes: "Ship it"
+    });
+
+    expect(detection).not.toBeNull();
+    expect(detection?.status).toBe("approved");
+    expect(detection?.notes).toBe("Ship it");
+
+    const proposals = getTableRows("platform.rule_pack_proposals");
+    expect(proposals[0].status).toBe("published");
+    expect(proposals[0].review_notes).toBe("Ship it");
+    expect(proposals[0].published_at).toBeTruthy();
+    expect(proposals[0].rule_pack_id).not.toBeNull();
+
+    const packs = getTableRows("platform.rule_packs");
+    const published = packs.find((pack) => pack.version === "1.1.0");
+    expect(published).toBeTruthy();
+    expect(published?.status).toBe("published");
+    expect(typeof published?.checksum).toBe("string");
   });
 });

@@ -59,7 +59,11 @@ export default async function FreshnessPage() {
           </header>
           <DiffViewer before={before} after={after} />
           <div className="mt-4">
-            <FreshnessActions watcherId={selected.id} status={selected.status} diff={selected.diff} />
+            <FreshnessActions
+              proposalId={selected.proposalId}
+              status={selected.status}
+              diff={selected.diff}
+            />
           </div>
         </section>
       ) : null}
