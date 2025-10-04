@@ -123,7 +123,7 @@ create table tenant_step_type_installs(
 
 create table tenant_secret_bindings(
   id uuid primary key default gen_random_uuid(),
-  org_id uuid references organisations(id) on delete cascade,
+  org_id uuid not null references organisations(id) on delete cascade,
   alias text not null,
   description text,
   provider text,
@@ -132,9 +132,11 @@ create table tenant_secret_bindings(
   unique(org_id, alias)
 );
 
+create index tenant_secret_bindings_org_alias_idx on tenant_secret_bindings(org_id, alias);
+
 create table tenant_workflow_overlays(
   id uuid primary key default gen_random_uuid(),
-  org_id uuid references organisations(id) on delete cascade,
+  org_id uuid not null references organisations(id) on delete cascade,
   workflow_def_id uuid references workflow_defs(id) on delete cascade,
   title text not null,
   patch jsonb not null,
@@ -144,6 +146,8 @@ create table tenant_workflow_overlays(
   created_at timestamptz default now(),
   unique(org_id, workflow_def_id, title)
 );
+
+create index tenant_workflow_overlays_org_workflow_idx on tenant_workflow_overlays(org_id, workflow_def_id);
 
 create table workflow_overlay_snapshots(
   id uuid primary key default gen_random_uuid(),
@@ -2033,7 +2037,7 @@ create policy "Tenant members manage secret bindings" on tenant_secret_bindings
   for select
   using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages tenant overlays" on tenant_workflow_overlays
@@ -2045,11 +2049,11 @@ create policy "Tenant members manage overlays" on tenant_workflow_overlays
   for select
   using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(org_id)
+    or app.is_org_member(org_id)
   )
   with check (
     auth.role() = 'service_role'
-    or public.is_member_of_org(org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages overlay snapshots" on workflow_overlay_snapshots
@@ -2062,6 +2066,12 @@ create policy "Members read overlay snapshots" on workflow_overlay_snapshots
   using (
     auth.role() = 'service_role'
     or (run_id is not null and public.can_access_run(run_id))
+    or exists (
+      select 1
+      from tenant_workflow_overlays two
+      where two.id = tenant_overlay_id
+        and app.is_org_member(two.org_id)
+    )
   );
 
 create policy "Service role manages overlay layers" on workflow_overlay_layers
@@ -2077,7 +2087,18 @@ create policy "Members read overlay layers" on workflow_overlay_layers
       select 1
       from workflow_overlay_snapshots s
       where s.id = snapshot_id
-        and public.can_access_run(s.run_id)
+        and (
+          (s.run_id is not null and public.can_access_run(s.run_id))
+          or (
+            s.tenant_overlay_id is not null
+            and exists (
+              select 1
+              from tenant_workflow_overlays two
+              where two.id = s.tenant_overlay_id
+                and app.is_org_member(two.org_id)
+            )
+          )
+        )
     )
   );
 

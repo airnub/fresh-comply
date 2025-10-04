@@ -1437,7 +1437,7 @@ export type Database = {
       workflow_overlay_snapshots: {
         Row: {
           id: string;
-          run_id: string;
+          run_id: string | null;
           tenant_overlay_id: string | null;
           applied_overlays: Json;
           merged_workflow: Json;
@@ -1445,7 +1445,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          run_id: string;
+          run_id?: string | null;
           tenant_overlay_id?: string | null;
           applied_overlays?: Json;
           merged_workflow: Json;
@@ -1453,7 +1453,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          run_id?: string;
+          run_id?: string | null;
           tenant_overlay_id?: string | null;
           applied_overlays?: Json;
           merged_workflow?: Json;
