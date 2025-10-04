@@ -139,6 +139,35 @@ test("POST upserts branding and returns audit metadata", async () => {
   });
 });
 
+test("POST returns 503 when tenant branding cannot resolve", async () => {
+  await withBrandingRoute(async ({ createBrandingRoute }) => {
+    const { TenantBrandingResolutionError } = await import("../../../../lib/tenant-branding");
+    const route = createBrandingRoute({
+      getSupabaseClient: () => {
+        throw new Error("Supabase should not be instantiated when branding resolution fails");
+      },
+      resolveTenantBranding: async () => {
+        throw new TenantBrandingResolutionError("No tenant org id");
+      }
+    });
+
+    const request = new Request("http://localhost/api/partner-admin/branding", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        host: "tenant.example.com"
+      },
+      body: JSON.stringify({ tokens: {} })
+    });
+
+    const response = await route.POST(request);
+    assert.equal(response.status, 503);
+    const json = (await response.json()) as Record<string, unknown>;
+    assert.equal(json.ok, false);
+    assert.equal(json.error, "No tenant org id");
+  });
+});
+
 test("POST surfaces audit failures", async () => {
   await withBrandingRoute(async ({ createBrandingRoute }) => {
     const route = createBrandingRoute({
@@ -212,7 +241,7 @@ test("resolveTenantBranding never reads SUPABASE_SERVICE_ROLE_KEY", async () => 
       return new Response(
         JSON.stringify([
           {
-            tenant_org_id: "tenant-test",
+            org_id: "tenant-test",
             domain: "tenant-no-service-role.example.com",
             tokens: {},
             logo_url: null,
@@ -237,9 +266,18 @@ test("resolveTenantBranding never reads SUPABASE_SERVICE_ROLE_KEY", async () => 
     });
 
     assert.equal(serviceRoleAccessed, false);
-    assert.equal(fetchCalls.length, 1);
+    assert.equal(fetchCalls.length, 2);
 
-    const headers = fetchCalls[0]?.init?.headers as Record<string, string> | undefined;
+    const rpcCall = fetchCalls[0];
+    const realmsCall = fetchCalls[1];
+
+    assert.ok(String(rpcCall?.input).includes("/rest/v1/rpc/resolve_tenant_branding"));
+    const rpcBody = JSON.parse((rpcCall?.init?.body as string) ?? "{}") as Record<string, unknown>;
+    assert.equal(rpcBody.p_host, "tenant-no-service-role.example.com");
+
+    assert.ok(String(realmsCall?.input).includes("/rest/v1/realms"));
+
+    const headers = rpcCall?.init?.headers as Record<string, string> | undefined;
     assert.equal(headers?.apikey, "unit-test-anon-key");
     assert.equal(headers?.Authorization, "Bearer unit-test-anon-key");
     assert.equal(branding.tenantOrgId, "tenant-test");
