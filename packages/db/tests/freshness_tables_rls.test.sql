@@ -145,12 +145,16 @@ begin
   on conflict do nothing;
 
   begin
+    v_text := null;
     insert into tenant_step_type_installs (org_id, step_type_version_id, status)
     values (null, v_step_type_version_id, 'enabled');
     raise exception 'tenant_step_type_installs.org_id should reject NULL values';
   exception
     when not_null_violation then
-      null;
+      get stacked diagnostics v_text = RETURNED_SQLSTATE;
+      if v_text <> '23502' then
+        raise exception 'Expected SQLSTATE 23502 for tenant_step_type_installs.org_id, got %', v_text;
+      end if;
   end;
   insert into platform.rule_pack_proposals (
     detection_id,
