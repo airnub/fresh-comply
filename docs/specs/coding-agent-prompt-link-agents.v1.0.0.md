@@ -54,11 +54,11 @@ status: Stable
 **Goal:** Enforce strict tenant isolation via **Supabase RLS**, while enabling **platform_admin** to operate across tenants; record acting‑on‑behalf context.
 
 **Schema/Migrations**
-- [ ] Ensure/extend **tenant context** on core tables: `organisations(tenant_org_id)`, `workflow_runs(tenant_org_id)`, `steps(tenant_org_id)`, `documents(tenant_org_id)`, `audit_log(tenant_org_id)`, `admin_actions(tenant_org_id)`, `engagements(tenant_org_id)`, etc.
+- [ ] Ensure/extend **tenant context** on core tables: `organisations(parent_org_id)`, `workflow_runs(org_id)`, `steps(org_id)`, `documents(org_id)`, `audit_log(org_id)`, `admin_actions(org_id)`, `engagements(org_id)`, etc.
 - [ ] Create/ensure roles:
   - `platform_admin` (global), `tenant_admin`, `org_member`, `read_only`.
 - [ ] RLS policies (examples):
-  - Tenants: `using (tenant_org_id = auth.jwt()→tenant_org_id)` + membership checks.
+  - Tenants: `using (org_id = auth.jwt()→org_id)` + membership checks.
   - Clients: `using (subject_org_id in auth.jwt()→org_ids)`.
   - Platform admin: via server‑side **service role** only; never in browser.
 - [ ] All write ops go through **RPCs / stored procedures** that log `{ actor_user_id, actor_org_id, on_behalf_of_org_id }` to `audit_log`.
@@ -169,14 +169,14 @@ status: Stable
 - **Append‑only & immutable**: no updates/deletes; corrections are new entries.
 - **Tamper‑evident**: per‑row SHA‑256 and an optional **hash chain** (prev_hash) for high assurance.
 - **Clock integrity**: server time with NTP; record `created_at` and `request_time` if provided; store timezone/offset.
-- **Actor context**: `{ actor_user_id, actor_org_id, on_behalf_of_org_id, tenant_org_id, role }`.
+- **Actor context**: `{ actor_user_id, actor_org_id, on_behalf_of_org_id, org_id, role }`.
 - **Purpose & basis**: include `purpose_code` and `lawful_basis` when processing involves personal data.
 - **PII minimisation**: store references/ids, not raw PII where possible; redact payloads in logs; store document checksums.
 - **Data lineage**: link to `document_id`, `step_id`, `run_id`, `source_id` where relevant.
 
 **Schema/Migrations**
-- [ ] `audit_log(id uuid, tenant_org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, target_kind, target_id, action, reason_code, meta_json, ip, user_agent, created_at, row_hash, prev_hash)`
-- [ ] `admin_actions(id uuid, tenant_org_id, actor_user_id, action, target_kind, target_id, reason_code, meta_json, created_at, row_hash, prev_hash)`
+- [ ] `audit_log(id uuid, org_id, actor_user_id, actor_org_id, on_behalf_of_org_id, target_kind, target_id, action, reason_code, meta_json, ip, user_agent, created_at, row_hash, prev_hash)`
+- [ ] `admin_actions(id uuid, org_id, actor_user_id, action, target_kind, target_id, reason_code, meta_json, created_at, row_hash, prev_hash)`
 - [ ] Database trigger to compute `row_hash` and link `prev_hash` (per‑tenant chain).
 - [ ] Views for reporting with RLS (tenants see own; platform admin all).
 
@@ -184,7 +184,7 @@ status: Stable
 - [ ] All privileged mutations go through **RPCs** that: validate role, write to domain tables, write audit row, and return affected ids. Client cannot directly write audit.
 
 **DSR Support**
-- [ ] `dsr_requests(id, tenant_org_id, subject_org_id, type, status, ack_at, due_at, resolved_at)`
+- [ ] `dsr_requests(id, org_id, subject_org_id, type, status, ack_at, due_at, resolved_at)`
 - [ ] Audit every DSR state transition; export job compiles all relevant data with document checksums.
 
 **Acceptance**

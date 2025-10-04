@@ -189,7 +189,7 @@ features: ["temporal", "docs"]
 ```
 workflow_packs(id, name, publisher, marketplace boolean, created_at)
 workflow_pack_versions(id, pack_id, version, manifest_json, overlay_json, checksum, created_at)
-workflow_pack_installs(id, pack_version_id, tenant_org_id, enabled boolean, created_at, disabled_at)
+workflow_pack_installs(id, pack_version_id, org_id, enabled boolean, created_at, disabled_at)
 workflow_overlays_resolved(id, run_id, pack_version_id, resolved_overlay_json, created_at)
 ```
 
@@ -216,7 +216,7 @@ fc pack install    # POST to admin API for a tenant
 ## 12) Observability & Audit
 
 - Correlate steps to overlays via `workflow_overlays_resolved`.  
-- Structured logs include `pack_version_id`, `tenant_org_id`, `run_id`, `step_id`.  
+- Structured logs include `pack_version_id`, `org_id`, `run_id`, `step_id`.
 - Expose metrics: overlay validation failures, merge conflicts, policy lint failures.
 
 ---

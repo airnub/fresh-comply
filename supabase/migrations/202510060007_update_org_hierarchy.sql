@@ -68,10 +68,10 @@ BEGIN
     from information_schema.columns
    where table_schema = 'public'
      and table_name = 'realms'
-     and column_name in ('org_id', 'tenant_org_id', 'customer_org_id')
-   order by case column_name
-              when 'org_id' then 1
-              when 'tenant_org_id' then 2
+    and column_name in ('org_id', 'parent_org_id', 'customer_org_id')
+  order by case column_name
+             when 'org_id' then 1
+              when 'parent_org_id' then 2
               else 3
             end
    limit 1;
