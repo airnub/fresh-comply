@@ -81,6 +81,13 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const brandingCache: Map<string, { data: TenantBrandingPayload; expiresAt: number }> = new Map();
 
+export class TenantBrandingResolutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TenantBrandingResolutionError";
+  }
+}
+
 function now() {
   return Date.now();
 }
@@ -253,6 +260,56 @@ export type ResolveTenantBrandingOptions = {
   fetchImpl?: typeof fetch;
 };
 
+type ResolveTenantBrandingRpcRow = {
+  org_id: string | null;
+  domain: string | null;
+  tokens: Record<string, unknown> | null;
+  logo_url: string | null;
+  favicon_url: string | null;
+  typography: Record<string, unknown> | null;
+  pdf_header: Record<string, unknown> | null;
+  pdf_footer: Record<string, unknown> | null;
+  updated_at: string | null;
+} | null;
+
+async function fetchTenantBrandingRpcRow(
+  fetcher: typeof fetch,
+  credentials: ResolveTenantBrandingCredentials,
+  host: string
+): Promise<ResolveTenantBrandingRpcRow> {
+  const response = await fetcher(`${credentials.supabaseUrl}/rest/v1/rpc/resolve_tenant_branding`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: credentials.accessToken,
+      Authorization: `Bearer ${credentials.accessToken}`
+    },
+    body: JSON.stringify({ p_host: host })
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to resolve tenant branding via RPC (${response.status})`);
+  }
+
+  const payload = await response.json();
+  if (Array.isArray(payload)) {
+    return (payload[0] ?? null) as ResolveTenantBrandingRpcRow;
+  }
+  return (payload ?? null) as ResolveTenantBrandingRpcRow;
+}
+
+function ensureTenantOrgId(row: ResolveTenantBrandingRpcRow, host: string): string {
+  const orgId = row?.org_id ?? null;
+  if (!orgId) {
+    throw new TenantBrandingResolutionError(`resolve_tenant_branding returned no org_id for host ${host}`);
+  }
+  return orgId;
+}
+
 export async function resolveTenantBranding(
   host: string | null | undefined,
   options?: ResolveTenantBrandingOptions
@@ -271,6 +328,12 @@ export async function resolveTenantBranding(
     if (typeof window !== "undefined") {
       // Browser execution falls back to the public REST endpoint.
       const { url, anonKey } = ensureSupabaseEnv();
+      const credentials: ResolveTenantBrandingCredentials = {
+        supabaseUrl: url,
+        accessToken: anonKey
+      };
+      const rpcRow = await fetchTenantBrandingRpcRow(globalThis.fetch ?? fetch, credentials, normalizedHost);
+      const tenantOrgId = ensureTenantOrgId(rpcRow, normalizedHost);
       const response = await fetch(
         `${url}/rest/v1/realms?domain=eq.${encodeURIComponent(normalizedHost)}`,
         {
@@ -287,36 +350,27 @@ export async function resolveTenantBranding(
 
       const payload = (await response.json()) as Array<Record<string, unknown>>;
       const realmRow = payload?.[0];
-      const realmTheme = decodeJsonPayload(realmRow?.theme) ?? {};
-      const themeRecord = realmTheme as Record<string, unknown>;
+      if (!realmRow) {
+        throw new TenantBrandingResolutionError(`No tenant realm configured for host ${normalizedHost}`);
+      }
       const branding = coalesceBranding({
-        tenantOrgId: DEFAULT_TENANT_BRANDING.tenantOrgId,
+        tenantOrgId,
         providerOrgId: (realmRow?.provider_org_id as string | undefined) ?? null,
         realmId: (realmRow?.id as string | undefined) ?? null,
         domain: normalizedHost,
-        tokens: decodeJsonPayload(themeRecord["tokens"]) as TenantBrandingTokens | undefined,
-        logoUrl: (themeRecord["logoUrl"] as string | undefined) ?? null,
-        faviconUrl: (themeRecord["faviconUrl"] as string | undefined) ?? null,
-        typography: decodeJsonPayload(themeRecord["typography"]) as TenantTypographySettings | undefined,
-        pdfHeader: decodeJsonPayload(themeRecord["pdfHeader"]) as TenantPdfMetadata | undefined,
-        pdfFooter: decodeJsonPayload(themeRecord["pdfFooter"]) as TenantPdfMetadata | undefined,
-        updatedAt: (realmRow?.updated_at as string | undefined) ?? null
+        tokens: (rpcRow?.tokens as TenantBrandingTokens | undefined) ?? undefined,
+        logoUrl: (rpcRow?.logo_url as string | undefined) ?? null,
+        faviconUrl: (rpcRow?.favicon_url as string | undefined) ?? null,
+        typography: decodeJsonPayload(rpcRow?.typography) as TenantTypographySettings | undefined,
+        pdfHeader: decodeJsonPayload(rpcRow?.pdf_header) as TenantPdfMetadata | undefined,
+        pdfFooter: decodeJsonPayload(rpcRow?.pdf_footer) as TenantPdfMetadata | undefined,
+        updatedAt: (rpcRow?.updated_at as string | undefined) ?? null
       });
 
       brandingCache.set(normalizedHost, { data: branding, expiresAt: now() + CACHE_TTL_MS });
       return branding;
     }
 
-    const supabase = getServiceSupabaseClient();
-    const { data, error } = await supabase
-      .from("realms")
-      .select("id, domain, provider_org_id, theme, updated_at")
-      .eq("domain", normalizedHost)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Failed to resolve realm via service client: ${error.message}`);
-    }
     const credentials: ResolveTenantBrandingCredentials =
       options?.credentials ??
       (() => {
@@ -330,42 +384,85 @@ export async function resolveTenantBranding(
       throw new Error("A fetch implementation must be provided to resolve tenant branding.");
     }
 
-    const response = await fetcher(`${credentials.supabaseUrl}/rest/v1/rpc/resolve_tenant_branding`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: credentials.accessToken,
-        Authorization: `Bearer ${credentials.accessToken}`
-      },
-      body: JSON.stringify({ p_host: normalizedHost })
-    });
+    const rpcRow = await fetchTenantBrandingRpcRow(fetcher, credentials, normalizedHost);
+    const tenantOrgId = ensureTenantOrgId(rpcRow, normalizedHost);
+    const env = typeof process !== "undefined" ? process.env : undefined;
+    const hasServiceCredentials =
+      typeof env === "object" &&
+      env !== null &&
+      "SUPABASE_SERVICE_ROLE_KEY" in env &&
+      "SUPABASE_URL" in env;
 
-    if (!data) {
-      const fallback = DEFAULT_TENANT_BRANDING;
-      brandingCache.set(normalizedHost, { data: fallback, expiresAt: now() + CACHE_TTL_MS });
-      return fallback;
+    let providerOrgId: string | null = null;
+    let realmId: string | null = null;
+    let updatedAt: string | null = (rpcRow?.updated_at as string | undefined) ?? null;
+
+    if (hasServiceCredentials) {
+      const supabase = getServiceSupabaseClient();
+      const { data, error } = await supabase
+        .from("realms")
+        .select("id, domain, provider_org_id, updated_at")
+        .eq("domain", normalizedHost)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Failed to resolve realm via service client: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new TenantBrandingResolutionError(`No tenant realm configured for host ${normalizedHost}`);
+      }
+
+      providerOrgId = data.provider_org_id ?? null;
+      realmId = data.id ?? null;
+      updatedAt = data.updated_at ?? updatedAt;
+    } else {
+      const response = await fetcher(
+        `${credentials.supabaseUrl}/rest/v1/realms?domain=eq.${encodeURIComponent(normalizedHost)}`,
+        {
+          headers: {
+            apikey: credentials.accessToken,
+            Authorization: `Bearer ${credentials.accessToken}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to resolve realm (${response.status})`);
+      }
+
+      const payload = (await response.json()) as Array<Record<string, unknown>>;
+      const realmRow = payload?.[0];
+      if (!realmRow) {
+        throw new TenantBrandingResolutionError(`No tenant realm configured for host ${normalizedHost}`);
+      }
+
+      providerOrgId = (realmRow?.provider_org_id as string | undefined) ?? null;
+      realmId = (realmRow?.id as string | undefined) ?? null;
+      updatedAt = (realmRow?.updated_at as string | undefined) ?? updatedAt;
     }
 
-    const realmTheme = decodeJsonPayload(data.theme) ?? {};
-    const themeRecord = realmTheme as Record<string, unknown>;
     const branding = coalesceBranding({
-      tenantOrgId: DEFAULT_TENANT_BRANDING.tenantOrgId,
-      providerOrgId: data.provider_org_id ?? null,
-      realmId: data.id ?? null,
+      tenantOrgId,
+      providerOrgId,
+      realmId,
       domain: normalizedHost,
-      tokens: decodeJsonPayload(themeRecord["tokens"]) as TenantBrandingTokens | undefined,
-      logoUrl: (themeRecord["logoUrl"] as string | undefined) ?? null,
-      faviconUrl: (themeRecord["faviconUrl"] as string | undefined) ?? null,
-      typography: decodeJsonPayload(themeRecord["typography"]) as TenantTypographySettings | undefined,
-      pdfHeader: decodeJsonPayload(themeRecord["pdfHeader"]) as TenantPdfMetadata | undefined,
-      pdfFooter: decodeJsonPayload(themeRecord["pdfFooter"]) as TenantPdfMetadata | undefined,
-      updatedAt: data.updated_at ?? null
+      tokens: (rpcRow?.tokens as TenantBrandingTokens | undefined) ?? undefined,
+      logoUrl: (rpcRow?.logo_url as string | undefined) ?? null,
+      faviconUrl: (rpcRow?.favicon_url as string | undefined) ?? null,
+      typography: decodeJsonPayload(rpcRow?.typography) as TenantTypographySettings | undefined,
+      pdfHeader: decodeJsonPayload(rpcRow?.pdf_header) as TenantPdfMetadata | undefined,
+      pdfFooter: decodeJsonPayload(rpcRow?.pdf_footer) as TenantPdfMetadata | undefined,
+      updatedAt
     });
 
     brandingCache.set(normalizedHost, { data: branding, expiresAt: now() + CACHE_TTL_MS });
     return branding;
   } catch (error) {
     console.warn("Tenant branding resolution failed", error);
+    if (error instanceof TenantBrandingResolutionError) {
+      throw error;
+    }
     const fallback = DEFAULT_TENANT_BRANDING;
     brandingCache.set(normalizedHost, { data: fallback, expiresAt: now() + CACHE_TTL_MS });
     return fallback;

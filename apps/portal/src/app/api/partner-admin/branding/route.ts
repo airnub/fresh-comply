@@ -3,7 +3,10 @@ import {
   getSupabaseClient,
   SupabaseConfigurationError
 } from "../../../../server/supabase";
-import { resolveTenantBranding } from "../../../../lib/tenant-branding";
+import {
+  resolveTenantBranding,
+  TenantBrandingResolutionError
+} from "../../../../lib/tenant-branding";
 
 const ROUTE = "/api/partner-admin/branding";
 
@@ -44,7 +47,15 @@ export function createBrandingRoute({
       }
 
       const host = request.headers.get("host");
-      const tenantBranding = await resolveBranding(host);
+      let tenantBranding: Awaited<ReturnType<typeof resolveBranding>>;
+      try {
+        tenantBranding = await resolveBranding(host);
+      } catch (error) {
+        if (error instanceof TenantBrandingResolutionError) {
+          return NextResponse.json({ ok: false, error: error.message }, { status: 503 });
+        }
+        return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
+      }
 
       try {
         const supabase = getClient();

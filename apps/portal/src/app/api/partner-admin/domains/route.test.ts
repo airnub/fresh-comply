@@ -134,6 +134,36 @@ test("POST claims domain and emits audit metadata", async () => {
     assert.equal(rpcCalls.length, 1);
     assert.equal(rpcCalls[0]?.name, "rpc_upsert_tenant_domain");
     assert.equal(rpcCalls[0]?.params?.p_domain, "tenant.example.com");
+    assert.equal(rpcCalls[0]?.params?.p_org_id, tenantBrandingStub.tenantOrgId);
+  });
+});
+
+test("POST returns 503 when tenant branding cannot resolve", async () => {
+  await withDomainsRoute(async ({ createDomainRoutes }) => {
+    const { TenantBrandingResolutionError } = await import("../../../../lib/tenant-branding");
+    const routes = createDomainRoutes({
+      getSupabaseClient: () => {
+        throw new Error("Supabase should not be instantiated when branding resolution fails");
+      },
+      resolveTenantBranding: async () => {
+        throw new TenantBrandingResolutionError("No tenant org id");
+      }
+    });
+
+    const request = new Request("http://localhost/api/partner-admin/domains", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        host: "tenant.example.com"
+      },
+      body: JSON.stringify({ domain: "tenant.example.com" })
+    });
+
+    const response = await routes.POST(request);
+    assert.equal(response.status, 503);
+    const json = (await response.json()) as Record<string, unknown>;
+    assert.equal(json.ok, false);
+    assert.equal(json.error, "No tenant org id");
   });
 });
 
@@ -195,6 +225,64 @@ test("PATCH verifies domain and returns audit entry", async () => {
       action: "tenant_domain_verify",
       reason_code: "tenant_domain_verify"
     });
+  });
+});
+
+test("PATCH setPrimary uses tenant org id", async () => {
+  await withDomainsRoute(async ({ createDomainRoutes }) => {
+    const rpcCalls: Array<{ name: string; params: Record<string, unknown> }> = [];
+
+    const supabase = {
+      async rpc(name: string, params: Record<string, unknown>) {
+        rpcCalls.push({ name, params });
+        if (name === "rpc_upsert_tenant_domain") {
+          return {
+            data: {
+              domain: {
+                id: "domain-1",
+                org_id: tenantBrandingStub.tenantOrgId,
+                domain: params.p_domain,
+                is_primary: true,
+                cert_status: "issued",
+                verified_at: null
+              },
+              audit_entry: {
+                audit_id: "audit-primary",
+                action: "tenant_domain_set_primary",
+                reason_code: "tenant_domain_set_primary"
+              }
+            },
+            error: null
+          } as const;
+        }
+
+        throw new Error(`Unexpected rpc call: ${name}`);
+      }
+    };
+
+    const routes = createDomainRoutes({
+      getSupabaseClient: () => supabase,
+      resolveTenantBranding: async () => tenantBrandingStub
+    });
+
+    const request = new Request("http://localhost/api/partner-admin/domains", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        host: "tenant.example.com"
+      },
+      body: JSON.stringify({ action: "setPrimary", domain: "tenant.example.com" })
+    });
+
+    const response = await routes.PATCH(request);
+    assert.equal(response.status, 200);
+    const json = (await response.json()) as Record<string, unknown>;
+    assert.equal(json.ok, true);
+
+    assert.equal(rpcCalls.length, 1);
+    assert.equal(rpcCalls[0]?.name, "rpc_upsert_tenant_domain");
+    assert.equal(rpcCalls[0]?.params?.p_org_id, tenantBrandingStub.tenantOrgId);
+    assert.equal(rpcCalls[0]?.params?.p_is_primary, true);
   });
 });
 

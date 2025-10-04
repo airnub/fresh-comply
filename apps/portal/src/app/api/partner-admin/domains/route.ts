@@ -4,7 +4,10 @@ import {
   getSupabaseClient,
   SupabaseConfigurationError
 } from "../../../../server/supabase";
-import { resolveTenantBranding } from "../../../../lib/tenant-branding";
+import {
+  resolveTenantBranding,
+  TenantBrandingResolutionError
+} from "../../../../lib/tenant-branding";
 
 type DomainCreatePayload = {
   domain?: string;
@@ -52,6 +55,27 @@ export function createDomainRoutes({
   getSupabaseClient: getClient,
   resolveTenantBranding: resolveBranding
 }: DomainRouteDependencies) {
+  type ResolvedBranding = Awaited<ReturnType<typeof resolveBranding>>;
+
+  async function resolveBrandingOrResponse(host: string | null | undefined): Promise<
+    | { branding: ResolvedBranding }
+    | { response: NextResponse }
+  > {
+    try {
+      const branding = await resolveBranding(host);
+      return { branding };
+    } catch (error) {
+      if (error instanceof TenantBrandingResolutionError) {
+        return {
+          response: NextResponse.json({ ok: false, error: error.message }, { status: 503 })
+        };
+      }
+      return {
+        response: NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 })
+      };
+    }
+  }
+
   return {
     async POST(request: Request) {
       let payload: DomainCreatePayload;
@@ -67,7 +91,11 @@ export function createDomainRoutes({
       }
 
       const host = request.headers.get("host");
-      const tenantBranding = await resolveBranding(host);
+      const brandingResult = await resolveBrandingOrResponse(host);
+      if ("response" in brandingResult) {
+        return brandingResult.response;
+      }
+      const tenantBranding = brandingResult.branding;
 
       try {
         const supabase = getClient();
@@ -102,7 +130,11 @@ export function createDomainRoutes({
       }
 
       const host = request.headers.get("host");
-      const tenantBranding = await resolveBranding(host);
+      const brandingResult = await resolveBrandingOrResponse(host);
+      if ("response" in brandingResult) {
+        return brandingResult.response;
+      }
+      const tenantBranding = brandingResult.branding;
 
       try {
         const supabase = getClient();
@@ -165,7 +197,10 @@ export function createDomainRoutes({
       }
 
       const host = request.headers.get("host");
-      await resolveBranding(host);
+      const brandingResult = await resolveBrandingOrResponse(host);
+      if ("response" in brandingResult) {
+        return brandingResult.response;
+      }
 
       try {
         const supabase = getClient();
