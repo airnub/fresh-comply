@@ -2,32 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import type { User } from "@supabase/supabase-js";
-import { getSupabaseClient, getSupabaseUser, SupabaseConfigurationError } from "../../../lib/auth/supabase-ssr";
+import {
+  getSupabaseClient,
+  getSupabaseUser,
+  SupabaseConfigurationError
+} from "../../../lib/auth/supabase-ssr";
+import {
+  getSupabaseServiceRoleClient,
+  SupabaseServiceRoleConfigurationError
+} from "../../../lib/auth/supabase-service-role";
 import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
-import type { Json } from "@airnub/types/supabase";
-import type { SourceDiff } from "@airnub/freshness/watcher";
+import type { Database } from "@airnub/types";
 
 type ModerationResult = { ok: boolean; error?: string };
 
-type SourceModerationProposal = {
-  kind: "source_change";
-  sourceKey: string;
-  severity: string;
-  summary: string;
-  detectedAt: string;
-  workflows: string[];
-  diff: SourceDiff;
-  current: {
-    snapshotId: string | null | undefined;
-    fingerprint: string;
-    records?: unknown;
-  };
-  previous: null | {
-    snapshotId: string | undefined;
-    fingerprint: string;
-    records?: unknown;
-  };
-};
+type PlatformDetection = Database["platform"]["Tables"]["rule_pack_detections"]["Row"];
 
 async function resolveContext() {
   try {
@@ -40,6 +29,19 @@ async function resolveContext() {
       return null;
     }
     console.error("Unexpected Supabase moderation error", error);
+    return null;
+  }
+}
+
+function resolveServiceClient() {
+  try {
+    return getSupabaseServiceRoleClient();
+  } catch (error) {
+    if (error instanceof SupabaseServiceRoleConfigurationError) {
+      console.warn("Service role unavailable for freshness moderation", error.message);
+      return null;
+    }
+    console.error("Unexpected service role error during freshness moderation", error);
     return null;
   }
 }
@@ -58,10 +60,15 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
     annotateSpan(span, { attributes: { "freshcomply.freshness.update_id": id } });
 
     const context = await resolveContext();
-    const now = new Date().toISOString();
     if (!context) {
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: true };
+    }
+
+    const service = resolveServiceClient();
+    if (!service) {
+      span.setAttribute("freshcomply.action.outcome", "service_unavailable");
+      return { ok: false, error: "Moderation service unavailable" };
     }
 
     const tenantOrgId = readOrgId(context.user, "tenant_org_id");
@@ -69,33 +76,40 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
-    const { data, error } = await client
-      .from("moderation_queue")
-      .update({
-        status: "approved",
-        notes_md: reason,
-        reviewer_id: user?.id ?? null,
-        decided_at: now,
-        updated_at: now
-      })
-      .eq("id", id)
-      .select("proposal")
-      .maybeSingle();
-
-    if (error) {
-      console.error("Unable to approve freshness update", error);
+    let detection: PlatformDetection | null = null;
+    try {
+      detection = await moderateDetection(service, id, "approved", reason);
+    } catch (error) {
+      console.error("Unable to approve platform detection", error);
       span.setAttribute("freshcomply.action.outcome", "update_failed");
-      return { ok: false, error: error.message };
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 
-    const proposal = parseModerationProposal(data?.proposal);
+    if (!detection) {
+      span.setAttribute("freshcomply.action.outcome", "not_found");
+      return { ok: false, error: "Detection not found" };
+    }
 
-    if (proposal?.workflows?.length) {
-      await bumpWorkflowVersions(client, proposal.workflows);
-      if (proposal.sourceKey === "funding_radar" && proposal.current?.snapshotId) {
-        await linkFundingOpportunitiesToWorkflows(client, proposal.current.snapshotId, proposal.workflows);
+    const diffRecord = toRecord(detection.diff);
+    const workflows = extractImpactedWorkflows(diffRecord);
+    const snapshotFingerprint = extractSnapshotFingerprint(diffRecord);
+
+    if (workflows.length) {
+      await bumpWorkflowVersions(client, workflows);
+      if (detection.rule_pack_key === "funding_radar" && snapshotFingerprint) {
+        await linkFundingOpportunitiesToWorkflows(client, snapshotFingerprint, workflows);
       }
     }
+
+    await appendModerationAudit(
+      client,
+      user?.id ?? null,
+      id,
+      reason,
+      "approve",
+      tenantOrgId,
+      partnerOrgId
+    );
 
     revalidatePath("/", "layout");
     span.setAttribute("freshcomply.action.outcome", "success");
@@ -112,10 +126,15 @@ export async function rejectPendingUpdate(id: string, reason: string): Promise<M
     annotateSpan(span, { attributes: { "freshcomply.freshness.update_id": id } });
 
     const context = await resolveContext();
-    const now = new Date().toISOString();
     if (!context) {
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: true };
+    }
+
+    const service = resolveServiceClient();
+    if (!service) {
+      span.setAttribute("freshcomply.action.outcome", "service_unavailable");
+      return { ok: false, error: "Moderation service unavailable" };
     }
 
     const tenantOrgId = readOrgId(context.user, "tenant_org_id");
@@ -123,22 +142,23 @@ export async function rejectPendingUpdate(id: string, reason: string): Promise<M
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
-    const { error } = await client
-      .from("moderation_queue")
-      .update({
-        status: "rejected",
-        notes_md: reason,
-        reviewer_id: user?.id ?? null,
-        decided_at: now,
-        updated_at: now
-      })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Unable to reject freshness update", error);
+    try {
+      await moderateDetection(service, id, "rejected", reason);
+    } catch (error) {
+      console.error("Unable to reject platform detection", error);
       span.setAttribute("freshcomply.action.outcome", "update_failed");
-      return { ok: false, error: error.message };
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
+
+    await appendModerationAudit(
+      client,
+      user?.id ?? null,
+      id,
+      reason,
+      "reject",
+      tenantOrgId,
+      partnerOrgId
+    );
 
     revalidatePath("/", "layout");
     span.setAttribute("freshcomply.action.outcome", "success");
@@ -186,25 +206,14 @@ function bumpPatch(version: string) {
 
 async function linkFundingOpportunitiesToWorkflows(
   client: ReturnType<typeof getSupabaseClient>,
-  snapshotId: string,
+  snapshotFingerprint: string,
   workflowKeys: string[]
 ) {
   if (!workflowKeys.length) return;
-  const { data: snapshot, error: snapshotError } = await client
-    .from("source_snapshot")
-    .select("content_hash")
-    .eq("id", snapshotId)
-    .maybeSingle();
-
-  if (snapshotError || !snapshot?.content_hash) {
-    console.warn("Unable to resolve funding snapshot for workflow linking", snapshotError);
-    return;
-  }
-
   const { data: opportunities, error: fundingError } = await client
     .from("funding_opportunities")
     .select("id")
-    .eq("snapshot_fingerprint", snapshot.content_hash);
+    .eq("snapshot_fingerprint", snapshotFingerprint);
 
   if (fundingError) {
     console.warn("Unable to load funding opportunities for workflow linking", fundingError);
@@ -229,12 +238,111 @@ async function linkFundingOpportunitiesToWorkflows(
   }
 }
 
-function parseModerationProposal(value: Json | null): SourceModerationProposal | null {
-  if (!value || typeof value !== "object") return null;
-  const proposal = value as SourceModerationProposal;
-  if (proposal.kind !== "source_change") return null;
-  return {
-    ...proposal,
-    workflows: Array.isArray(proposal.workflows) ? proposal.workflows : []
-  };
+async function moderateDetection(
+  service: ReturnType<typeof getSupabaseServiceRoleClient>,
+  detectionId: string,
+  status: "approved" | "rejected",
+  reason: string
+): Promise<PlatformDetection | null> {
+  const { data, error } = await service
+    .schema("platform")
+    .from("rule_pack_detections")
+    .update({ status, notes: reason })
+    .eq("id", detectionId)
+    .select("id, rule_pack_key, diff, severity, proposed_version, current_version")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as PlatformDetection) ?? null;
+}
+
+function extractImpactedWorkflows(diff: Record<string, unknown> | null): string[] {
+  if (!diff) return [];
+
+  const candidates = [
+    diff.workflows,
+    diff.workflowKeys,
+    diff.workflow_keys,
+    diff.impactedWorkflows,
+    diff.impacted_workflows,
+    toRecord(diff.metadata)?.workflows,
+    toRecord(diff.metadata)?.workflowKeys,
+    toRecord(diff.metadata)?.workflow_keys,
+  ];
+
+  const values = new Set<string>();
+  for (const candidate of candidates) {
+    for (const entry of coerceStringArray(candidate)) {
+      values.add(entry);
+    }
+  }
+
+  return Array.from(values);
+}
+
+function extractSnapshotFingerprint(diff: Record<string, unknown> | null): string | null {
+  if (!diff) return null;
+
+  const candidates: unknown[] = [
+    diff.snapshotFingerprint,
+    diff.snapshot_fingerprint,
+    toRecord(diff.current)?.fingerprint,
+    toRecord(diff.snapshots)?.current && toRecord(toRecord(diff.snapshots)?.current)?.fingerprint,
+    toRecord(diff.metadata)?.snapshotFingerprint,
+    toRecord(diff.metadata)?.snapshot_fingerprint,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.length > 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function coerceStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+async function appendModerationAudit(
+  client: ReturnType<typeof getSupabaseClient>,
+  actorId: string | null,
+  detectionId: string,
+  reason: string,
+  action: "approve" | "reject",
+  tenantOrgId: string | null,
+  partnerOrgId: string | null
+) {
+  const procedure = action === "approve" ? "admin_approve_freshness_diff" : "admin_reject_freshness_diff";
+
+  try {
+    const { error } = await client.rpc(procedure, {
+      actor_id: actorId,
+      reason,
+      diff_id: detectionId,
+      notes: reason,
+      tenant_org_id: tenantOrgId,
+      actor_org_id: partnerOrgId ?? tenantOrgId,
+      on_behalf_of_org_id: partnerOrgId ?? tenantOrgId,
+      subject_org_id: tenantOrgId,
+    });
+
+    if (error) {
+      console.warn(`Unable to append ${action} freshness audit entry`, error);
+    }
+  } catch (error) {
+    console.warn(`RPC ${procedure} failed`, error);
+  }
 }
