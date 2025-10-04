@@ -41,7 +41,27 @@
         "taskQueue": { "type": "string" },
         "defaultTaskQueue": { "type": "string" },
         "tenantId": { "type": "string" },
-        "config": { "$ref": "#/definitions/ExecutionConfig" }
+        "config": { "$ref": "#/definitions/ExecutionConfig" },
+        "input_schema": { "type": "string" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "secret_aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "secrets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "externalWebhook": {
+          "type": "object",
+          "additionalProperties": true
+        }
       },
       "allOf": [
         {
