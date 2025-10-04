@@ -51,6 +51,15 @@ begin
     (gen_random_uuid(), 'core-two', '1.0.0', 'Core Workflow Two', '{}'::jsonb)
   returning id into workflow_def_two;
 
+  begin
+    insert into tenant_workflow_overlays (org_id, workflow_def_id, title, patch)
+    values (null, workflow_def_one, 'Missing Org Overlay', '[]'::jsonb);
+    raise exception 'Overlay insert should fail when org_id is NULL';
+  exception
+    when sqlstate '23502' then
+      null;
+  end;
+
   insert into tenant_workflow_overlays (org_id, workflow_def_id, title, patch)
   values (tenant_two, workflow_def_two, 'Tenant Two Overlay', '[]'::jsonb)
   returning id into overlay_two;
