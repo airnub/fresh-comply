@@ -87,41 +87,10 @@ create table json_schemas(
   created_at timestamptz default now()
 );
 
-create table step_types(
-  id uuid primary key default gen_random_uuid(),
-  slug text unique not null,
-  title text not null,
-  category text,
-  summary text,
-  latest_version text,
-  created_by uuid references users(id),
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-create table step_type_versions(
-  id uuid primary key default gen_random_uuid(),
-  step_type_id uuid references step_types(id) on delete cascade,
-  version text not null,
-  definition jsonb not null,
-  input_schema_id uuid references json_schemas(id),
-  output_schema_id uuid references json_schemas(id),
-  status text check (status in ('draft','published','deprecated')) default 'draft',
-  created_by uuid references users(id),
-  created_at timestamptz default now(),
-  published_at timestamptz,
-  unique(step_type_id, version)
-);
-
-alter table steps
-  add constraint steps_step_type_version_id_fkey
-  foreign key (step_type_version_id)
-  references step_type_versions(id);
-
 create table tenant_step_type_installs(
   id uuid primary key default gen_random_uuid(),
   org_id uuid references organisations(id) on delete cascade,
-  step_type_version_id uuid references step_type_versions(id) on delete cascade,
+  step_type_version_id uuid,
   installed_at timestamptz default now(),
   status text check (status in ('enabled','disabled')) default 'enabled',
   unique(org_id, step_type_version_id)
@@ -1110,6 +1079,38 @@ left join billing_prices bp on bp.stripe_price_id = coalesce(bs.stripe_price_id,
 
 grant select on billing_subscription_overview to authenticated, service_role;
 
+create or replace view v_step_types as
+select
+  st.id,
+  st.slug,
+  st.title,
+  st.category,
+  st.summary,
+  st.latest_version,
+  st.created_by,
+  st.created_at,
+  st.updated_at
+from platform.step_types st;
+
+create or replace view v_step_type_versions as
+select
+  stv.id,
+  stv.step_type_id,
+  st.slug as step_type_slug,
+  stv.version,
+  stv.definition,
+  stv.input_schema_id,
+  stv.output_schema_id,
+  stv.status,
+  stv.created_by,
+  stv.created_at,
+  stv.published_at
+from platform.step_type_versions stv
+join platform.step_types st on st.id = stv.step_type_id;
+
+grant select on v_step_types to authenticated, service_role;
+grant select on v_step_type_versions to authenticated, service_role;
+
 create table dsr_requests (
   id uuid primary key default gen_random_uuid(),
   tenant_org_id uuid not null references organisations(id),
@@ -1391,6 +1392,42 @@ create index adoption_records_run_idx on adoption_records(run_id);
 
 create schema if not exists platform;
 
+create table platform.step_types (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  category text,
+  summary text,
+  latest_version text,
+  created_by uuid references users(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table platform.step_type_versions (
+  id uuid primary key default gen_random_uuid(),
+  step_type_id uuid not null references platform.step_types(id) on delete cascade,
+  version text not null,
+  definition jsonb not null,
+  input_schema_id uuid references json_schemas(id),
+  output_schema_id uuid references json_schemas(id),
+  status text check (status in ('draft','published','deprecated')) default 'draft',
+  created_by uuid references users(id),
+  created_at timestamptz default now(),
+  published_at timestamptz,
+  unique(step_type_id, version)
+);
+
+alter table steps
+  add constraint steps_step_type_version_id_fkey
+  foreign key (step_type_version_id)
+  references platform.step_type_versions(id);
+
+alter table tenant_step_type_installs
+  add constraint tenant_step_type_installs_step_type_version_id_fkey
+  foreign key (step_type_version_id)
+  references platform.step_type_versions(id) on delete cascade;
+
 create table platform.rule_sources (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -1643,8 +1680,6 @@ alter table documents enable row level security;
 alter table audit_log enable row level security;
 alter table admin_actions enable row level security;
 alter table json_schemas enable row level security;
-alter table step_types enable row level security;
-alter table step_type_versions enable row level security;
 alter table tenant_step_type_installs enable row level security;
 alter table tenant_secret_bindings enable row level security;
 alter table tenant_workflow_overlays enable row level security;
@@ -1662,6 +1697,8 @@ alter table workflow_pack_versions enable row level security;
 alter table moderation_queue enable row level security;
 alter table release_notes enable row level security;
 alter table adoption_records enable row level security;
+alter table platform.step_types enable row level security;
+alter table platform.step_type_versions enable row level security;
 alter table platform.rule_sources enable row level security;
 alter table platform.rule_source_snapshots enable row level security;
 alter table platform.rule_packs enable row level security;
@@ -1997,6 +2034,16 @@ create policy "Tenant members insert adoption records" on adoption_records
     or app.is_org_member(org_id)
   );
 
+create policy "Platform services manage step types" on platform.step_types
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy "Platform services manage step type versions" on platform.step_type_versions
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
 create policy "Platform services manage rule sources" on platform.rule_sources
   for all
   using (public.is_platform_service() or app.is_platform_admin())
@@ -2033,24 +2080,6 @@ create policy "Service role manages json schemas" on json_schemas
   with check (auth.role() = 'service_role');
 
 create policy "Admins read json schemas" on json_schemas
-  for select
-  using (auth.role() in ('service_role', 'authenticated'));
-
-create policy "Service role manages step types" on step_types
-  for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
-
-create policy "Admins read step types" on step_types
-  for select
-  using (auth.role() in ('service_role', 'authenticated'));
-
-create policy "Service role manages step type versions" on step_type_versions
-  for all
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
-
-create policy "Admins read step type versions" on step_type_versions
   for select
   using (auth.role() in ('service_role', 'authenticated'));
 
