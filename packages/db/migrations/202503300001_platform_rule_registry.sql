@@ -17,6 +17,18 @@ create table if not exists platform.rule_sources (
 create index if not exists platform_rule_sources_jurisdiction_category_idx
   on platform.rule_sources(jurisdiction, category);
 
+create table if not exists platform.rule_source_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  rule_source_id uuid not null references platform.rule_sources(id) on delete cascade,
+  content_hash text not null,
+  parsed_facts jsonb not null default '{}'::jsonb,
+  fetched_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists platform_rule_source_snapshots_source_idx
+  on platform.rule_source_snapshots(rule_source_id, fetched_at desc);
+
 create table if not exists platform.rule_packs (
   id uuid primary key default gen_random_uuid(),
   pack_key text not null,
@@ -67,11 +79,17 @@ create index if not exists platform_rule_pack_detection_sources_source_idx
   on platform.rule_pack_detection_sources(rule_source_id);
 
 alter table platform.rule_sources enable row level security;
+alter table platform.rule_source_snapshots enable row level security;
 alter table platform.rule_packs enable row level security;
 alter table platform.rule_pack_detections enable row level security;
 alter table platform.rule_pack_detection_sources enable row level security;
 
 create policy if not exists "Platform services manage rule sources" on platform.rule_sources
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy if not exists "Platform services manage rule source snapshots" on platform.rule_source_snapshots
   for all
   using (public.is_platform_service() or app.is_platform_admin())
   with check (public.is_platform_service() or app.is_platform_admin());
