@@ -1223,21 +1223,21 @@ create table funding_opportunity_workflows (
 
 create table source_registry (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   name text not null,
   url text not null,
   parser text not null,
   jurisdiction text,
   category text,
   created_at timestamptz not null default now(),
-  unique(tenant_org_id, url)
+  unique(org_id, url)
 );
 
-create index source_registry_tenant_idx on source_registry(tenant_org_id);
+create index source_registry_org_idx on source_registry(org_id);
 
 create table source_snapshot (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   source_id uuid not null references source_registry(id) on delete cascade,
   fetched_at timestamptz not null default now(),
   content_hash text not null,
@@ -1248,11 +1248,11 @@ create table source_snapshot (
 );
 
 create index source_snapshot_source_idx on source_snapshot(source_id, fetched_at desc);
-create index source_snapshot_tenant_idx on source_snapshot(tenant_org_id);
+create index source_snapshot_org_idx on source_snapshot(org_id);
 
 create table change_event (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   source_id uuid not null references source_registry(id) on delete cascade,
   from_hash text,
   to_hash text not null,
@@ -1263,11 +1263,11 @@ create table change_event (
 );
 
 create index change_event_source_idx on change_event(source_id, detected_at desc);
-create index change_event_tenant_idx on change_event(tenant_org_id, detected_at desc);
+create index change_event_org_idx on change_event(org_id, detected_at desc);
 
 create table rule_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   rule_id text not null,
   version text not null,
   logic_jsonb jsonb not null,
@@ -1275,30 +1275,30 @@ create table rule_versions (
   checksum text not null,
   created_by uuid references users(id),
   created_at timestamptz not null default now(),
-  unique(tenant_org_id, rule_id, version)
+  unique(org_id, rule_id, version)
 );
 
 create index rule_versions_rule_idx on rule_versions(rule_id);
-create index rule_versions_tenant_idx on rule_versions(tenant_org_id);
+create index rule_versions_org_idx on rule_versions(org_id);
 
 create table template_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   template_id text not null,
   version text not null,
   storage_ref text not null,
   checksum text not null,
   created_by uuid references users(id),
   created_at timestamptz not null default now(),
-  unique(tenant_org_id, template_id, version)
+  unique(org_id, template_id, version)
 );
 
 create index template_versions_template_idx on template_versions(template_id);
-create index template_versions_tenant_idx on template_versions(tenant_org_id);
+create index template_versions_org_idx on template_versions(org_id);
 
 create table workflow_def_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   workflow_def_id uuid not null references workflow_defs(id) on delete cascade,
   version text not null,
   graph_jsonb jsonb not null,
@@ -1310,26 +1310,26 @@ create table workflow_def_versions (
   unique(workflow_def_id, version)
 );
 
-create index workflow_def_versions_tenant_idx on workflow_def_versions(tenant_org_id);
+create index workflow_def_versions_org_idx on workflow_def_versions(org_id);
 
 create table workflow_pack_versions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   pack_id text not null,
   version text not null,
   overlay_jsonb jsonb not null,
   checksum text not null,
   created_by uuid references users(id),
   created_at timestamptz not null default now(),
-  unique(tenant_org_id, pack_id, version)
+  unique(org_id, pack_id, version)
 );
 
 create index workflow_pack_versions_pack_idx on workflow_pack_versions(pack_id);
-create index workflow_pack_versions_tenant_idx on workflow_pack_versions(tenant_org_id);
+create index workflow_pack_versions_org_idx on workflow_pack_versions(org_id);
 
 create table moderation_queue (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   change_event_id uuid references change_event(id) on delete set null,
   proposal jsonb not null,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'amended')),
@@ -1342,12 +1342,12 @@ create table moderation_queue (
   updated_at timestamptz not null default now()
 );
 
-create index moderation_queue_tenant_status_idx on moderation_queue(tenant_org_id, status, created_at desc);
+create index moderation_queue_org_status_idx on moderation_queue(org_id, status, created_at desc);
 create index moderation_queue_change_event_idx on moderation_queue(change_event_id);
 
 create table release_notes (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid references organisations(id),
+  org_id uuid not null references organisations(id),
   scope text not null,
   ref_id text not null,
   from_version text,
@@ -1359,11 +1359,11 @@ create table release_notes (
   created_at timestamptz not null default now()
 );
 
-create index release_notes_scope_idx on release_notes(tenant_org_id, scope, ref_id);
+create index release_notes_scope_idx on release_notes(org_id, scope, ref_id);
 
 create table adoption_records (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   run_id uuid references workflow_runs(id) on delete set null,
   scope text not null,
   ref_id text not null,
@@ -1376,8 +1376,73 @@ create table adoption_records (
   created_at timestamptz not null default now()
 );
 
-create index adoption_records_scope_idx on adoption_records(tenant_org_id, scope, ref_id);
+create index adoption_records_scope_idx on adoption_records(org_id, scope, ref_id);
 create index adoption_records_run_idx on adoption_records(run_id);
+
+create schema if not exists platform;
+
+create table platform.rule_sources (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  url text not null unique,
+  parser text not null,
+  jurisdiction text,
+  category text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index platform_rule_sources_jurisdiction_category_idx
+  on platform.rule_sources(jurisdiction, category);
+
+create table platform.rule_packs (
+  id uuid primary key default gen_random_uuid(),
+  pack_key text not null,
+  version text not null,
+  title text not null,
+  summary text,
+  manifest jsonb not null default '{}'::jsonb,
+  checksum text not null,
+  created_by uuid references users(id),
+  created_at timestamptz not null default now(),
+  published_at timestamptz,
+  status text not null default 'draft' check (status in ('draft','proposed','published','deprecated')),
+  unique(pack_key, version)
+);
+
+create index platform_rule_packs_key_idx on platform.rule_packs(pack_key);
+
+create table platform.rule_pack_detections (
+  id uuid primary key default gen_random_uuid(),
+  rule_pack_id uuid references platform.rule_packs(id) on delete set null,
+  rule_pack_key text not null,
+  current_version text,
+  proposed_version text not null,
+  severity text not null check (severity in ('info','minor','major','critical')),
+  status text not null default 'open' check (status in ('open','in_review','approved','rejected','superseded')),
+  diff jsonb not null default '{}'::jsonb,
+  detected_at timestamptz not null default now(),
+  created_by uuid references users(id),
+  notes text,
+  unique(rule_pack_key, proposed_version, detected_at)
+);
+
+create index platform_rule_pack_detections_pack_idx
+  on platform.rule_pack_detections(rule_pack_key, detected_at desc);
+
+create index platform_rule_pack_detections_status_idx
+  on platform.rule_pack_detections(status);
+
+create table platform.rule_pack_detection_sources (
+  detection_id uuid references platform.rule_pack_detections(id) on delete cascade,
+  rule_source_id uuid references platform.rule_sources(id) on delete cascade,
+  change_summary jsonb not null default '{}'::jsonb,
+  primary key(detection_id, rule_source_id)
+);
+
+create index platform_rule_pack_detection_sources_source_idx
+  on platform.rule_pack_detection_sources(rule_source_id);
 
 create schema if not exists app;
 
@@ -1515,6 +1580,10 @@ alter table workflow_pack_versions enable row level security;
 alter table moderation_queue enable row level security;
 alter table release_notes enable row level security;
 alter table adoption_records enable row level security;
+alter table platform.rule_sources enable row level security;
+alter table platform.rule_packs enable row level security;
+alter table platform.rule_pack_detections enable row level security;
+alter table platform.rule_pack_detection_sources enable row level security;
 
 create policy "Members read organisations" on organisations
   for select
@@ -1716,7 +1785,7 @@ create policy "Tenant members read source registry" on source_registry
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages source snapshots" on source_snapshot
@@ -1729,7 +1798,7 @@ create policy "Tenant members read source snapshots" on source_snapshot
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages change events" on change_event
@@ -1742,7 +1811,7 @@ create policy "Tenant members read change events" on change_event
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages rule versions" on rule_versions
@@ -1755,7 +1824,7 @@ create policy "Tenant members read rule versions" on rule_versions
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages template versions" on template_versions
@@ -1768,7 +1837,7 @@ create policy "Tenant members read template versions" on template_versions
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages workflow def versions" on workflow_def_versions
@@ -1781,7 +1850,7 @@ create policy "Tenant members read workflow def versions" on workflow_def_versio
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages workflow pack versions" on workflow_pack_versions
@@ -1794,7 +1863,7 @@ create policy "Tenant members read workflow pack versions" on workflow_pack_vers
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages moderation queue" on moderation_queue
@@ -1807,7 +1876,7 @@ create policy "Tenant members view moderation queue" on moderation_queue
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages release notes" on release_notes
@@ -1820,7 +1889,7 @@ create policy "Tenant members read release notes" on release_notes
   using (
     public.is_platform_service()
     or app.is_platform_admin()
-    or app.is_org_member(tenant_org_id)
+    or app.is_org_member(org_id)
   );
 
 create policy "Service role manages adoption records" on adoption_records
@@ -1831,16 +1900,38 @@ create policy "Service role manages adoption records" on adoption_records
 create policy "Tenant members read adoption records" on adoption_records
   for select
   using (
-    auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(org_id)
   );
 
 create policy "Tenant members insert adoption records" on adoption_records
   for insert
   with check (
-    auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(org_id)
   );
+
+create policy "Platform services manage rule sources" on platform.rule_sources
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy "Platform services manage rule packs" on platform.rule_packs
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy "Platform services manage rule pack detections" on platform.rule_pack_detections
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy "Platform services manage rule pack detection sources" on platform.rule_pack_detection_sources
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
 
 create policy "Service role manages json schemas" on json_schemas
   for all
@@ -2210,11 +2301,11 @@ begin
     meta_json
   )
   values (
-    new.tenant_org_id,
-    new.tenant_org_id,
+    new.org_id,
+    new.org_id,
     coalesce(new.reviewer_id, new.created_by),
-    new.tenant_org_id,
-    new.tenant_org_id,
+    new.org_id,
+    new.org_id,
     'moderation_queue',
     'freshness_moderation',
     new.id,
@@ -2250,11 +2341,11 @@ begin
     meta_json
   )
   values (
-    new.tenant_org_id,
-    new.tenant_org_id,
+    new.org_id,
+    new.org_id,
     new.actor_id,
-    new.tenant_org_id,
-    new.tenant_org_id,
+    new.org_id,
+    new.org_id,
     new.run_id,
     'adoption_records',
     'freshness_adoption',
