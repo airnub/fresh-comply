@@ -1,4 +1,4 @@
--- Align app.is_platform_admin with platform_admin role claims
+-- Require explicit platform admin role or boolean override
 set check_function_bodies = off;
 
 create or replace function app.is_platform_admin()

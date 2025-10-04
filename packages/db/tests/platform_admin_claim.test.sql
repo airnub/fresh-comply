@@ -23,6 +23,23 @@ begin
 
   perform set_config(
     'request.jwt.claims',
+    jsonb_build_object('role', 'service_role')::text,
+    true
+  );
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  perform set_config('request.jwt.claim.is_platform_admin', 'false', true);
+
+  begin
+    insert into platform.rule_sources (name, url, parser)
+    values ('Service Role Shortcut', 'https://example.test/service-role', 'manual');
+    raise exception 'Service role without explicit override should be rejected';
+  exception
+    when sqlstate '42501' then
+      null;
+  end;
+
+  perform set_config(
+    'request.jwt.claims',
     jsonb_build_object('role', 'authenticated')::text,
     true
   );
