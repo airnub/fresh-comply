@@ -51,6 +51,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check for disallowed platform mutations
+        run: scripts/check-platform-mutations.sh
+
       - name: Run ${{ matrix.display }}
         run: pnpm ${{ matrix.task }}
 
