@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { pollSource } from "../watcher.js";
 import { SOURCES } from "../sources.js";
 import { createInMemorySupabase } from "../testing/inMemorySupabase.js";
@@ -43,24 +43,34 @@ vi.mock("@airnub/connectors/funding", () => ({
 }));
 
 describe("pollSource persistence", () => {
-  const tenantOrgId = "00000000-0000-0000-0000-000000000123";
-  const sourceRegistryId = "00000000-0000-0000-0000-000000000321";
+  const ruleSourceId = "00000000-0000-0000-0000-000000000321";
+  const rulePackId = "00000000-0000-0000-0000-000000000654";
 
-  beforeEach(() => {
-    process.env.FRESHNESS_TENANT_ORG_ID = tenantOrgId;
-  });
-
-  it("persists snapshots, change events, and moderation proposals", async () => {
+  it("persists platform snapshots and detections", async () => {
     const { client, getTableRows } = createInMemorySupabase({
-      source_registry: [
+      "platform.rule_sources": [
         {
-          id: sourceRegistryId,
-          tenant_org_id: tenantOrgId,
+          id: ruleSourceId,
           name: SOURCES.cro_open_services.label,
           url: SOURCES.cro_open_services.url,
           parser: "cro_open_services",
           jurisdiction: SOURCES.cro_open_services.jurisdiction,
           category: SOURCES.cro_open_services.category,
+          metadata: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ],
+      "platform.rule_packs": [
+        {
+          id: rulePackId,
+          pack_key: "platform.ie.rules",
+          version: "1.0.0",
+          title: "IE Compliance Pack",
+          summary: "Initial pack",
+          manifest: {},
+          checksum: "sha-1",
+          status: "published",
           created_at: new Date().toISOString()
         }
       ]
@@ -68,33 +78,36 @@ describe("pollSource persistence", () => {
 
     const event = await pollSource("cro_open_services", {
       supabase: client,
-      tenantOrgId,
-      workflows: ["setup-nonprofit-ie"]
+      workflows: ["setup-nonprofit-ie"],
+      ruleSourceId,
+      rulePack: {
+        id: rulePackId,
+        key: "platform.ie.rules",
+        currentVersion: "1.0.0"
+      }
     });
 
     expect(event).not.toBeNull();
     expect(event?.current.snapshotId).toBeTruthy();
 
-    const snapshots = getTableRows("source_snapshot");
+    const snapshots = getTableRows("platform.rule_source_snapshots");
     expect(snapshots).toHaveLength(1);
-    expect(snapshots[0].tenant_org_id).toBe(tenantOrgId);
-    expect(snapshots[0].source_id).toBe(sourceRegistryId);
+    expect(snapshots[0].rule_source_id).toBe(ruleSourceId);
     expect(snapshots[0].content_hash).toBe(event?.current.fingerprint);
 
-    const changeEvents = getTableRows("change_event");
-    expect(changeEvents).toHaveLength(1);
-    expect(changeEvents[0].tenant_org_id).toBe(tenantOrgId);
-    expect(changeEvents[0].source_id).toBe(sourceRegistryId);
-    expect(changeEvents[0].to_hash).toBe(event?.current.fingerprint);
+    const detections = getTableRows("platform.rule_pack_detections");
+    expect(detections).toHaveLength(1);
+    expect(detections[0].rule_pack_id).toBe(rulePackId);
+    expect(detections[0].rule_pack_key).toBe("platform.ie.rules");
+    expect(detections[0].severity).toBe("info");
+    expect(detections[0].diff?.summary).toBe(event?.summary);
 
-    const queue = getTableRows("moderation_queue");
-    expect(queue).toHaveLength(1);
-    const proposal = queue[0].proposal as Record<string, any>;
-    expect(proposal).toBeTruthy();
-    expect(proposal.kind).toBe("source_change");
-    expect(proposal.sourceKey).toBe("cro_open_services");
-    expect(proposal.current?.snapshotId).toBe(event?.current.snapshotId);
-    expect(proposal.workflows).toEqual(["setup-nonprofit-ie"]);
-    expect(proposal.diff?.added?.length).toBeGreaterThan(0);
+    const detectionSources = getTableRows("platform.rule_pack_detection_sources");
+    expect(detectionSources).toHaveLength(1);
+    expect(detectionSources[0].rule_source_id).toBe(ruleSourceId);
+    const changeSummary = detectionSources[0].change_summary as Record<string, any>;
+    expect(changeSummary.sourceKey).toBe("cro_open_services");
+    expect(changeSummary.snapshots?.current?.snapshotId).toBe(event?.current.snapshotId);
+    expect(changeSummary.workflows).toEqual(["setup-nonprofit-ie"]);
   });
 });

@@ -9,8 +9,13 @@ export type RefreshSourceInput = {
   sourceKey: SourceKey;
   workflows?: string[];
   metadata?: Record<string, unknown>;
-  tenantOrgId?: string;
-  sourceRegistryId?: string;
+  rulePack?: {
+    id?: string | null;
+    key?: string;
+    currentVersion?: string | null;
+    proposedVersion?: string;
+  };
+  ruleSourceId?: string;
 };
 
 const DEFAULT_WORKFLOW_ROUTES: Partial<Record<SourceKey, string[]>> = {
@@ -29,19 +34,31 @@ function getSupabaseEnv() {
   return { url, key };
 }
 
-function getFreshnessTenant() {
-  const tenant = process.env.FRESHNESS_TENANT_ORG_ID ?? process.env.PLATFORM_TENANT_ORG_ID;
-  if (!tenant) {
-    throw new Error("FRESHNESS_TENANT_ORG_ID (or PLATFORM_TENANT_ORG_ID) must be set for freshness polling");
-  }
-  return tenant;
-}
-
 function getSupabaseClient() {
   const { url, key } = getSupabaseEnv();
   return createClient<Database>(url, key, {
     auth: { persistSession: false }
   });
+}
+
+type RulePackConfig = {
+  id?: string | null;
+  key: string;
+  currentVersion?: string | null;
+  proposedVersion?: string;
+};
+
+function getPlatformRulePack(): RulePackConfig {
+  const key = process.env.PLATFORM_RULE_PACK_KEY;
+  if (!key) {
+    throw new Error("PLATFORM_RULE_PACK_KEY must be set for freshness polling");
+  }
+  return {
+    id: process.env.PLATFORM_RULE_PACK_ID ?? null,
+    key,
+    currentVersion: process.env.PLATFORM_RULE_PACK_VERSION ?? null,
+    proposedVersion: process.env.PLATFORM_RULE_PACK_PROPOSED_VERSION ?? undefined
+  } satisfies RulePackConfig;
 }
 
 export async function refreshFreshnessSource(input: RefreshSourceInput): Promise<WatchEvent | null> {
@@ -53,12 +70,16 @@ export async function refreshFreshnessSource(input: RefreshSourceInput): Promise
   }, async (span) => {
     const client = getSupabaseClient();
     const workflows = input.workflows ?? DEFAULT_WORKFLOW_ROUTES[input.sourceKey];
+    const baseRulePack = getPlatformRulePack();
     const event = await pollSource(input.sourceKey, {
       supabase: client,
       workflows,
       metadata: input.metadata,
-      tenantOrgId: input.tenantOrgId ?? getFreshnessTenant(),
-      sourceRegistryId: input.sourceRegistryId
+      rulePack: {
+        ...baseRulePack,
+        ...(input.rulePack ?? {})
+      },
+      ruleSourceId: input.ruleSourceId
     });
     if (event?.current) {
       await persistMaterializedViews(client, input.sourceKey, event);
@@ -86,8 +107,13 @@ export async function refreshAllSources(options?: { workflows?: string[] }) {
       "funding_radar"
     ];
     const events: WatchEvent[] = [];
+    const rulePack = getPlatformRulePack();
     for (const key of keys) {
-      const event = await refreshFreshnessSource({ sourceKey: key, workflows: options?.workflows });
+      const event = await refreshFreshnessSource({
+        sourceKey: key,
+        workflows: options?.workflows,
+        rulePack
+      });
       if (event) {
         events.push(event);
       }
