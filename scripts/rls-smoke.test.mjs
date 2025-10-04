@@ -30,8 +30,8 @@ assertRegex(
 );
 
 assertRegex(
-  /create\s+or\s+replace\s+function\s+app\.is_provider_admin_for[\s\S]+public\.realms/i,
-  "Provider admin helper must reference public.realms for ancestry resolution."
+  /create\s+or\s+replace\s+function\s+app\.is_provider_admin_for[\s\S]+with\s+recursive[\s\S]+public\.orgs[\s\S]+m\.role\s+in\s+\('provider_admin',\s*'org_admin'\)/i,
+  "Provider admin helper must traverse the org hierarchy with a recursive CTE and honor provider/org admin memberships."
 );
 
 // Platform catalog policies must be locked to app.is_platform_admin
