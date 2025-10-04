@@ -1,0 +1,20 @@
+name: DB Baseline Guard
+on: [pull_request]
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect iterative noise
+        run: |
+          # Warn on ALTER churn/backfill patterns in new migrations
+          NEW_SQL=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -E '\.sql$' || true)
+          if [ -n "$NEW_SQL" ]; then
+            echo "$NEW_SQL" | xargs -I{} grep -nE "(BACKFILL|UPDATE .* SET .* =|INSERT INTO .* SELECT|\\balter\\b .* (drop|rename)|\\btenant_org_id\\b)" {} || true
+          fi
+      - name: Forbid tenancy gates via IS NULL (ownership)
+        run: |
+          if rg -n --hidden -S "(org_id|tenant_org_id)\\s+is\\s+null" --glob "**/*.sql"; then
+            echo "Forbidden tenancy gate via IS NULL detected in SQL." >&2
+            exit 1
+          fi
