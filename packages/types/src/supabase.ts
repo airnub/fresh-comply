@@ -12,7 +12,7 @@ export type Database = {
       adoption_records: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           run_id: string | null;
           scope: string;
           ref_id: string;
@@ -26,7 +26,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           run_id?: string | null;
           scope: string;
           ref_id: string;
@@ -40,7 +40,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           run_id?: string | null;
           scope?: string;
           ref_id?: string;
@@ -68,8 +68,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "adoption_records_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "adoption_records_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -79,7 +79,7 @@ export type Database = {
       change_event: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           source_id: string;
           from_hash: string | null;
           to_hash: string;
@@ -90,7 +90,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           source_id: string;
           from_hash?: string | null;
           to_hash: string;
@@ -101,7 +101,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           source_id?: string;
           from_hash?: string | null;
           to_hash?: string;
@@ -119,8 +119,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "change_event_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "change_event_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -130,7 +130,7 @@ export type Database = {
       moderation_queue: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           change_event_id: string | null;
           proposal: Json;
           status: "pending" | "approved" | "rejected" | "amended";
@@ -144,7 +144,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           change_event_id?: string | null;
           proposal: Json;
           status?: "pending" | "approved" | "rejected" | "amended";
@@ -158,7 +158,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           change_event_id?: string | null;
           proposal?: Json;
           status?: "pending" | "approved" | "rejected" | "amended";
@@ -193,8 +193,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "moderation_queue_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "moderation_queue_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -204,7 +204,7 @@ export type Database = {
       release_notes: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           scope: string;
           ref_id: string;
           from_version: string | null;
@@ -217,7 +217,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           scope: string;
           ref_id: string;
           from_version?: string | null;
@@ -230,7 +230,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           scope?: string;
           ref_id?: string;
           from_version?: string | null;
@@ -250,8 +250,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "release_notes_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "release_notes_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -261,7 +261,7 @@ export type Database = {
       rule_versions: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           rule_id: string;
           version: string;
           logic_jsonb: Json;
@@ -272,7 +272,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           rule_id: string;
           version: string;
           logic_jsonb: Json;
@@ -283,7 +283,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           rule_id?: string;
           version?: string;
           logic_jsonb?: Json;
@@ -301,8 +301,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "rule_versions_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "rule_versions_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -312,7 +312,7 @@ export type Database = {
       source_registry: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           name: string;
           url: string;
           parser: string;
@@ -322,7 +322,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           name: string;
           url: string;
           parser: string;
@@ -332,7 +332,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           name?: string;
           url?: string;
           parser?: string;
@@ -342,8 +342,8 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "source_registry_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "source_registry_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -353,7 +353,7 @@ export type Database = {
       source_snapshot: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           source_id: string;
           fetched_at: string;
           content_hash: string;
@@ -363,7 +363,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           source_id: string;
           fetched_at?: string;
           content_hash: string;
@@ -373,7 +373,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           source_id?: string;
           fetched_at?: string;
           content_hash?: string;
@@ -390,8 +390,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "source_snapshot_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "source_snapshot_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -401,7 +401,7 @@ export type Database = {
       template_versions: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           template_id: string;
           version: string;
           storage_ref: string;
@@ -411,7 +411,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           template_id: string;
           version: string;
           storage_ref: string;
@@ -421,7 +421,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           template_id?: string;
           version?: string;
           storage_ref?: string;
@@ -438,8 +438,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "template_versions_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "template_versions_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -449,7 +449,7 @@ export type Database = {
       workflow_def_versions: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           workflow_def_id: string;
           version: string;
           graph_jsonb: Json;
@@ -461,7 +461,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           workflow_def_id: string;
           version: string;
           graph_jsonb: Json;
@@ -473,7 +473,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           workflow_def_id?: string;
           version?: string;
           graph_jsonb?: Json;
@@ -492,8 +492,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "workflow_def_versions_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "workflow_def_versions_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -510,7 +510,7 @@ export type Database = {
       workflow_pack_versions: {
         Row: {
           id: string;
-          tenant_org_id: string;
+          org_id: string;
           pack_id: string;
           version: string;
           overlay_jsonb: Json;
@@ -520,7 +520,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          tenant_org_id: string;
+          org_id: string;
           pack_id: string;
           version: string;
           overlay_jsonb: Json;
@@ -530,7 +530,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          tenant_org_id?: string;
+          org_id?: string;
           pack_id?: string;
           version?: string;
           overlay_jsonb?: Json;
@@ -547,8 +547,8 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "workflow_pack_versions_tenant_org_id_fkey";
-            columns: ["tenant_org_id"];
+            foreignKeyName: "workflow_pack_versions_org_id_fkey";
+            columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organisations";
             referencedColumns: ["id"];
@@ -2349,6 +2349,198 @@ export type Database = {
           audit_entry: Json | null;
         };
       };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+  platform: {
+    Tables: {
+      rule_pack_detection_sources: {
+        Row: {
+          detection_id: string;
+          rule_source_id: string;
+          change_summary: Json;
+        };
+        Insert: {
+          detection_id: string;
+          rule_source_id: string;
+          change_summary?: Json;
+        };
+        Update: {
+          detection_id?: string;
+          rule_source_id?: string;
+          change_summary?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_pack_detection_sources_detection_id_fkey";
+            columns: ["detection_id"];
+            isOneToOne: false;
+            referencedRelation: "rule_pack_detections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_detection_sources_rule_source_id_fkey";
+            columns: ["rule_source_id"];
+            isOneToOne: false;
+            referencedRelation: "rule_sources";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      rule_pack_detections: {
+        Row: {
+          id: string;
+          rule_pack_id: string | null;
+          rule_pack_key: string;
+          current_version: string | null;
+          proposed_version: string;
+          severity: string;
+          status: string;
+          diff: Json;
+          detected_at: string;
+          created_by: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          rule_pack_id?: string | null;
+          rule_pack_key: string;
+          current_version?: string | null;
+          proposed_version: string;
+          severity: string;
+          status?: string;
+          diff?: Json;
+          detected_at?: string;
+          created_by?: string | null;
+          notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          rule_pack_id?: string | null;
+          rule_pack_key?: string;
+          current_version?: string | null;
+          proposed_version?: string;
+          severity?: string;
+          status?: string;
+          diff?: Json;
+          detected_at?: string;
+          created_by?: string | null;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_pack_detections_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_detections_rule_pack_id_fkey";
+            columns: ["rule_pack_id"];
+            isOneToOne: false;
+            referencedRelation: "rule_packs";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      rule_packs: {
+        Row: {
+          id: string;
+          pack_key: string;
+          version: string;
+          title: string;
+          summary: string | null;
+          manifest: Json;
+          checksum: string;
+          created_by: string | null;
+          created_at: string;
+          published_at: string | null;
+          status: string;
+        };
+        Insert: {
+          id?: string;
+          pack_key: string;
+          version: string;
+          title: string;
+          summary?: string | null;
+          manifest?: Json;
+          checksum: string;
+          created_by?: string | null;
+          created_at?: string;
+          published_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          id?: string;
+          pack_key?: string;
+          version?: string;
+          title?: string;
+          summary?: string | null;
+          manifest?: Json;
+          checksum?: string;
+          created_by?: string | null;
+          created_at?: string;
+          published_at?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_packs_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      rule_sources: {
+        Row: {
+          id: string;
+          name: string;
+          url: string;
+          parser: string;
+          jurisdiction: string | null;
+          category: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          url: string;
+          parser: string;
+          jurisdiction?: string | null;
+          category?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          url?: string;
+          parser?: string;
+          jurisdiction?: string | null;
+          category?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
     };
     Enums: {
       [_ in never]: never;
