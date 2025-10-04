@@ -39,8 +39,13 @@ export type PollSourceOptions = {
   supabase?: SupabaseClient<Database>;
   workflows?: string[];
   metadata?: Record<string, unknown>;
-  tenantOrgId?: string;
-  sourceRegistryId?: string;
+  ruleSourceId?: string;
+  rulePack?: {
+    id?: string | null;
+    key?: string;
+    currentVersion?: string | null;
+    proposedVersion?: string;
+  };
   abortSignal?: AbortSignal;
 };
 
@@ -119,21 +124,15 @@ export async function pollSource(sourceKey: SourceKey, options: PollSourceOption
   const detectedAt = new Date().toISOString();
   const supabase = options.supabase;
 
-  let tenantOrgId: string | undefined = options.tenantOrgId;
-  if (!tenantOrgId) {
-    tenantOrgId = process.env.FRESHNESS_TENANT_ORG_ID;
+  const platformClient = supabase?.schema("platform") as PlatformClient | undefined;
+  let ruleSourceId = options.ruleSourceId;
+
+  if (platformClient) {
+    ruleSourceId = await resolvePlatformRuleSourceId(platformClient, sourceKey, ruleSourceId);
   }
 
-  let sourceRegistryId = options.sourceRegistryId;
-  if (supabase) {
-    if (!tenantOrgId) {
-      throw new Error(`tenantOrgId must be provided when persisting freshness data for ${sourceKey}`);
-    }
-    sourceRegistryId = await resolveSourceRegistryId(supabase, tenantOrgId, sourceKey, sourceRegistryId);
-  }
-
-  const previous = supabase && tenantOrgId && sourceRegistryId
-    ? await loadPreviousSnapshot(supabase, tenantOrgId, sourceRegistryId)
+  const previous = platformClient && ruleSourceId
+    ? await loadPreviousPlatformSnapshot(platformClient, ruleSourceId)
     : undefined;
   if (previous && previous.fingerprint === fingerprint) {
     return null;
@@ -143,29 +142,28 @@ export async function pollSource(sourceKey: SourceKey, options: PollSourceOption
   const summary = buildSummary(diff, records.length);
   const mergedMetadata = { ...(options.metadata ?? {}), ...(metadata ?? {}) };
 
-  const currentSnapshot = supabase
-    ? await saveSnapshot({
-        client: supabase,
+  const currentSnapshot = platformClient && ruleSourceId
+    ? await savePlatformSnapshot({
+        client: platformClient,
         sourceKey,
-        sourceId: sourceRegistryId!,
-        tenantOrgId: tenantOrgId!,
+        ruleSourceId,
         fingerprint,
         payload: records,
         metadata: mergedMetadata
       })
     : { fingerprint, payload: records };
 
-  if (supabase && tenantOrgId && sourceRegistryId) {
-    await persistChangeEventAndProposal(supabase, {
+  if (platformClient && ruleSourceId) {
+    await persistPlatformDetection(platformClient, {
       sourceKey,
-      sourceId: sourceRegistryId,
-      tenantOrgId,
+      ruleSourceId,
       detectedAt,
       diff,
       summary,
       current: currentSnapshot,
       previous,
-      workflows: options.workflows
+      workflows: options.workflows,
+      rulePack: options.rulePack
     });
   }
 
@@ -182,145 +180,184 @@ export async function pollSource(sourceKey: SourceKey, options: PollSourceOption
 
 type PreviousSnapshot = SnapshotInfo & { snapshotId: string };
 
-async function loadPreviousSnapshot(
-  client: SupabaseClient<Database>,
-  tenantOrgId: string,
-  sourceId: string
-): Promise<PreviousSnapshot | undefined> {
-  const { data, error } = await client
-    .from("source_snapshot")
-    .select("id, content_hash, parsed_facts, fetched_at")
-    .eq("tenant_org_id", tenantOrgId)
-    .eq("source_id", sourceId)
-    .order("fetched_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+type PlatformClient = ReturnType<SupabaseClient<Database>["schema"]>;
 
-  if (error) {
-    if (error.code === "PGRST116" || error.message?.toLowerCase().includes("row")) {
+async function loadPreviousPlatformSnapshot(
+  client: PlatformClient,
+  ruleSourceId: string
+): Promise<PreviousSnapshot | undefined> {
+  try {
+    const { data, error } = await client
+      .from("rule_source_snapshots" as never)
+      .select("id, content_hash, parsed_facts, fetched_at")
+      .eq("rule_source_id", ruleSourceId)
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.toLowerCase().includes("row")) {
+        return undefined;
+      }
+      if (error.code === "42P01") {
+        console.warn("[freshness] Platform snapshot table missing; skipping history lookup");
+        return undefined;
+      }
+      console.warn(`[freshness] Unable to load platform snapshot for source ${ruleSourceId}`, error);
       return undefined;
     }
-    console.warn(`[freshness] Unable to load snapshot for source ${sourceId}`, error);
+
+    if (!data) return undefined;
+
+    const parsed =
+      (data.parsed_facts as { records?: SourceRecord[]; metadata?: Record<string, unknown> | null }) ?? {};
+
+    return {
+      fingerprint: data.content_hash,
+      payload: Array.isArray(parsed.records) ? parsed.records : [],
+      snapshotId: data.id,
+      sourceId: ruleSourceId,
+      metadata: (parsed.metadata ?? undefined) as Record<string, unknown> | undefined
+    } satisfies PreviousSnapshot;
+  } catch (error) {
+    console.warn(`[freshness] Unexpected error loading platform snapshot for source ${ruleSourceId}`, error);
     return undefined;
   }
-
-  if (!data) return undefined;
-
-  const parsed = (data.parsed_facts as { records?: SourceRecord[]; metadata?: Record<string, unknown> | null }) ?? {};
-
-  return {
-    fingerprint: data.content_hash,
-    payload: Array.isArray(parsed.records) ? parsed.records : [],
-    snapshotId: data.id,
-    sourceId,
-    metadata: (parsed.metadata ?? undefined) as Record<string, unknown> | undefined
-  } satisfies PreviousSnapshot;
 }
 
-async function saveSnapshot(options: {
-  client: SupabaseClient<Database>;
-  tenantOrgId: string;
-  sourceId: string;
+async function savePlatformSnapshot(options: {
+  client: PlatformClient;
+  ruleSourceId: string;
   sourceKey: SourceKey;
   fingerprint: string;
   payload: SourceRecord[];
   metadata?: Record<string, unknown>;
 }): Promise<SnapshotInfo> {
-  const { client, tenantOrgId, sourceId, sourceKey, fingerprint, payload, metadata } = options;
-  const { data, error } = await client
-    .from("source_snapshot")
-    .insert({
-      tenant_org_id: tenantOrgId,
-      source_id: sourceId,
-      content_hash: fingerprint,
-      parsed_facts: snapshotFacts(payload, metadata),
-      storage_ref: null
-    })
-    .select("id")
-    .single();
+  const { client, ruleSourceId, sourceKey, fingerprint, payload, metadata } = options;
 
-  if (error) {
-    throw new Error(`Unable to persist snapshot for ${sourceKey}: ${error.message}`);
+  try {
+    const { data, error } = await client
+      .from("rule_source_snapshots" as never)
+      .insert({
+        rule_source_id: ruleSourceId,
+        content_hash: fingerprint,
+        parsed_facts: snapshotFacts(payload, metadata)
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      if (error.code === "42P01") {
+        console.warn("[freshness] Platform snapshot table missing; skipping snapshot persistence");
+        return { fingerprint, payload, sourceId: ruleSourceId, metadata } satisfies SnapshotInfo;
+      }
+      throw new Error(`Unable to persist platform snapshot for ${sourceKey}: ${error.message}`);
+    }
+
+    return {
+      fingerprint,
+      payload,
+      snapshotId: data.id,
+      sourceId: ruleSourceId,
+      metadata
+    } satisfies SnapshotInfo;
+  } catch (error) {
+    if ((error as { message?: string })?.message?.includes("Unable to persist")) {
+      throw error;
+    }
+    console.warn(`[freshness] Unexpected error persisting platform snapshot for ${sourceKey}`, error);
+    return { fingerprint, payload, sourceId: ruleSourceId, metadata } satisfies SnapshotInfo;
   }
-
-  return {
-    fingerprint,
-    payload,
-    snapshotId: data.id,
-    sourceId,
-    metadata
-  } satisfies SnapshotInfo;
 }
 
-async function persistChangeEventAndProposal(
-  client: SupabaseClient<Database>,
+async function persistPlatformDetection(
+  client: PlatformClient,
   payload: {
-    tenantOrgId: string;
-    sourceId: string;
     sourceKey: SourceKey;
+    ruleSourceId: string;
     detectedAt: string;
     diff: SourceDiff;
     summary: string;
     current: SnapshotInfo;
     previous?: PreviousSnapshot;
     workflows?: string[];
+    rulePack?: PollSourceOptions["rulePack"];
   }
 ) {
-  const currentSnapshotId = payload.current.snapshotId;
-  if (!currentSnapshotId) {
-    throw new Error(`Missing current snapshot id for ${payload.sourceKey}`);
-  }
+  const severity = mapDetectionSeverity(inferSeverity(payload.diff));
+  const rulePackKey = payload.rulePack?.key ?? `source:${payload.sourceKey}`;
+  const proposedVersion =
+    payload.rulePack?.proposedVersion ?? bumpVersion(payload.rulePack?.currentVersion ?? null, severity);
 
-  const severity = inferSeverity(payload.diff);
-
-  const changeEventRow: Database["public"]["Tables"]["change_event"]["Insert"] = {
-    tenant_org_id: payload.tenantOrgId,
-    source_id: payload.sourceId,
-    from_hash: payload.previous?.fingerprint ?? null,
-    to_hash: payload.current.fingerprint,
-    detected_at: payload.detectedAt,
-    severity,
-    notes: payload.summary
-  };
-
-  const { data: changeEvent, error: changeEventError } = await client
-    .from("change_event")
-    .insert(changeEventRow)
-    .select("id")
-    .single();
-
-  if (changeEventError) {
-    console.error(`[freshness] Unable to persist change event for ${payload.sourceKey}`, changeEventError);
-    return;
-  }
-
-  const proposal = buildModerationProposal({
+  const detectionDiff = normalizeJson({
     sourceKey: payload.sourceKey,
-    severity,
     summary: payload.summary,
-    detectedAt: payload.detectedAt,
     diff: payload.diff,
-    workflows: payload.workflows,
-    current: payload.current,
-    previous: payload.previous
+    workflows: payload.workflows ?? [],
+    current: serializeSnapshot(payload.current),
+    previous: payload.previous ? serializeSnapshot(payload.previous) : null
   });
 
-  const moderationRow: Database["public"]["Tables"]["moderation_queue"]["Insert"] = {
-    tenant_org_id: payload.tenantOrgId,
-    change_event_id: changeEvent.id,
-    proposal,
-    status: "pending",
-    classification: null,
-    reviewer_id: null,
-    decided_at: null,
-    created_by: null,
-    notes_md: null
-  };
+  try {
+    const { data: detection, error: detectionError } = await client
+      .from("rule_pack_detections" as never)
+      .insert({
+        rule_pack_id: payload.rulePack?.id ?? null,
+        rule_pack_key: rulePackKey,
+        current_version: payload.rulePack?.currentVersion ?? null,
+        proposed_version: proposedVersion,
+        severity,
+        diff: detectionDiff,
+        detected_at: payload.detectedAt,
+        status: "open",
+        notes: payload.summary
+      })
+      .select("id")
+      .single();
 
-  const { error: moderationError } = await client.from("moderation_queue").insert(moderationRow);
+    if (detectionError) {
+      if (detectionError.code === "42P01") {
+        console.warn("[freshness] Platform detection table missing; skipping detection persistence");
+        return;
+      }
+      console.error(`[freshness] Unable to persist platform detection for ${payload.sourceKey}`, detectionError);
+      return;
+    }
 
-  if (moderationError) {
-    console.error(`[freshness] Unable to enqueue moderation proposal for ${payload.sourceKey}`, moderationError);
+    const changeSummary = normalizeJson({
+      sourceKey: payload.sourceKey,
+      fingerprint: payload.current.fingerprint,
+      previousFingerprint: payload.previous?.fingerprint ?? null,
+      workflows: payload.workflows ?? [],
+      diff: payload.diff,
+      snapshots: {
+        current: serializeSnapshot(payload.current),
+        previous: payload.previous ? serializeSnapshot(payload.previous) : null
+      }
+    });
+
+    const { error: sourceLinkError } = await client
+      .from("rule_pack_detection_sources" as never)
+      .insert({
+        detection_id: detection.id,
+        rule_source_id: payload.ruleSourceId,
+        change_summary: changeSummary
+      });
+
+    if (sourceLinkError) {
+      if (sourceLinkError.code === "42P01") {
+        console.warn(
+          "[freshness] Platform detection sources table missing; skipping detection source persistence"
+        );
+        return;
+      }
+      console.error(
+        `[freshness] Unable to persist platform detection source link for ${payload.sourceKey}`,
+        sourceLinkError
+      );
+    }
+  } catch (error) {
+    console.error(`[freshness] Unexpected error persisting platform detection for ${payload.sourceKey}`, error);
   }
 }
 
@@ -333,9 +370,8 @@ function snapshotFacts(
   ) as Json;
 }
 
-async function resolveSourceRegistryId(
-  client: SupabaseClient<Database>,
-  tenantOrgId: string,
+async function resolvePlatformRuleSourceId(
+  client: PlatformClient,
   sourceKey: SourceKey,
   providedId?: string
 ): Promise<string> {
@@ -348,78 +384,51 @@ async function resolveSourceRegistryId(
     throw new Error(`Unknown freshness source ${sourceKey}`);
   }
 
-  const { data, error } = await client
-    .from("source_registry")
-    .select("id")
-    .eq("tenant_org_id", tenantOrgId)
-    .eq("url", sourceInfo.url)
-    .maybeSingle();
+  try {
+    const { data, error } = await client
+      .from("rule_sources" as never)
+      .select("id")
+      .eq("url", sourceInfo.url)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Unable to resolve source registry entry for ${sourceKey}: ${error.message}`);
+    if (error) {
+      if (error.code === "42P01") {
+        throw new Error("platform.rule_sources table missing; service role access required");
+      }
+      throw new Error(`Unable to resolve platform rule source entry for ${sourceKey}: ${error.message}`);
+    }
+
+    if (data?.id) {
+      return data.id;
+    }
+
+    const insertRow = {
+      name: sourceInfo.label,
+      url: sourceInfo.url,
+      parser: sourceKey,
+      jurisdiction: sourceInfo.jurisdiction ?? null,
+      category: sourceInfo.category ?? null,
+      metadata: normalizeJson({})
+    } satisfies Database["platform"]["Tables"]["rule_sources"]["Insert"];
+
+    const { data: created, error: insertError } = await client
+      .from("rule_sources" as never)
+      .insert(insertRow)
+      .select("id")
+      .single();
+
+    if (insertError || !created?.id) {
+      throw new Error(
+        `Unable to register platform rule source ${sourceKey}: ${insertError?.message ?? "unknown error"}`
+      );
+    }
+
+    return created.id;
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error(`Unable to resolve platform rule source entry for ${sourceKey}: ${String(error)}`);
   }
-
-  if (data?.id) {
-    return data.id;
-  }
-
-  const insertRow: Database["public"]["Tables"]["source_registry"]["Insert"] = {
-    tenant_org_id: tenantOrgId,
-    name: sourceInfo.label,
-    url: sourceInfo.url,
-    parser: sourceKey,
-    jurisdiction: sourceInfo.jurisdiction ?? null,
-    category: sourceInfo.category ?? null
-  };
-
-  const { data: created, error: insertError } = await client
-    .from("source_registry")
-    .insert(insertRow)
-    .select("id")
-    .single();
-
-  if (insertError || !created?.id) {
-    throw new Error(`Unable to register source ${sourceKey}: ${insertError?.message ?? "unknown error"}`);
-  }
-
-  return created.id;
-}
-
-function buildModerationProposal(input: {
-  sourceKey: SourceKey;
-  severity: string;
-  summary: string;
-  detectedAt: string;
-  diff: SourceDiff;
-  workflows?: string[];
-  current: SnapshotInfo;
-  previous?: PreviousSnapshot;
-}): Json {
-  const proposal = {
-    kind: "source_change" as const,
-    sourceKey: input.sourceKey,
-    severity: input.severity,
-    summary: input.summary,
-    detectedAt: input.detectedAt,
-    workflows: input.workflows ?? [],
-    current: {
-      snapshotId: input.current.snapshotId ?? null,
-      fingerprint: input.current.fingerprint,
-      records: input.current.payload,
-      metadata: input.current.metadata ?? null
-    },
-    previous: input.previous
-      ? {
-          snapshotId: input.previous.snapshotId,
-          fingerprint: input.previous.fingerprint,
-          records: input.previous.payload,
-          metadata: input.previous.metadata ?? null
-        }
-      : null,
-    diff: input.diff
-  } satisfies SourceModerationProposal;
-
-  return JSON.parse(JSON.stringify(proposal)) as Json;
 }
 
 function inferSeverity(diff: SourceDiff): "patch" | "minor" | "major" {
@@ -431,28 +440,6 @@ function inferSeverity(diff: SourceDiff): "patch" | "minor" | "major" {
   }
   return diff.added.length > 0 ? "patch" : "patch";
 }
-
-type SourceModerationProposal = {
-  kind: "source_change";
-  sourceKey: SourceKey;
-  severity: string;
-  summary: string;
-  detectedAt: string;
-  workflows: string[];
-  current: {
-    snapshotId: string | null | undefined;
-    fingerprint: string;
-    records: SourceRecord[];
-    metadata: Record<string, unknown> | null;
-  };
-  previous: null | {
-    snapshotId: string | undefined;
-    fingerprint: string;
-    records: SourceRecord[];
-    metadata: Record<string, unknown> | null;
-  };
-  diff: SourceDiff;
-};
 
 function buildSummary(diff: SourceDiff, total: number) {
   const parts = [] as string[];
@@ -532,6 +519,51 @@ function canonicalStringify(value: unknown): string {
     }
     return input;
   });
+}
+
+function normalizeJson<T>(value: T): Json {
+  return JSON.parse(JSON.stringify(value)) as Json;
+}
+
+type DetectionSeverity = Database["platform"]["Tables"]["rule_pack_detections"]["Row"]["severity"];
+
+function mapDetectionSeverity(severity: "patch" | "minor" | "major"): DetectionSeverity {
+  switch (severity) {
+    case "major":
+      return "major";
+    case "minor":
+      return "minor";
+    case "patch":
+    default:
+      return "info";
+  }
+}
+
+function bumpVersion(currentVersion: string | null, severity: DetectionSeverity): string {
+  const defaultVersion = "0.0.0";
+  const [major, minor, patch] = (currentVersion ?? defaultVersion).split(".").map((part) => Number(part) || 0);
+
+  switch (severity) {
+    case "major":
+      return `${major + 1}.0.0`;
+    case "minor":
+      return `${major}.${minor + 1}.0`;
+    case "critical":
+      return `${major + 1}.0.0`;
+    case "info":
+    default:
+      return `${major}.${minor}.${patch + 1}`;
+  }
+}
+
+function serializeSnapshot(snapshot: SnapshotInfo) {
+  return {
+    snapshotId: snapshot.snapshotId ?? null,
+    fingerprint: snapshot.fingerprint,
+    metadata: snapshot.metadata ?? null,
+    sourceId: snapshot.sourceId ?? null,
+    recordCount: Array.isArray(snapshot.payload) ? snapshot.payload.length : null
+  };
 }
 
 export { SOURCE_POLLERS, buildFingerprint };
