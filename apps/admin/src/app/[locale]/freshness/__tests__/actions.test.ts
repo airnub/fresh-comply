@@ -28,25 +28,55 @@ vi.mock("../../../../lib/auth/supabase-service-role", async () => {
   };
 });
 
+vi.mock("@airnub/freshness/watcher", () => ({
+  publishApprovedProposal: vi.fn(),
+}));
+
 const { getSupabaseClient, getSupabaseUser } = await import("../../../../lib/auth/supabase-ssr");
 const { getSupabaseServiceRoleClient } = await import("../../../../lib/auth/supabase-service-role");
 const { revalidatePath } = await import("next/cache");
+const { publishApprovedProposal } = await import("@airnub/freshness/watcher");
 
 type PlatformDetection = Database["platform"]["Tables"]["rule_pack_detections"]["Row"];
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000555";
 const USER_ID = "00000000-0000-0000-0000-000000000777";
 
-function createServiceStub(payload: Partial<PlatformDetection> | null) {
-  const detection = payload as PlatformDetection | null;
-  const maybeSingle = vi.fn().mockResolvedValue({ data: detection, error: null });
-  const select = vi.fn().mockReturnValue({ maybeSingle });
-  const eq = vi.fn().mockReturnValue({ select });
-  const update = vi.fn().mockReturnValue({ eq, select });
-  const from = vi.fn().mockReturnValue({ update });
+function createServiceStub(options: { detectionId?: string } = {}) {
+  const detectionId = options.detectionId ?? null;
+  const proposalsMaybeSingle = vi.fn().mockResolvedValue({
+    data: detectionId ? { detection_id: detectionId } : null,
+    error: null,
+  });
+  const proposalsSelect = vi.fn().mockReturnValue({ maybeSingle: proposalsMaybeSingle });
+  const proposalsEq = vi.fn().mockReturnValue({ select: proposalsSelect });
+  const proposalsUpdate = vi.fn().mockReturnValue({ eq: proposalsEq });
+
+  const detectionsEq = vi.fn().mockReturnValue({});
+  const detectionsUpdate = vi.fn().mockReturnValue({ eq: detectionsEq });
+
+  const from = vi.fn((table: string) => {
+    if (table === "rule_pack_proposals") {
+      return { update: proposalsUpdate };
+    }
+    if (table === "rule_pack_detections") {
+      return { update: detectionsUpdate };
+    }
+    throw new Error(`Unexpected table ${table}`);
+  });
+
   const schema = vi.fn().mockReturnValue({ from });
 
-  return { schema, from, update, eq, select, maybeSingle };
+  return {
+    schema,
+    from,
+    proposalsUpdate,
+    proposalsEq,
+    proposalsSelect,
+    proposalsMaybeSingle,
+    detectionsUpdate,
+    detectionsEq,
+  };
 }
 
 function seedSupabase() {
@@ -90,6 +120,7 @@ function seedSupabase() {
 describe("freshness moderation actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (publishApprovedProposal as vi.Mock).mockReset();
   });
 
   it("approves a detection, bumps workflows, and revalidates", async () => {
@@ -105,10 +136,11 @@ describe("freshness moderation actions", () => {
       current_version: "1.2.3",
       severity: "minor",
     };
-    const service = createServiceStub(detection);
+    const service = createServiceStub({ detectionId: detection.id });
     (getSupabaseServiceRoleClient as unknown as vi.Mock).mockReturnValue(service);
+    (publishApprovedProposal as vi.Mock).mockResolvedValue(detection as PlatformDetection);
 
-    const result = await approvePendingUpdate("detection-1", "Looks good");
+    const result = await approvePendingUpdate("proposal-1", "Looks good");
 
     expect(result.ok).toBe(true);
     const [workflow] = getTableRows("workflow_defs");
@@ -118,7 +150,14 @@ describe("freshness moderation actions", () => {
     expect(links).toHaveLength(1);
     expect(links[0]?.workflow_key).toBe("setup-nonprofit-ie");
 
-    expect(service.update).toHaveBeenCalledWith({ status: "approved", notes: "Looks good" });
+    expect(service.proposalsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "approved", review_notes: "Looks good" })
+    );
+    expect(service.proposalsEq).toHaveBeenCalledWith("id", "proposal-1");
+    expect(publishApprovedProposal).toHaveBeenCalledWith(expect.anything(), {
+      proposalId: "proposal-1",
+      reviewNotes: "Looks good",
+    });
     expect((client as unknown as { rpc: vi.Mock }).rpc).toHaveBeenCalledWith(
       "admin_approve_freshness_diff",
       expect.objectContaining({ diff_id: "detection-1", reason: "Looks good" })
@@ -133,13 +172,20 @@ describe("freshness moderation actions", () => {
       rule_pack_key: "cro_open_services",
       diff: {} as unknown,
     };
-    const service = createServiceStub(detection);
+    const service = createServiceStub({ detectionId: detection.id });
     (getSupabaseServiceRoleClient as unknown as vi.Mock).mockReturnValue(service);
+    (publishApprovedProposal as vi.Mock).mockResolvedValue(null);
 
-    const result = await rejectPendingUpdate("detection-2", "Not ready");
+    const result = await rejectPendingUpdate("proposal-2", "Not ready");
 
     expect(result.ok).toBe(true);
-    expect(service.update).toHaveBeenCalledWith({ status: "rejected", notes: "Not ready" });
+    expect(service.proposalsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "rejected", review_notes: "Not ready" })
+    );
+    expect(service.detectionsUpdate).toHaveBeenCalledWith({ status: "rejected", notes: "Not ready" });
+    expect(service.proposalsEq).toHaveBeenCalledWith("id", "proposal-2");
+    expect(service.detectionsEq).toHaveBeenCalledWith("id", "detection-2");
+    expect(publishApprovedProposal).not.toHaveBeenCalled();
     expect((client as unknown as { rpc: vi.Mock }).rpc).toHaveBeenCalledWith(
       "admin_reject_freshness_diff",
       expect.objectContaining({ diff_id: "detection-2", reason: "Not ready" })

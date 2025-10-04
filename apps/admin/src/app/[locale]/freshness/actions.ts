@@ -12,6 +12,7 @@ import {
   SupabaseServiceRoleConfigurationError
 } from "../../../lib/auth/supabase-service-role";
 import { annotateSpan, withTelemetrySpan } from "@airnub/utils/telemetry";
+import { publishApprovedProposal } from "@airnub/freshness/watcher";
 import type { Database } from "@airnub/types";
 
 type ModerationResult = { ok: boolean; error?: string };
@@ -76,13 +77,34 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
-    let detection: PlatformDetection | null = null;
+    let detectionId: string | null = null;
     try {
-      detection = await moderateDetection(service, id, "approved", reason);
+      detectionId = await moderateProposal(service, id, "approved", reason);
     } catch (error) {
-      console.error("Unable to approve platform detection", error);
+      console.error("Unable to approve rule pack proposal", error);
       span.setAttribute("freshcomply.action.outcome", "update_failed");
       return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+
+    if (!detectionId) {
+      span.setAttribute("freshcomply.action.outcome", "not_found");
+      return { ok: false, error: "Proposal not found" };
+    }
+
+    let detection: PlatformDetection | null = null;
+    try {
+      detection = await publishApprovedProposal(service.schema("platform"), {
+        proposalId: id,
+        reviewNotes: reason
+      });
+    } catch (error) {
+      console.error("Unable to publish approved rule pack proposal", error);
+      span.setAttribute("freshcomply.action.outcome", "publish_failed");
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+
+    if (!detection) {
+      detection = await loadDetection(service, detectionId);
     }
 
     if (!detection) {
@@ -104,7 +126,7 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
     await appendModerationAudit(
       client,
       user?.id ?? null,
-      id,
+      detection.id,
       reason,
       "approve",
       tenantOrgId,
@@ -142,18 +164,24 @@ export async function rejectPendingUpdate(id: string, reason: string): Promise<M
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
     const { client, user } = context;
+    let detectionId: string | null = null;
     try {
-      await moderateDetection(service, id, "rejected", reason);
+      detectionId = await moderateProposal(service, id, "rejected", reason);
     } catch (error) {
-      console.error("Unable to reject platform detection", error);
+      console.error("Unable to reject rule pack proposal", error);
       span.setAttribute("freshcomply.action.outcome", "update_failed");
       return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+
+    if (!detectionId) {
+      span.setAttribute("freshcomply.action.outcome", "not_found");
+      return { ok: false, error: "Proposal not found" };
     }
 
     await appendModerationAudit(
       client,
       user?.id ?? null,
-      id,
+      detectionId,
       reason,
       "reject",
       tenantOrgId,
@@ -238,22 +266,63 @@ async function linkFundingOpportunitiesToWorkflows(
   }
 }
 
-async function moderateDetection(
+async function moderateProposal(
   service: ReturnType<typeof getSupabaseServiceRoleClient>,
-  detectionId: string,
+  proposalId: string,
   status: "approved" | "rejected",
   reason: string
-): Promise<PlatformDetection | null> {
+): Promise<string | null> {
+  const now = new Date().toISOString();
+  const updates: Database["platform"]["Tables"]["rule_pack_proposals"]["Update"] = {
+    status,
+    review_notes: reason,
+    updated_at: now,
+    approved_at: status === "approved" ? now : null
+  };
+
   const { data, error } = await service
     .schema("platform")
-    .from("rule_pack_detections")
-    .update({ status, notes: reason })
-    .eq("id", detectionId)
-    .select("id, rule_pack_key, diff, severity, proposed_version, current_version")
+    .from("rule_pack_proposals")
+    .update(updates)
+    .eq("id", proposalId)
+    .select("detection_id")
     .maybeSingle();
 
   if (error) {
     throw error;
+  }
+
+  const detectionId = data?.detection_id ?? null;
+
+  if (detectionId && status === "rejected") {
+    const { error: detectionError } = await service
+      .schema("platform")
+      .from("rule_pack_detections")
+      .update({ status: "rejected", notes: reason })
+      .eq("id", detectionId);
+
+    if (detectionError) {
+      console.warn("Unable to update detection status after rejection", detectionError);
+    }
+  }
+
+  return detectionId;
+}
+
+async function loadDetection(
+  service: ReturnType<typeof getSupabaseServiceRoleClient>,
+  detectionId: string
+): Promise<PlatformDetection | null> {
+  const { data, error } = await service
+    .schema("platform")
+    .from("rule_pack_detections")
+    .select("id, rule_pack_key, diff, severity, proposed_version, current_version")
+    .eq("id", detectionId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Unable to load detection for proposal moderation", error);
+    return null;
   }
 
   return (data as PlatformDetection) ?? null;

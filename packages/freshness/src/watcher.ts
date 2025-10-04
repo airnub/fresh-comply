@@ -182,6 +182,10 @@ type PreviousSnapshot = SnapshotInfo & { snapshotId: string };
 
 type PlatformClient = ReturnType<SupabaseClient<Database>["schema"]>;
 
+type PlatformProposalRow = Database["platform"]["Tables"]["rule_pack_proposals"]["Row"];
+type PlatformDetectionRow = Database["platform"]["Tables"]["rule_pack_detections"]["Row"];
+type PlatformRulePackRow = Database["platform"]["Tables"]["rule_packs"]["Row"];
+
 async function loadPreviousPlatformSnapshot(
   client: PlatformClient,
   ruleSourceId: string
@@ -323,6 +327,27 @@ async function persistPlatformDetection(
       console.error(`[freshness] Unable to persist platform detection for ${payload.sourceKey}`, detectionError);
       return;
     }
+
+    if (!detection?.id) {
+      console.warn(`[freshness] Detection persisted without id for ${payload.sourceKey}; skipping proposal`);
+      return;
+    }
+
+    await persistPlatformProposal(client, {
+      detectionId: detection.id,
+      rulePackId: payload.rulePack?.id ?? null,
+      rulePackKey,
+      currentVersion: payload.rulePack?.currentVersion ?? null,
+      proposedVersion,
+      severity,
+      summary: payload.summary,
+      diff: payload.diff,
+      workflows: payload.workflows ?? [],
+      currentSnapshot: payload.current,
+      previousSnapshot: payload.previous,
+      detectedAt: payload.detectedAt,
+      sourceKey: payload.sourceKey
+    });
 
     const changeSummary = normalizeJson({
       sourceKey: payload.sourceKey,
@@ -564,6 +589,324 @@ function serializeSnapshot(snapshot: SnapshotInfo) {
     sourceId: snapshot.sourceId ?? null,
     recordCount: Array.isArray(snapshot.payload) ? snapshot.payload.length : null
   };
+}
+
+async function persistPlatformProposal(
+  client: PlatformClient,
+  payload: {
+    detectionId: string;
+    rulePackId: string | null;
+    rulePackKey: string;
+    currentVersion: string | null;
+    proposedVersion: string;
+    severity: DetectionSeverity;
+    summary: string;
+    diff: SourceDiff;
+    workflows: string[];
+    currentSnapshot: SnapshotInfo;
+    previousSnapshot?: PreviousSnapshot;
+    detectedAt: string;
+    sourceKey: SourceKey;
+    createdBy?: string | null;
+  }
+) {
+  const changelog = buildProposalChangelog(payload);
+  const now = new Date().toISOString();
+
+  try {
+    const { data: existing, error: fetchError } = await client
+      .from("rule_pack_proposals" as never)
+      .select("*")
+      .eq("detection_id", payload.detectionId)
+      .maybeSingle();
+
+    if (fetchError) {
+      if (fetchError.code === "42P01") {
+        console.warn("[freshness] Platform proposal table missing; skipping proposal persistence");
+        return;
+      }
+      throw fetchError;
+    }
+
+    if (!existing) {
+      const insertRow: Database["platform"]["Tables"]["rule_pack_proposals"]["Insert"] = {
+        detection_id: payload.detectionId,
+        rule_pack_id: payload.rulePackId,
+        rule_pack_key: payload.rulePackKey,
+        current_version: payload.currentVersion,
+        proposed_version: payload.proposedVersion,
+        changelog,
+        status: "pending",
+        review_notes: null,
+        created_by: payload.createdBy ?? null,
+        updated_at: now,
+        created_at: payload.detectedAt
+      };
+
+      const { error: insertError } = await client
+        .from("rule_pack_proposals" as never)
+        .insert(insertRow);
+
+      if (insertError) {
+        if (insertError.code === "42P01") {
+          console.warn("[freshness] Platform proposal table missing; skipping proposal persistence");
+          return;
+        }
+        throw insertError;
+      }
+    } else {
+      if (["approved", "rejected", "published", "superseded"].includes(existing.status)) {
+        return;
+      }
+
+      const nextStatus: PlatformProposalRow["status"] =
+        existing.status === "in_review" ? "in_review" : "pending";
+
+      const { error: updateError } = await client
+        .from("rule_pack_proposals" as never)
+        .update({
+          changelog,
+          proposed_version: payload.proposedVersion,
+          current_version: payload.currentVersion,
+          rule_pack_key: payload.rulePackKey,
+          rule_pack_id: payload.rulePackId ?? existing.rule_pack_id ?? null,
+          status: nextStatus,
+          updated_at: now
+        })
+        .eq("id", existing.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+    }
+
+    await client
+      .from("rule_pack_detections" as never)
+      .update({ status: "in_review" as PlatformDetectionRow["status"] })
+      .eq("id", payload.detectionId)
+      .eq("status", "open");
+  } catch (error) {
+    console.error(
+      `[freshness] Unable to persist platform proposal for ${payload.rulePackKey}`,
+      error
+    );
+  }
+}
+
+export async function publishApprovedProposal(
+  client: PlatformClient,
+  options: { proposalId: string; reviewNotes?: string | null }
+): Promise<PlatformDetectionRow | null> {
+  const { proposalId, reviewNotes } = options;
+  const publishedAt = new Date().toISOString();
+
+  try {
+    const { data: proposal, error: proposalError } = await client
+      .from("rule_pack_proposals" as never)
+      .select("*")
+      .eq("id", proposalId)
+      .maybeSingle();
+
+    if (proposalError) {
+      if (proposalError.code === "42P01") {
+        console.warn("[freshness] Proposal table missing; cannot publish");
+        return null;
+      }
+      throw proposalError;
+    }
+
+    if (!proposal) {
+      return null;
+    }
+
+    if (proposal.status !== "approved") {
+      console.warn(`[freshness] Proposal ${proposalId} is not approved; skipping publish`);
+      return null;
+    }
+
+    const { data: detection, error: detectionError } = await client
+      .from("rule_pack_detections" as never)
+      .select("*")
+      .eq("id", proposal.detection_id)
+      .maybeSingle();
+
+    if (detectionError) {
+      throw detectionError;
+    }
+
+    if (!detection) {
+      throw new Error(`Detection ${proposal.detection_id} missing for proposal ${proposalId}`);
+    }
+
+    const basePack = await loadBaseRulePack(client, proposal, detection);
+
+    const manifestSource = deriveManifestSource(basePack, detection, proposal);
+    const checksumPayload = JSON.stringify({
+      rulePackKey: proposal.rule_pack_key ?? detection.rule_pack_key,
+      proposedVersion: proposal.proposed_version,
+      diff: detection.diff,
+      changelog: proposal.changelog
+    });
+
+    const packInsert: Database["platform"]["Tables"]["rule_packs"]["Insert"] = {
+      pack_key: proposal.rule_pack_key ?? detection.rule_pack_key,
+      version: proposal.proposed_version,
+      title: basePack?.title ?? detection.rule_pack_key,
+      summary: deriveProposalSummary(proposal, detection, basePack),
+      manifest: manifestSource,
+      checksum: createHash("sha256").update(checksumPayload).digest("hex"),
+      status: "published",
+      published_at: publishedAt,
+      created_by: basePack?.created_by ?? proposal.created_by ?? detection.created_by ?? null
+    };
+
+    const { error: packError } = await client
+      .from("rule_packs" as never)
+      .upsert(packInsert, { onConflict: "pack_key,version" });
+
+    if (packError) {
+      throw packError;
+    }
+
+    const { data: publishedPack, error: fetchPackError } = await client
+      .from("rule_packs" as never)
+      .select("id")
+      .eq("pack_key", packInsert.pack_key)
+      .eq("version", packInsert.version)
+      .maybeSingle();
+
+    if (fetchPackError) {
+      throw fetchPackError;
+    }
+
+    const { data: updatedDetection, error: detectionUpdateError } = await client
+      .from("rule_pack_detections" as never)
+      .update({
+        status: "approved" as PlatformDetectionRow["status"],
+        notes: reviewNotes ?? detection.notes ?? null
+      })
+      .eq("id", detection.id)
+      .select("*")
+      .maybeSingle();
+
+    if (detectionUpdateError) {
+      throw detectionUpdateError;
+    }
+
+    const { error: proposalUpdateError } = await client
+      .from("rule_pack_proposals" as never)
+      .update({
+        status: "published" as PlatformProposalRow["status"],
+        rule_pack_id: publishedPack?.id ?? proposal.rule_pack_id ?? null,
+        published_at: publishedAt,
+        review_notes: reviewNotes ?? proposal.review_notes ?? null,
+        updated_at: publishedAt
+      })
+      .eq("id", proposal.id);
+
+    if (proposalUpdateError) {
+      throw proposalUpdateError;
+    }
+
+    return (updatedDetection ?? detection) as PlatformDetectionRow;
+  } catch (error) {
+    console.error(`[freshness] Unable to publish rule pack proposal ${proposalId}`, error);
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+}
+
+function buildProposalChangelog(payload: {
+  sourceKey: SourceKey;
+  summary: string;
+  severity: DetectionSeverity;
+  diff: SourceDiff;
+  workflows: string[];
+  currentSnapshot: SnapshotInfo;
+  previousSnapshot?: PreviousSnapshot;
+  detectedAt: string;
+}): Json {
+  return normalizeJson({
+    sourceKey: payload.sourceKey,
+    summary: payload.summary,
+    severity: payload.severity,
+    workflows: payload.workflows,
+    diff: payload.diff,
+    detectedAt: payload.detectedAt,
+    snapshots: {
+      current: serializeSnapshot(payload.currentSnapshot),
+      previous: payload.previousSnapshot ? serializeSnapshot(payload.previousSnapshot) : null
+    }
+  });
+}
+
+async function loadBaseRulePack(
+  client: PlatformClient,
+  proposal: PlatformProposalRow,
+  detection: PlatformDetectionRow
+): Promise<PlatformRulePackRow | null> {
+  const packId = proposal.rule_pack_id ?? detection.rule_pack_id;
+  if (!packId) {
+    return null;
+  }
+
+  const { data, error } = await client
+    .from("rule_packs" as never)
+    .select("*")
+    .eq("id", packId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`Unable to load base rule pack ${packId} for proposal ${proposal.id}`, error);
+    return null;
+  }
+
+  return (data as PlatformRulePackRow) ?? null;
+}
+
+function deriveManifestSource(
+  basePack: PlatformRulePackRow | null,
+  detection: PlatformDetectionRow,
+  proposal: PlatformProposalRow
+): Json {
+  if (basePack?.manifest) {
+    return basePack.manifest as Json;
+  }
+
+  return normalizeJson({
+    baselineVersion: proposal.current_version ?? detection.current_version ?? null,
+    diff: detection.diff,
+    changelog: proposal.changelog
+  });
+}
+
+function deriveProposalSummary(
+  proposal: PlatformProposalRow,
+  detection: PlatformDetectionRow,
+  basePack: PlatformRulePackRow | null
+): string | null {
+  const changelogRecord = toRecord(proposal.changelog);
+  const candidates: unknown[] = [
+    changelogRecord?.summary,
+    changelogRecord?.notes,
+    proposal.review_notes,
+    detection.notes,
+    basePack?.summary
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
 }
 
 export { SOURCE_POLLERS, buildFingerprint };

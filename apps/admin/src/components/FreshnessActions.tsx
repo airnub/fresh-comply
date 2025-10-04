@@ -8,12 +8,12 @@ import type { SourceDiff } from "@airnub/freshness/watcher";
 import { approvePendingUpdate, rejectPendingUpdate } from "../app/[locale]/freshness/actions";
 
 interface FreshnessActionsProps {
-  watcherId: string;
-  status: "pending" | "approved" | "rejected";
+  proposalId: string;
+  status: "pending" | "approved" | "rejected" | "amended";
   diff: SourceDiff;
 }
 
-export function FreshnessActions({ watcherId, status, diff }: FreshnessActionsProps) {
+export function FreshnessActions({ proposalId, status, diff }: FreshnessActionsProps) {
   const t = useTranslations("freshness");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -37,8 +37,8 @@ export function FreshnessActions({ watcherId, status, diff }: FreshnessActionsPr
     startTransition(async () => {
       const result =
         action === "approve"
-          ? await approvePendingUpdate(watcherId, reason)
-          : await rejectPendingUpdate(watcherId, reason);
+          ? await approvePendingUpdate(proposalId, reason)
+          : await rejectPendingUpdate(proposalId, reason);
       if (!result.ok) {
         setError(result.error ?? t("error.generic"));
         return;
