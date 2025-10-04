@@ -1056,7 +1056,7 @@ export type Database = {
             foreignKeyName: "steps_step_type_version_id_fkey";
             columns: ["step_type_version_id"];
             isOneToOne: false;
-            referencedRelation: "step_type_versions";
+            referencedRelation: "platform.step_type_versions";
             referencedColumns: ["id"];
           },
           {
@@ -1101,118 +1101,6 @@ export type Database = {
           created_at?: string | null;
         };
         Relationships: [];
-      };
-      step_types: {
-        Row: {
-          id: string;
-          slug: string;
-          title: string;
-          category: string | null;
-          summary: string | null;
-          latest_version: string | null;
-          created_by: string | null;
-          created_at: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          slug: string;
-          title: string;
-          category?: string | null;
-          summary?: string | null;
-          latest_version?: string | null;
-          created_by?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          slug?: string;
-          title?: string;
-          category?: string | null;
-          summary?: string | null;
-          latest_version?: string | null;
-          created_by?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "step_types_created_by_fkey";
-            columns: ["created_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      step_type_versions: {
-        Row: {
-          id: string;
-          step_type_id: string;
-          version: string;
-          definition: Json;
-          input_schema_id: string | null;
-          output_schema_id: string | null;
-          status: "draft" | "published" | "deprecated";
-          created_by: string | null;
-          created_at: string | null;
-          published_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          step_type_id: string;
-          version: string;
-          definition: Json;
-          input_schema_id?: string | null;
-          output_schema_id?: string | null;
-          status?: "draft" | "published" | "deprecated";
-          created_by?: string | null;
-          created_at?: string | null;
-          published_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          step_type_id?: string;
-          version?: string;
-          definition?: Json;
-          input_schema_id?: string | null;
-          output_schema_id?: string | null;
-          status?: "draft" | "published" | "deprecated";
-          created_by?: string | null;
-          created_at?: string | null;
-          published_at?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "step_type_versions_created_by_fkey";
-            columns: ["created_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "step_type_versions_input_schema_id_fkey";
-            columns: ["input_schema_id"];
-            isOneToOne: false;
-            referencedRelation: "json_schemas";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "step_type_versions_output_schema_id_fkey";
-            columns: ["output_schema_id"];
-            isOneToOne: false;
-            referencedRelation: "json_schemas";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "step_type_versions_step_type_id_fkey";
-            columns: ["step_type_id"];
-            isOneToOne: false;
-            referencedRelation: "step_types";
-            referencedColumns: ["id"];
-          }
-        ];
       };
       tenant_branding: {
         Row: {
@@ -1333,7 +1221,7 @@ export type Database = {
             foreignKeyName: "tenant_step_type_installs_step_type_version_id_fkey";
             columns: ["step_type_version_id"];
             isOneToOne: false;
-            referencedRelation: "step_type_versions";
+            referencedRelation: "platform.step_type_versions";
             referencedColumns: ["id"];
           }
         ];
@@ -2171,6 +2059,36 @@ export type Database = {
       };
     };
     Views: {
+      v_step_type_versions: {
+        Row: {
+          id: string;
+          step_type_id: string;
+          step_type_slug: string;
+          version: string;
+          definition: Json;
+          input_schema_id: string | null;
+          output_schema_id: string | null;
+          status: "draft" | "published" | "deprecated" | string;
+          created_by: string | null;
+          created_at: string | null;
+          published_at: string | null;
+        };
+        Relationships: [];
+      };
+      v_step_types: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          category: string | null;
+          summary: string | null;
+          latest_version: string | null;
+          created_by: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Relationships: [];
+      };
       billing_subscription_overview: {
         Row: {
           tenant_org_id: string;
@@ -2359,6 +2277,118 @@ export type Database = {
   };
   platform: {
     Tables: {
+      step_type_versions: {
+        Row: {
+          id: string;
+          step_type_id: string;
+          version: string;
+          definition: Json;
+          input_schema_id: string | null;
+          output_schema_id: string | null;
+          status: "draft" | "published" | "deprecated";
+          created_by: string | null;
+          created_at: string | null;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          step_type_id: string;
+          version: string;
+          definition: Json;
+          input_schema_id?: string | null;
+          output_schema_id?: string | null;
+          status?: "draft" | "published" | "deprecated";
+          created_by?: string | null;
+          created_at?: string | null;
+          published_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          step_type_id?: string;
+          version?: string;
+          definition?: Json;
+          input_schema_id?: string | null;
+          output_schema_id?: string | null;
+          status?: "draft" | "published" | "deprecated";
+          created_by?: string | null;
+          created_at?: string | null;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "step_type_versions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "step_type_versions_input_schema_id_fkey";
+            columns: ["input_schema_id"];
+            isOneToOne: false;
+            referencedRelation: "json_schemas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "step_type_versions_output_schema_id_fkey";
+            columns: ["output_schema_id"];
+            isOneToOne: false;
+            referencedRelation: "json_schemas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "step_type_versions_step_type_id_fkey";
+            columns: ["step_type_id"];
+            isOneToOne: false;
+            referencedRelation: "step_types";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      step_types: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          category: string | null;
+          summary: string | null;
+          latest_version: string | null;
+          created_by: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          category?: string | null;
+          summary?: string | null;
+          latest_version?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          title?: string;
+          category?: string | null;
+          summary?: string | null;
+          latest_version?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "step_types_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       rule_pack_detection_sources: {
         Row: {
           detection_id: string;
