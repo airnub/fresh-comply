@@ -22,22 +22,25 @@ end$$;
 
 create or replace function app.is_platform_admin()
   returns boolean
-  language plpgsql
+  language sql
   stable
 as $$
-declare
-  claims jsonb := app.jwt();
-begin
-  if claims ? 'is_platform_admin' then
-    return coalesce((claims->>'is_platform_admin')::boolean, false);
-  end if;
-
-  if claims ? 'role' then
-    return claims->>'role' = 'service_role';
-  end if;
-
-  return false;
-end;
+  with claims as (
+    select app.jwt() as payload
+  )
+  select
+    coalesce(payload->>'role', '') = 'platform_admin'
+    or coalesce(
+      case jsonb_typeof(payload->'is_platform_admin')
+        when 'boolean' then (payload->'is_platform_admin')::boolean
+        when 'string' then lower(payload->>'is_platform_admin') in ('true','t','1','yes','y','on')
+        when 'number' then (payload->>'is_platform_admin')::numeric <> 0
+        else null
+      end,
+      false
+    )
+    or coalesce(payload->>'role', '') = 'service_role'
+  from claims;
 $$;
 
 create or replace function app.is_direct_member(target_org_id uuid)
