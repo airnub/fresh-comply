@@ -1466,6 +1466,32 @@ create table platform.rule_pack_detection_sources (
 create index platform_rule_pack_detection_sources_source_idx
   on platform.rule_pack_detection_sources(rule_source_id);
 
+create table platform.rule_pack_proposals (
+  id uuid primary key default gen_random_uuid(),
+  detection_id uuid not null references platform.rule_pack_detections(id) on delete cascade,
+  rule_pack_id uuid references platform.rule_packs(id) on delete set null,
+  rule_pack_key text not null,
+  current_version text,
+  proposed_version text not null,
+  changelog jsonb not null default '{}'::jsonb,
+  status text not null default 'pending'
+    check (status in ('pending','in_review','approved','rejected','amended','published','superseded')),
+  review_notes text,
+  created_by uuid references users(id),
+  approved_by uuid references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  approved_at timestamptz,
+  published_at timestamptz,
+  unique(detection_id)
+);
+
+create index platform_rule_pack_proposals_status_idx
+  on platform.rule_pack_proposals(status);
+
+create index platform_rule_pack_proposals_pack_idx
+  on platform.rule_pack_proposals(rule_pack_key, proposed_version);
+
 create schema if not exists app;
 
 create or replace function app.jwt()
@@ -1641,6 +1667,7 @@ alter table platform.rule_source_snapshots enable row level security;
 alter table platform.rule_packs enable row level security;
 alter table platform.rule_pack_detections enable row level security;
 alter table platform.rule_pack_detection_sources enable row level security;
+alter table platform.rule_pack_proposals enable row level security;
 
 create policy "Members read organisations" on organisations
   for select
@@ -1991,6 +2018,11 @@ create policy "Platform services manage rule pack detections" on platform.rule_p
   with check (public.is_platform_service() or app.is_platform_admin());
 
 create policy "Platform services manage rule pack detection sources" on platform.rule_pack_detection_sources
+  for all
+  using (public.is_platform_service() or app.is_platform_admin())
+  with check (public.is_platform_service() or app.is_platform_admin());
+
+create policy "Platform services manage rule pack proposals" on platform.rule_pack_proposals
   for all
   using (public.is_platform_service() or app.is_platform_admin())
   with check (public.is_platform_service() or app.is_platform_admin());

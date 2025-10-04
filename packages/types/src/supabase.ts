@@ -2403,6 +2403,110 @@ export type Database = {
           }
         ];
       };
+      rule_pack_proposals: {
+        Row: {
+          id: string;
+          detection_id: string;
+          rule_pack_id: string | null;
+          rule_pack_key: string;
+          current_version: string | null;
+          proposed_version: string;
+          changelog: Json;
+          status:
+            | "pending"
+            | "in_review"
+            | "approved"
+            | "rejected"
+            | "amended"
+            | "published"
+            | "superseded";
+          review_notes: string | null;
+          created_by: string | null;
+          approved_by: string | null;
+          created_at: string;
+          updated_at: string;
+          approved_at: string | null;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          detection_id: string;
+          rule_pack_id?: string | null;
+          rule_pack_key: string;
+          current_version?: string | null;
+          proposed_version: string;
+          changelog?: Json;
+          status?:
+            | "pending"
+            | "in_review"
+            | "approved"
+            | "rejected"
+            | "amended"
+            | "published"
+            | "superseded";
+          review_notes?: string | null;
+          created_by?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          approved_at?: string | null;
+          published_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          detection_id?: string;
+          rule_pack_id?: string | null;
+          rule_pack_key?: string;
+          current_version?: string | null;
+          proposed_version?: string;
+          changelog?: Json;
+          status?:
+            | "pending"
+            | "in_review"
+            | "approved"
+            | "rejected"
+            | "amended"
+            | "published"
+            | "superseded";
+          review_notes?: string | null;
+          created_by?: string | null;
+          approved_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          approved_at?: string | null;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_pack_proposals_detection_id_fkey";
+            columns: ["detection_id"];
+            isOneToOne: true;
+            referencedRelation: "rule_pack_detections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_proposals_rule_pack_id_fkey";
+            columns: ["rule_pack_id"];
+            isOneToOne: false;
+            referencedRelation: "rule_packs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_proposals_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rule_pack_proposals_approved_by_fkey";
+            columns: ["approved_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       rule_pack_detections: {
         Row: {
           id: string;

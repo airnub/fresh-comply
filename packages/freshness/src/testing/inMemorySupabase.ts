@@ -240,11 +240,20 @@ function ensureRowDefaults(
   if (key === "platform.rule_pack_detection_sources") {
     base.change_summary = base.change_summary ?? {};
   }
+  if (key === "platform.rule_pack_proposals") {
+    base.created_at = base.created_at ?? new Date().toISOString();
+    base.updated_at = base.updated_at ?? new Date().toISOString();
+    base.status = base.status ?? "pending";
+    base.changelog = base.changelog ?? {};
+  }
   return base;
 }
 
 function updatedTimestamps(schema: SchemaName, table: string) {
   if (schema === "public" && table === "moderation_queue") {
+    return { updated_at: new Date().toISOString() };
+  }
+  if (schema === "platform" && table === "rule_pack_proposals") {
     return { updated_at: new Date().toISOString() };
   }
   return {};

@@ -15,6 +15,7 @@ declare
   v_snapshot_id uuid;
   v_moderation_id uuid;
   v_adoption_id uuid;
+  v_proposal_id uuid;
   v_admin_source_id uuid;
   v_admin_adoption_id uuid;
   v_text text;
@@ -125,6 +126,35 @@ begin
     raise exception 'Detection should reference exactly one rule source';
   end if;
 
+  insert into platform.rule_pack_proposals (
+    detection_id,
+    rule_pack_id,
+    rule_pack_key,
+    current_version,
+    proposed_version,
+    changelog,
+    status
+  )
+  values (
+    v_detection_id,
+    v_rule_pack_id,
+    'freshness_pack',
+    '1.0.0',
+    '1.1.0',
+    jsonb_build_object('summary', 'Initial proposal'),
+    'pending'
+  )
+  returning id into v_proposal_id;
+
+  select status
+  into v_text
+  from platform.rule_pack_proposals
+  where id = v_proposal_id;
+
+  if v_text <> 'pending' then
+    raise exception 'Service role should insert pending proposals';
+  end if;
+
   insert into source_snapshot (org_id, source_id, content_hash, parsed_facts, storage_ref)
   values (tenant_one, v_source_id, 'hash-1', '{"facts":[]}'::jsonb, 's3://bucket/object');
 
@@ -186,6 +216,14 @@ begin
   begin
     perform 1 from platform.rule_source_snapshots;
     raise exception 'Tenant member should not read platform rule source snapshots';
+  exception
+    when sqlstate '42501' then
+      null;
+  end;
+
+  begin
+    perform 1 from platform.rule_pack_proposals;
+    raise exception 'Tenant member should not read platform rule pack proposals';
   exception
     when sqlstate '42501' then
       null;
@@ -280,6 +318,26 @@ begin
 
   if v_text <> 'major' then
     raise exception 'Platform admin should be able to update platform rule pack detections';
+  end if;
+
+  select status into v_text
+  from platform.rule_pack_proposals
+  where id = v_proposal_id;
+
+  if v_text is null then
+    raise exception 'Platform admin should read platform rule pack proposals';
+  end if;
+
+  update platform.rule_pack_proposals
+  set status = 'approved', review_notes = 'looks good'
+  where id = v_proposal_id;
+
+  select status into v_text
+  from platform.rule_pack_proposals
+  where id = v_proposal_id;
+
+  if v_text <> 'approved' then
+    raise exception 'Platform admin should be able to update platform rule pack proposals';
   end if;
 
   insert into adoption_records (org_id, scope, ref_id, from_version, to_version, mode, actor_id)
