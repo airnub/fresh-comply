@@ -1571,14 +1571,22 @@ as $$
   )
   select
     coalesce(payload->>'role', '') = 'platform_admin'
-    or case jsonb_typeof(payload->'is_platform_admin')
-      when 'boolean' then (payload->'is_platform_admin')::boolean
-      when 'string' then lower(payload->>'is_platform_admin') in ('true','t','1','yes','y','on')
-      when 'number' then (payload->>'is_platform_admin')::numeric <> 0
-      else false
-    end
+    or coalesce(
+      case jsonb_typeof(payload->'is_platform_admin')
+        when 'boolean' then (payload->'is_platform_admin')::boolean
+        when 'string' then lower(payload->>'is_platform_admin') in ('true','t','1','yes','y','on')
+        when 'number' then (payload->>'is_platform_admin')::numeric <> 0
+        else null
+      end,
+      false
+    )
+    or coalesce(payload->>'role', '') = 'service_role'
   from claims;
 $$;
+
+comment on function app.is_platform_admin() is
+  'Returns true when the JWT role is platform_admin, when is_platform_admin is truthy, '
+  'or (for legacy internal automation) when the token role is service_role.';
 
 create or replace function public.current_org_id()
 returns uuid

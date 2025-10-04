@@ -50,7 +50,7 @@ create or replace function app.is_org_member(target_org uuid) returns boolean;
 ```
 
 - `app.jwt()` unwraps `request.jwt.claims` (defaults to `{}`) to avoid null lookups in policies.
-- `app.is_platform_admin()` accepts either a role claim (`role = 'platform_admin'`) or explicit `is_platform_admin` boolean flag (minted by the admin API).
+- `app.is_platform_admin()` accepts either a role claim (`role = 'platform_admin'`) or explicit `is_platform_admin` boolean flag (minted by the admin API). Service automation using Supabase service keys continues to pass with `role = 'service_role'` (documented legacy fallback).
 - `app.is_org_member()` wraps membership lookups and cascades platform admin/service allowances.
 - Use `public.is_member_of_org()` in policies to keep SQL migrations concise.
 
