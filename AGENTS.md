@@ -8,7 +8,7 @@
 - **Freshness Steward** — sources registry, watchers, rule/version publishing.
 - **Connector Builder** — CRO/CKAN/Revenue/RBO/Funding adapters.
 - **Docs/Policy Writer** — templates and specs.
-- **Compliance Doc Steward** — `docs/LEGAL/*`, GDPR/i18n/a11y, audits.
+- **Compliance Doc Steward** — `docs/compliance/*`, GDPR/i18n/a11y, audits.
 
 ## Tools & Conventions
 - TypeScript, Next.js 15, pnpm + Turborepo.
@@ -26,34 +26,34 @@ Documentation (Source of Truth)
 Current (Canonical)
 
 Consolidated Architecture & Tenancy Spec (v2025-10-04)
-docs/specs/FreshComply-Consolidated-Spec.md
+docs/specs/freshcomply-consolidated-spec.v1.0.0.md
 
 Admin App Spec (v2025-10-03)
-docs/specs/admin-app-spec.md
+docs/specs/admin-app-spec.v1.0.0.md
 
 Workflow-Agnostic Extension Model — Tenant Overlays (v2025-10-03)
-docs/specs/extensions-tenant-overlays.md
+docs/specs/extensions-tenant-overlays.v1.0.0.md
 
 White-Label Architecture (v2025-10-03)
-docs/specs/fresh_comply_white_label_multi_tenant_architecture_v_2025_10_03.md
+docs/specs/white-label-architecture.v1.0.0.md
 
 Secure Bidirectional Integration Architecture for Custom Steps (v2025-10-03)
-docs/specs/integration-architecture-bidirectional.md
+docs/specs/integration-architecture-bidirectional.v1.0.0.md
 
 ADR-0001: Temporal Orchestration (Custom UI, targeted use)
-docs/adr/0001-temporal-orchestration.md
+docs/architecture/0001-temporal-orchestration.v1.0.0.md
 ADR-0002: Stripe Billing Scaffold (White-Label Tenants)
-docs/adr/0002-billing-stripe.md
+docs/architecture/0002-billing-stripe.v1.0.0.md
 
 ADR-0003: White-Label Multi-Tenant Architecture
-docs/adr/0003-white-label-multi-tenant-architecture.md
+docs/architecture/0003-white-label-multi-tenant-architecture.v1.0.0.md
 
 Superseded / Archive
 
 Live Workflow — Irish Non-Profit Setup (Product Spec) (v2025-10-02) — superseded by Consolidated Product Spec
 docs/archive/2025-10-02-live-workflow-nonprofit-ie.md
 
-See the full docs index at docs/README.md.
+See the full docs index at docs/INDEX.md.
 ```
 
 ## Change Policy for Agents
