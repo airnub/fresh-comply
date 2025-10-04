@@ -84,7 +84,7 @@ export async function ensureStripeCustomer({
   const stripe = getStripeClient();
   const mergedMetadata: Stripe.MetadataParam = {
     ...(metadata ?? {}),
-    ...(tenantOrgId ? { tenant_org_id: tenantOrgId } : {}),
+    ...(tenantOrgId ? { org_id: tenantOrgId } : {}),
     ...(billingMode ? { billing_mode: billingMode } : {}),
     ...(partnerOrgId ? { partner_org_id: partnerOrgId } : {}),
     ...(defaultPriceId ? { default_price_id: defaultPriceId } : {})

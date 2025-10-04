@@ -1,7 +1,7 @@
 -- Tenant domains and branding tables with RLS and helper RPCs
 create table if not exists tenant_domains (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  org_id uuid not null references organisations(id) on delete cascade,
   domain text not null check (domain = lower(domain)),
   is_primary boolean not null default false,
   verified_at timestamptz,
@@ -18,13 +18,13 @@ create table if not exists tenant_domains (
   unique(domain)
 );
 
-create unique index if not exists tenant_domains_tenant_domain_unique on tenant_domains(tenant_org_id, domain);
-create unique index if not exists tenant_domains_primary_unique on tenant_domains(tenant_org_id) where is_primary;
+create unique index if not exists tenant_domains_tenant_domain_unique on tenant_domains(org_id, domain);
+create unique index if not exists tenant_domains_primary_unique on tenant_domains(org_id) where is_primary;
 create index if not exists tenant_domains_lookup_idx on tenant_domains(domain, verified_at);
-create index if not exists tenant_domains_tenant_idx on tenant_domains(tenant_org_id, verified_at);
+create index if not exists tenant_domains_tenant_idx on tenant_domains(org_id, verified_at);
 
 create table if not exists tenant_branding (
-  tenant_org_id uuid primary key references organisations(id) on delete cascade,
+  org_id uuid primary key references organisations(id) on delete cascade,
   tokens jsonb not null default '{}'::jsonb,
   logo_url text,
   favicon_url text,
@@ -48,11 +48,11 @@ create policy if not exists "Service role manages tenant domains" on tenant_doma
 create policy if not exists "Tenant members manage domains" on tenant_domains
   for all using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   )
   with check (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   );
 
 create policy if not exists "Service role manages tenant branding" on tenant_branding
@@ -62,11 +62,11 @@ create policy if not exists "Service role manages tenant branding" on tenant_bra
 create policy if not exists "Tenant members manage branding" on tenant_branding
   for all using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   )
   with check (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   );
 
 create or replace function public.normalize_domain(host text)
@@ -81,7 +81,7 @@ grant execute on function public.normalize_domain(text) to anon, authenticated, 
 
 create or replace function public.resolve_tenant_branding(p_host text)
 returns table (
-  tenant_org_id uuid,
+  org_id uuid,
   domain text,
   tokens jsonb,
   logo_url text,
@@ -102,7 +102,7 @@ begin
   normalized := public.normalize_domain(p_host);
   return query
   select
-    d.tenant_org_id,
+    d.org_id,
     d.domain,
     coalesce(b.tokens, '{}'::jsonb) as tokens,
     b.logo_url,
@@ -112,7 +112,7 @@ begin
     coalesce(b.pdf_footer, '{}'::jsonb) as pdf_footer,
     coalesce(b.updated_at, d.updated_at) as updated_at
   from tenant_domains d
-  left join tenant_branding b on b.tenant_org_id = d.tenant_org_id
+  left join tenant_branding b on b.org_id = d.org_id
   where d.domain = normalized
     and d.verified_at is not null
   order by d.is_primary desc, coalesce(b.updated_at, d.updated_at) desc
@@ -147,7 +147,7 @@ $$;
 grant execute on function public.assert_tenant_membership(uuid) to authenticated, service_role;
 
 create or replace function public.rpc_upsert_tenant_branding(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_tokens jsonb,
   p_logo_url text,
   p_favicon_url text,
@@ -167,10 +167,10 @@ declare
   normalized_pdf_footer jsonb := coalesce(p_pdf_footer, '{}'::jsonb);
   result tenant_branding;
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   insert into tenant_branding as tb (
-    tenant_org_id,
+    org_id,
     tokens,
     logo_url,
     favicon_url,
@@ -180,7 +180,7 @@ begin
     updated_at
   )
   values (
-    p_tenant_org_id,
+    p_org_id,
     normalized_tokens,
     p_logo_url,
     p_favicon_url,
@@ -189,7 +189,7 @@ begin
     normalized_pdf_footer,
     now()
   )
-  on conflict (tenant_org_id) do update
+  on conflict (org_id) do update
     set tokens = excluded.tokens,
         logo_url = excluded.logo_url,
         favicon_url = excluded.favicon_url,
@@ -205,7 +205,7 @@ $$;
 
 grant execute on function public.rpc_upsert_tenant_branding(uuid, jsonb, text, text, jsonb, jsonb, jsonb) to authenticated, service_role;
 
-create or replace function public.rpc_get_tenant_branding(p_tenant_org_id uuid)
+create or replace function public.rpc_get_tenant_branding(p_org_id uuid)
 returns tenant_branding
 language plpgsql
 stable
@@ -215,11 +215,11 @@ as $$
 declare
   result tenant_branding;
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   select * into result
   from tenant_branding
-  where tenant_org_id = p_tenant_org_id;
+  where org_id = p_org_id;
 
   return result;
 end;
@@ -228,7 +228,7 @@ $$;
 grant execute on function public.rpc_get_tenant_branding(uuid) to authenticated, service_role;
 
 create or replace function public.rpc_upsert_tenant_domain(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_domain text,
   p_is_primary boolean default false
 )
@@ -241,7 +241,7 @@ declare
   normalized_domain text;
   result tenant_domains;
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   normalized_domain := public.normalize_domain(p_domain);
 
@@ -250,21 +250,21 @@ begin
   end if;
 
   insert into tenant_domains as td (
-    tenant_org_id,
+    org_id,
     domain,
     is_primary,
     cert_status,
     updated_at
   )
   values (
-    p_tenant_org_id,
+    p_org_id,
     normalized_domain,
     coalesce(p_is_primary, false),
     'pending',
     now()
   )
   on conflict (domain) do update
-    set tenant_org_id = excluded.tenant_org_id,
+    set org_id = excluded.org_id,
         is_primary = excluded.is_primary,
         updated_at = now()
   returning * into result;
@@ -273,7 +273,7 @@ begin
     update tenant_domains
     set is_primary = false,
         updated_at = now()
-    where tenant_org_id = p_tenant_org_id
+    where org_id = p_org_id
       and id <> result.id
       and is_primary;
   end if;
@@ -298,7 +298,7 @@ declare
   result tenant_domains;
   tenant_id uuid;
 begin
-  select tenant_org_id into tenant_id
+  select org_id into tenant_id
   from tenant_domains
   where id = p_domain_id;
 
@@ -333,7 +333,7 @@ declare
   tenant_id uuid;
   removed integer;
 begin
-  select tenant_org_id into tenant_id
+  select org_id into tenant_id
   from tenant_domains
   where id = p_domain_id;
 

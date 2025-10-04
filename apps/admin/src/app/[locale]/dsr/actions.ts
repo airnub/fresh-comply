@@ -47,7 +47,7 @@ function resolveServiceClient(): ServiceClient {
 
 async function appendDsrAuditEntry(
   service: ServiceClient,
-  request: { id: string; tenant_org_id: string; subject_org_id: string | null },
+  request: { id: string; org_id: string; subject_org_id: string | null },
   actorId: string | null | undefined,
   action: string,
   reasonCode: string,
@@ -69,8 +69,8 @@ async function appendDsrAuditEntry(
     payload,
     target_kind: "dsr_request",
     target_id: request.id,
-    tenant_org_id: request.tenant_org_id,
-    actor_org_id: request.tenant_org_id,
+    org_id: request.org_id,
+    actor_org_id: request.org_id,
     on_behalf_of_org_id: request.subject_org_id,
     subject_org_id: request.subject_org_id,
   });
@@ -87,7 +87,7 @@ function normalizeEmail(email: string) {
 async function loadRequest(client: ReturnType<typeof getSupabaseClient>, id: string) {
   const { data, error } = await client
     .from("dsr_requests")
-    .select("id, tenant_org_id, subject_org_id, status, due_at")
+    .select("id, org_id, subject_org_id, status, due_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -115,7 +115,7 @@ export async function reassignDsrRequest(id: string, email: string, reason: stri
       return { ok: false, error: "supabase_unavailable" };
     }
 
-    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const tenantOrgId = readOrgId(context.user, "org_id");
     const partnerOrgId = readOrgId(context.user, "partner_org_id");
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
@@ -152,7 +152,7 @@ export async function reassignDsrRequest(id: string, email: string, reason: stri
           .from("memberships")
           .select("user_id")
           .eq("user_id", candidate.id)
-          .eq("org_id", request.tenant_org_id)
+          .eq("org_id", request.org_id)
           .maybeSingle();
 
         if (!membership) {
@@ -207,7 +207,7 @@ export async function completeDsrRequest(id: string, reason: string): Promise<Ds
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: false, error: "supabase_unavailable" };
     }
-    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const tenantOrgId = readOrgId(context.user, "org_id");
     const partnerOrgId = readOrgId(context.user, "partner_org_id");
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
     const { client, user } = context;
@@ -255,7 +255,7 @@ export async function togglePauseDsrRequest(id: string, reason: string): Promise
       span.setAttribute("freshcomply.action.outcome", "supabase_unavailable");
       return { ok: false, error: "supabase_unavailable" };
     }
-    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const tenantOrgId = readOrgId(context.user, "org_id");
     const partnerOrgId = readOrgId(context.user, "partner_org_id");
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 

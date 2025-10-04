@@ -45,7 +45,7 @@ export async function POST(request: Request, { params }: { params: { requestId: 
       reason: parsed.reason,
       enabled: parsed.enabled,
       second_actor_id: secondActorId,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

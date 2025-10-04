@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: { params: { requestId: 
       request_id: params.requestId,
       reason: parsed.reason,
       notes: parsed.notes ?? null,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

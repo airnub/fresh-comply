@@ -34,7 +34,7 @@ export async function POST(_request: Request, { params }: { params: { actionId: 
     const result = await callAdminRpc<ConfirmResult>("rpc_confirm_admin_action", {
       action_id: parsedParams.data.actionId,
       actor_id: context.userId,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

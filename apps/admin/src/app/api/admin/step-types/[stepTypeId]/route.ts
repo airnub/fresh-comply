@@ -36,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: { stepTypeId
       actor_id: context.userId,
       step_type_id: stepTypeId,
       patch: parsed.patch,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

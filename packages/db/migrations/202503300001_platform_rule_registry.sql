@@ -112,7 +112,7 @@ create policy if not exists "Platform services manage rule pack detection source
 insert into platform.rule_sources (id, name, url, parser, jurisdiction, category, created_at)
 select id, name, url, parser, jurisdiction, category, created_at
 from source_registry
-where tenant_org_id is null
+where org_id is null
 on conflict (id) do update set
   name = excluded.name,
   url = excluded.url,
@@ -121,18 +121,18 @@ on conflict (id) do update set
   category = excluded.category,
   updated_at = now();
 
-delete from source_registry where tenant_org_id is null;
+delete from source_registry where org_id is null;
 
-alter table source_registry rename column tenant_org_id to org_id;
-alter table source_snapshot rename column tenant_org_id to org_id;
-alter table change_event rename column tenant_org_id to org_id;
-alter table rule_versions rename column tenant_org_id to org_id;
-alter table template_versions rename column tenant_org_id to org_id;
-alter table workflow_def_versions rename column tenant_org_id to org_id;
-alter table workflow_pack_versions rename column tenant_org_id to org_id;
-alter table moderation_queue rename column tenant_org_id to org_id;
-alter table release_notes rename column tenant_org_id to org_id;
-alter table adoption_records rename column tenant_org_id to org_id;
+alter table source_registry rename column org_id to org_id;
+alter table source_snapshot rename column org_id to org_id;
+alter table change_event rename column org_id to org_id;
+alter table rule_versions rename column org_id to org_id;
+alter table template_versions rename column org_id to org_id;
+alter table workflow_def_versions rename column org_id to org_id;
+alter table workflow_pack_versions rename column org_id to org_id;
+alter table moderation_queue rename column org_id to org_id;
+alter table release_notes rename column org_id to org_id;
+alter table adoption_records rename column org_id to org_id;
 
 alter table source_registry alter column org_id set not null;
 alter table source_snapshot alter column org_id set not null;

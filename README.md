@@ -81,3 +81,21 @@ pnpm dlx lychee --no-progress --markdown --base . ./AGENTS.md './docs/**/*.md'
 
 > [!NOTE]
 > Installing [`lychee`](https://github.com/lycheeverse/lychee) via `pnpm dlx` keeps the Markdown link checker aligned with CI.
+
+## Tenancy migration plan
+
+All future tenancy work must be encoded as Supabase SQL migrations under `supabase/migrations`. The current rollout sequence is:
+
+1. Provision the `public.orgs`, `public.org_memberships`, and `public.realms` tables.
+2. Deploy helper functions inside the `app` schema (`jwt`, `is_platform_admin`, `is_direct_member`, `is_provider_admin_for`, `has_org_access`).
+3. Create the `platform` schema, including rule catalog tables guarded by RLS that only allows `app.is_platform_admin()`.
+4. Archive any legacy rows with `org_id IS NULL` into `platform.global_records` before enforcing `org_id uuid not null`.
+5. Rename remaining `org_id` columns to `org_id`, backfill constraints, and re-apply the four-policy `app.has_org_access` template across tenant tables.
+
+Whenever you add a migration, run the smoke suite locally to ensure governance rules stay intact:
+
+```bash
+pnpm test:rls-smoke
+```
+
+The script verifies helper definitions, RLS policy patterns, and ensures no client bundle writes to `platform.*` tables.

@@ -6,14 +6,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Check RLS bad patterns
+      - name: Detect forbidden tenancy gates
         run: |
           set -euo pipefail
-          # Fail if any policy uses tenancy gates relying on org/tenant columns being NULL
           mapfile -d '' matches < <(
             grep -RPzl --include='*.sql' \
               'create\s+policy[\s\S]{0,200}(org_id|tenant_org_id)\s+is\s+null' \
-              packages/db/migrations || true
+              packages/db/migrations supabase/migrations || true
           )
 
           if (( ${#matches[@]} )); then
@@ -21,10 +20,14 @@ jobs:
             echo "Forbidden tenancy gate via IS NULL detected in SQL policies." >&2
             exit 1
           fi
-      - name: Block client writes to platform.*
-        run: |
-          # Adjust app paths if needed
-          if grep -RinE "from\\(['\"\"]platform\\." apps/ -n | grep -E "insert|update|upsert|delete"; then
-            echo "Client write to platform.* detected." >&2
-            exit 1
-          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+      - name: Install dependencies (no scripts)
+        run: pnpm install --ignore-scripts
+      - name: Run tenancy smoke checks
+        run: pnpm test:rls-smoke

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       provider: parsed.provider,
       external_id: parsed.externalId,
       description: parsed.description ?? null,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: parsed.orgId,
     });

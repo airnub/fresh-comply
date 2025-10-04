@@ -1,48 +1,48 @@
 begin;
 
 with latest_bindings as (
-  select distinct on (target_id) target_id, tenant_org_id
+  select distinct on (target_id) target_id, org_id
   from audit_log
   where target_kind = 'tenant_secret_binding'
-    and tenant_org_id is not null
+    and org_id is not null
   order by target_id, created_at desc
 )
 update tenant_secret_bindings tsb
-set org_id = latest_bindings.tenant_org_id
+set org_id = latest_bindings.org_id
 from latest_bindings
 where tsb.id = latest_bindings.target_id
   and tsb.org_id is null;
 
 with overlay_orgs as (
-  select distinct on (target_id) target_id, tenant_org_id
+  select distinct on (target_id) target_id, org_id
   from audit_log
   where target_kind = 'tenant_workflow_overlay'
-    and tenant_org_id is not null
+    and org_id is not null
   order by target_id, created_at desc
 ),
 resolved_overlays as (
   select two.id,
-         coalesce(overlay_orgs.tenant_org_id,
+         coalesce(overlay_orgs.org_id,
            (
-             select wr.tenant_org_id
+             select wr.org_id
              from workflow_overlay_snapshots s
              join workflow_runs wr on wr.id = s.run_id
              where s.tenant_overlay_id = two.id
-               and wr.tenant_org_id is not null
+               and wr.org_id is not null
              order by s.created_at desc
              limit 1
            )
-         ) as tenant_org_id
+         ) as org_id
   from tenant_workflow_overlays two
   left join overlay_orgs on overlay_orgs.target_id = two.id
   where two.org_id is null
 )
 update tenant_workflow_overlays two
-set org_id = resolved_overlays.tenant_org_id
+set org_id = resolved_overlays.org_id
 from resolved_overlays
 where two.id = resolved_overlays.id
   and two.org_id is null
-  and resolved_overlays.tenant_org_id is not null;
+  and resolved_overlays.org_id is not null;
 
 alter table tenant_secret_bindings
   alter column org_id set not null;

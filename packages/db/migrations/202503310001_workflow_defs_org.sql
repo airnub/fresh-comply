@@ -31,9 +31,9 @@ where wd.id = sub.workflow_def_id
   and wd.org_id is null;
 
 update workflow_defs wd
-set org_id = sub.tenant_org_id
+set org_id = sub.org_id
 from (
-  select workflow_def_id, tenant_org_id,
+  select workflow_def_id, org_id,
          row_number() over (partition by workflow_def_id order by created_at desc nulls last) as rn
   from workflow_runs
   where workflow_def_id is not null
@@ -73,10 +73,10 @@ where two.workflow_def_id = wd.id
   and two.org_id is distinct from wd.org_id;
 
 update workflow_runs wr
-set tenant_org_id = wd.org_id
+set org_id = wd.org_id
 from workflow_defs wd
 where wr.workflow_def_id = wd.id
-  and wd.org_id is distinct from wr.tenant_org_id;
+  and wd.org_id is distinct from wr.org_id;
 
 alter table workflow_def_versions
   drop constraint if exists workflow_def_versions_workflow_def_id_fkey;
@@ -101,7 +101,7 @@ alter table workflow_runs
 
 alter table workflow_runs
   add constraint workflow_runs_workflow_def_fk
-    foreign key (tenant_org_id, workflow_def_id)
+    foreign key (org_id, workflow_def_id)
     references workflow_defs(org_id, id);
 
 commit;

@@ -20,7 +20,8 @@ jobs:
         if: >
           (contains(steps.changes.outputs.changed, 'docs/specs/FreshComply-Spec.md') ||
            contains(steps.changes.outputs.changed, 'docs/agents.md') ||
-           contains(steps.changes.outputs.changed, 'docs/architecture/ARD.md'))
+           contains(steps.changes.outputs.changed, 'docs/architecture/ARD.md') ||
+           contains(steps.changes.outputs.changed, 'docs/specs/Tenancy-Design-WhiteLabel.md'))
            && !contains(join(fromJSON(toJSON(github.event.pull_request.labels)).*.name, ','), 'allow-spec-edit')
         run: |
           echo "Locked docs changed but PR lacks 'allow-spec-edit' label." >&2

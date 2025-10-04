@@ -77,7 +77,7 @@ test("POST upserts branding and returns audit metadata", async () => {
         return {
           data: {
             branding: {
-              tenant_org_id: tenantBrandingStub.tenantOrgId,
+              org_id: tenantBrandingStub.tenantOrgId,
               tokens: { theme: "custom" },
               logo_url: "https://cdn.example.com/logo.png",
               favicon_url: null,
@@ -119,7 +119,7 @@ test("POST upserts branding and returns audit metadata", async () => {
 
     assert.equal(json.ok, true);
     assert.deepEqual(json.branding, {
-      tenant_org_id: tenantBrandingStub.tenantOrgId,
+      org_id: tenantBrandingStub.tenantOrgId,
       tokens: { theme: "custom" },
       logo_url: "https://cdn.example.com/logo.png",
       favicon_url: null,
@@ -135,7 +135,7 @@ test("POST upserts branding and returns audit metadata", async () => {
 
     assert.equal(rpcCalls.length, 1);
     assert.equal(rpcCalls[0]?.name, "rpc_upsert_tenant_branding");
-    assert.equal(rpcCalls[0]?.params?.p_tenant_org_id, tenantBrandingStub.tenantOrgId);
+    assert.equal(rpcCalls[0]?.params?.p_org_id, tenantBrandingStub.tenantOrgId);
   });
 });
 

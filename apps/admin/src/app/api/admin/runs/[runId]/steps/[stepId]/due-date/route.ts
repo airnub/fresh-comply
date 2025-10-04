@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { runId: str
       step_id: params.stepId,
       reason: parsed.reason,
       due_date: parsed.dueDate,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

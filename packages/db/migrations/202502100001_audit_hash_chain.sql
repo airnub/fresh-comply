@@ -62,11 +62,11 @@ begin
   for rec in
     select *
     from audit_log
-    order by tenant_org_id, created_at, id
+    order by org_id, created_at, id
   loop
-    if v_tenant is distinct from rec.tenant_org_id then
+    if v_tenant is distinct from rec.org_id then
       v_prev := repeat('0', 64);
-      v_tenant := rec.tenant_org_id;
+      v_tenant := rec.org_id;
     end if;
 
     update audit_log
@@ -74,7 +74,7 @@ begin
         row_hash = encode(
           digest(
             jsonb_build_object(
-              'tenant_org_id', rec.tenant_org_id,
+              'org_id', rec.org_id,
               'actor_user_id', rec.actor_user_id,
               'actor_org_id', rec.actor_org_id,
               'on_behalf_of_org_id', rec.on_behalf_of_org_id,
@@ -111,11 +111,11 @@ begin
   for rec in
     select *
     from admin_actions
-    order by tenant_org_id, created_at, id
+    order by org_id, created_at, id
   loop
-    if v_tenant is distinct from rec.tenant_org_id then
+    if v_tenant is distinct from rec.org_id then
       v_prev := repeat('0', 64);
-      v_tenant := rec.tenant_org_id;
+      v_tenant := rec.org_id;
     end if;
 
     update admin_actions
@@ -123,7 +123,7 @@ begin
         row_hash = encode(
           digest(
             jsonb_build_object(
-              'tenant_org_id', rec.tenant_org_id,
+              'org_id', rec.org_id,
               'actor_id', rec.actor_id,
               'actor_org_id', rec.actor_org_id,
               'on_behalf_of_org_id', rec.on_behalf_of_org_id,
@@ -177,7 +177,7 @@ begin
   select row_hash
     into v_prev_hash
   from audit_log
-  where tenant_org_id = new.tenant_org_id
+  where org_id = new.org_id
   order by inserted_at desc, created_at desc, id desc
   limit 1
   for update;
@@ -189,13 +189,13 @@ begin
   if new.prev_hash is null then
     new.prev_hash := v_prev_hash;
   elsif new.prev_hash <> v_prev_hash then
-    raise exception 'Invalid prev_hash for tenant %', new.tenant_org_id;
+    raise exception 'Invalid prev_hash for tenant %', new.org_id;
   end if;
 
   new.row_hash := encode(
     digest(
       jsonb_build_object(
-        'tenant_org_id', new.tenant_org_id,
+        'org_id', new.org_id,
         'actor_user_id', new.actor_user_id,
         'actor_org_id', new.actor_org_id,
         'on_behalf_of_org_id', new.on_behalf_of_org_id,
@@ -236,7 +236,7 @@ begin
   select row_hash
     into v_prev_hash
   from admin_actions
-  where tenant_org_id = new.tenant_org_id
+  where org_id = new.org_id
   order by inserted_at desc, created_at desc, id desc
   limit 1
   for update;
@@ -248,13 +248,13 @@ begin
   if new.prev_hash is null then
     new.prev_hash := v_prev_hash;
   elsif new.prev_hash <> v_prev_hash then
-    raise exception 'Invalid prev_hash for tenant %', new.tenant_org_id;
+    raise exception 'Invalid prev_hash for tenant %', new.org_id;
   end if;
 
   new.row_hash := encode(
     digest(
       jsonb_build_object(
-        'tenant_org_id', new.tenant_org_id,
+        'org_id', new.org_id,
         'actor_id', new.actor_id,
         'actor_org_id', new.actor_org_id,
         'on_behalf_of_org_id', new.on_behalf_of_org_id,

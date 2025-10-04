@@ -5,8 +5,8 @@ alter table audit_log
   add column if not exists chain_position bigint;
 
 update audit_log
-set tenant_id = coalesce(tenant_id, tenant_org_id)
-where tenant_id is distinct from coalesce(tenant_org_id, tenant_id);
+set tenant_id = coalesce(tenant_id, org_id)
+where tenant_id is distinct from coalesce(org_id, tenant_id);
 
 alter table audit_log
   alter column tenant_id set not null;
@@ -57,7 +57,7 @@ begin
   new.inserted_at := coalesce(new.inserted_at, now());
   new.meta_json := coalesce(new.meta_json, '{}'::jsonb);
   new.target_kind := coalesce(new.target_kind, new.entity);
-  new.tenant_id := coalesce(new.tenant_id, new.tenant_org_id);
+  new.tenant_id := coalesce(new.tenant_id, new.org_id);
 
   if new.tenant_id is null then
     raise exception 'tenant_id is required for audit chain';
@@ -95,7 +95,7 @@ begin
     digest(
       jsonb_build_object(
         'tenant_id', new.tenant_id,
-        'tenant_org_id', new.tenant_org_id,
+        'org_id', new.org_id,
         'actor_user_id', new.actor_user_id,
         'actor_org_id', new.actor_org_id,
         'on_behalf_of_org_id', new.on_behalf_of_org_id,
@@ -149,7 +149,7 @@ begin
           digest(
             jsonb_build_object(
               'tenant_id', rec.tenant_id,
-              'tenant_org_id', rec.tenant_org_id,
+              'org_id', rec.org_id,
               'actor_user_id', rec.actor_user_id,
               'actor_org_id', rec.actor_org_id,
               'on_behalf_of_org_id', rec.on_behalf_of_org_id,

@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
       step_type_id: stepTypeId,
       version_id: payload.version,
       changelog: payload.changelog ?? null,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

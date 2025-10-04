@@ -16,7 +16,7 @@ export async function loadTenantBrandingSettings() {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc("rpc_get_tenant_branding", {
-      p_tenant_org_id: resolvedBranding.tenantOrgId
+      p_org_id: resolvedBranding.tenantOrgId
     });
 
     if (error) {
@@ -51,7 +51,7 @@ export async function loadTenantDomains() {
     const { data, error } = await supabase
       .from("tenant_domains")
       .select("id, domain, is_primary, verified_at, cert_status, created_at, updated_at")
-      .eq("tenant_org_id", branding.tenantOrgId)
+      .eq("org_id", branding.tenantOrgId)
       .order("created_at", { ascending: false });
 
     if (error) {

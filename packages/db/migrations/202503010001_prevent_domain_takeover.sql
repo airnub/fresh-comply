@@ -1,6 +1,6 @@
 -- Prevent tenant domain takeovers by ensuring ownership cannot change across tenants
 create or replace function public.rpc_upsert_tenant_domain(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_domain text,
   p_is_primary boolean default false
 )
@@ -14,7 +14,7 @@ declare
   existing tenant_domains%rowtype;
   result tenant_domains%rowtype;
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   normalized_domain := public.normalize_domain(p_domain);
 
@@ -29,7 +29,7 @@ begin
   for update;
 
   if found then
-    if existing.tenant_org_id <> p_tenant_org_id then
+    if existing.org_id <> p_org_id then
       raise exception 'Domain % already claimed by another tenant', normalized_domain using errcode = '42501';
     end if;
 
@@ -40,14 +40,14 @@ begin
     returning * into result;
   else
     insert into tenant_domains as td (
-      tenant_org_id,
+      org_id,
       domain,
       is_primary,
       cert_status,
       updated_at
     )
     values (
-      p_tenant_org_id,
+      p_org_id,
       normalized_domain,
       coalesce(p_is_primary, false),
       'pending',
@@ -60,7 +60,7 @@ begin
     update tenant_domains
     set is_primary = false,
         updated_at = now()
-    where tenant_org_id = p_tenant_org_id
+    where org_id = p_org_id
       and id <> result.id
       and is_primary;
   end if;

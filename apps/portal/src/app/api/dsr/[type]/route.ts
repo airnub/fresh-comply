@@ -10,7 +10,7 @@ type SupabaseServiceClient = ReturnType<typeof getServiceSupabaseClient>;
 
 async function appendDsrAuditEntry(
   supabase: SupabaseServiceClient,
-  request: { id: string; tenant_org_id: string; subject_org_id: string | null },
+  request: { id: string; org_id: string; subject_org_id: string | null },
   action: string,
   reasonCode: string,
   payload: Record<string, unknown>
@@ -22,8 +22,8 @@ async function appendDsrAuditEntry(
     payload,
     target_kind: "dsr_request",
     target_id: request.id,
-    tenant_org_id: request.tenant_org_id,
-    actor_org_id: request.tenant_org_id,
+    org_id: request.org_id,
+    actor_org_id: request.org_id,
     on_behalf_of_org_id: request.subject_org_id ?? null,
     subject_org_id: request.subject_org_id ?? null,
   });
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
       const ackDeadline = calculateAckDeadline(receivedAt).toISOString();
 
       const insertPayload: TablesInsert<"dsr_requests"> = {
-        tenant_org_id: input.tenantOrgId,
+        org_id: input.tenantOrgId,
         subject_org_id: input.subjectOrgId ?? null,
         assignee_user_id: input.assigneeUserId ?? null,
         assignee_email: input.assigneeEmail ?? null,
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
       const { data: requestRow, error: insertError } = await supabase
         .from("dsr_requests")
         .insert(insertPayload)
-        .select("id, tenant_org_id, subject_org_id, requester_email, requester_name, received_at")
+        .select("id, org_id, subject_org_id, requester_email, requester_name, received_at")
         .maybeSingle();
 
       if (insertError || !requestRow) {
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
       console.info("DSR request received", {
         requestId: requestRow.id,
         type,
-        tenantOrgId: requestRow.tenant_org_id,
+        tenantOrgId: requestRow.org_id,
         receivedAt: requestRow.received_at,
         ackSentAt
       });
