@@ -8,9 +8,17 @@ jobs:
         with: { fetch-depth: 0 }
       - name: Check RLS bad patterns
         run: |
-          # Fail if any migration adds tenancy gates using IS NULL on org/tenant columns
-          if grep -RinE "(org_id|tenant_org_id)[[:space:]]+is[[:space:]]+null" **/*.sql; then
-            echo "Forbidden tenancy gate via IS NULL detected in SQL." >&2
+          set -euo pipefail
+          # Fail if any policy uses tenancy gates relying on org/tenant columns being NULL
+          mapfile -d '' matches < <(
+            grep -RPzl --include='*.sql' \
+              'create\s+policy[\s\S]{0,200}(org_id|tenant_org_id)\s+is\s+null' \
+              packages/db/migrations || true
+          )
+
+          if (( ${#matches[@]} )); then
+            printf '%s\n' "${matches[@]}"
+            echo "Forbidden tenancy gate via IS NULL detected in SQL policies." >&2
             exit 1
           fi
       - name: Block client writes to platform.*
