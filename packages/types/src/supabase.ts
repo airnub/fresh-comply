@@ -2499,6 +2499,41 @@ export type Database = {
           }
         ];
       };
+      rule_source_snapshots: {
+        Row: {
+          id: string;
+          rule_source_id: string;
+          content_hash: string;
+          parsed_facts: Json;
+          fetched_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          rule_source_id: string;
+          content_hash: string;
+          parsed_facts?: Json;
+          fetched_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          rule_source_id?: string;
+          content_hash?: string;
+          parsed_facts?: Json;
+          fetched_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rule_source_snapshots_rule_source_id_fkey";
+            columns: ["rule_source_id"];
+            isOneToOne: false;
+            referencedRelation: "rule_sources";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       rule_sources: {
         Row: {
           id: string;

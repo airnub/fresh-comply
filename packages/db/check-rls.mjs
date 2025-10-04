@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const schemaPath = resolve(__dirname, "schema.sql");
-const schema = await readFile(schemaPath, "utf8");
 
 const tablesWithRls = [
   "organisations",
@@ -30,16 +29,6 @@ const tablesWithRls = [
   "release_notes",
   "adoption_records"
 ];
-
-const missingRls = tablesWithRls.filter((table) => {
-  const pattern = new RegExp(`alter\\s+table\\s+${table}\\s+enable\\s+row\\s+level\\s+security`, "i");
-  return !pattern.test(schema);
-});
-
-if (missingRls.length > 0) {
-  console.error("Missing RLS enablement for:", missingRls.join(", "));
-  process.exit(1);
-}
 
 const requiredPolicies = {
   organisations: ["Members read organisations", "Service role manages organisations"],
@@ -104,46 +93,96 @@ const requiredPolicies = {
   ]
 };
 
-const missingPolicies = Object.entries(requiredPolicies).flatMap(([table, policies]) =>
-  policies
-    .filter((policy) => !schema.includes(`create policy "${policy}" on ${table}`))
-    .map((policy) => `${table}: ${policy}`)
-);
+export function checkRlsSchema(schema) {
+  const missingRls = tablesWithRls.filter((table) => {
+    const pattern = new RegExp(
+      `alter\\s+table\\s+${table}\\s+enable\\s+row\\s+level\\s+security`,
+      "i"
+    );
+    return !pattern.test(schema);
+  });
 
-if (missingPolicies.length > 0) {
-  console.error("Missing required policies:\n -", missingPolicies.join("\n - "));
-  process.exit(1);
+  if (missingRls.length > 0) {
+    throw new Error(`Missing RLS enablement for: ${missingRls.join(", ")}`);
+  }
+
+  const missingPolicies = Object.entries(requiredPolicies).flatMap(([table, policies]) =>
+    policies
+      .filter((policy) => !schema.includes(`create policy "${policy}" on ${table}`))
+      .map((policy) => `${table}: ${policy}`)
+  );
+
+  if (missingPolicies.length > 0) {
+    throw new Error(`Missing required policies:\n - ${missingPolicies.join("\n - ")}`);
+  }
+
+  if (!schema.includes("create or replace function public.is_member_of_org")) {
+    throw new Error("Function public.is_member_of_org is not defined in schema.sql");
+  }
+
+  if (!schema.includes("create or replace function public.can_access_run")) {
+    throw new Error("Function public.can_access_run is not defined in schema.sql");
+  }
+
+  const policyRegex = /create\s+policy\s+"([^"]+)"\s+on\s+([^\s]+)[\s\S]*?;/gi;
+  const prohibitedColumns = ["tenant_org_id", "org_id"];
+  const policiesWithNullChecks = [];
+
+  let policyMatch;
+  while ((policyMatch = policyRegex.exec(schema)) !== null) {
+    const [policyBlock, policyName, tableName] = policyMatch;
+    const policyBlockLower = policyBlock.toLowerCase();
+
+    for (const column of prohibitedColumns) {
+      if (policyBlockLower.includes(`${column.toLowerCase()} is null`)) {
+        policiesWithNullChecks.push({ column, policyRef: `${tableName}.${policyName}` });
+      }
+    }
+  }
+
+  if (policiesWithNullChecks.length > 0) {
+    const offendingColumns = [
+      ...new Set(policiesWithNullChecks.map(({ column }) => column))
+    ];
+
+    const columnList =
+      offendingColumns.length === 1
+        ? offendingColumns[0]
+        : `${offendingColumns.slice(0, -1).join(", ")} or ${
+            offendingColumns[offendingColumns.length - 1]
+          }`;
+
+    const policiesList = policiesWithNullChecks
+      .map(({ policyRef }) => policyRef)
+      .join("\n - ");
+
+    throw new Error(
+      `Policies must not rely on ${columnList} being NULL:\n - ${policiesList}`
+    );
+  }
+
+  return { tablesWithRls };
 }
 
-if (!schema.includes("create or replace function public.is_member_of_org")) {
-  console.error("Function public.is_member_of_org is not defined in schema.sql");
-  process.exit(1);
+export async function verifyRls({ schema } = {}) {
+  const schemaText = schema ?? (await readFile(schemaPath, "utf8"));
+  return checkRlsSchema(schemaText);
 }
 
-if (!schema.includes("create or replace function public.can_access_run")) {
-  console.error("Function public.can_access_run is not defined in schema.sql");
-  process.exit(1);
-}
-
-const policyRegex = /create\s+policy\s+"([^"]+)"\s+on\s+([^\s]+)[\s\S]*?;/gi;
-const policiesWithNullTenant = [];
-let policyMatch;
-while ((policyMatch = policyRegex.exec(schema)) !== null) {
-  const [policyBlock, policyName, tableName] = policyMatch;
-  if (policyBlock.toLowerCase().includes("tenant_org_id is null")) {
-    policiesWithNullTenant.push(`${tableName}.${policyName}`);
+async function runCli() {
+  try {
+    const { tablesWithRls: tables } = await verifyRls();
+    console.log("✅ RLS enforcement verified for tables:", tables.join(", "));
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
   }
 }
 
-if (policiesWithNullTenant.length > 0) {
-  console.error(
-    "Policies must not rely on tenant_org_id being NULL:\n -",
-    policiesWithNullTenant.join("\n - ")
-  );
-  process.exit(1);
-}
-
-console.log(
-  "✅ RLS enforcement verified for tables:",
-  tablesWithRls.join(", ")
+const isCliExecution = Boolean(
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
 );
+
+if (isCliExecution) {
+  await runCli();
+}
