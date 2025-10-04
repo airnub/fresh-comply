@@ -12,6 +12,7 @@ declare
   v_platform_source_id uuid;
   v_rule_pack_id uuid;
   v_detection_id uuid;
+  v_snapshot_id uuid;
   v_moderation_id uuid;
   v_adoption_id uuid;
   v_count integer;
@@ -52,6 +53,23 @@ begin
   insert into platform.rule_sources (name, url, parser, jurisdiction, category)
   values ('Platform CRO Guidance', 'https://example.test/platform-cro', 'html', 'ie', 'platform')
   returning id into v_platform_source_id;
+
+  insert into platform.rule_source_snapshots (rule_source_id, content_hash, parsed_facts)
+  values (
+    v_platform_source_id,
+    'hash-platform-1',
+    jsonb_build_object('records', jsonb_build_array())
+  )
+  returning id into v_snapshot_id;
+
+  select count(*)
+  into v_count
+  from platform.rule_source_snapshots
+  where rule_source_id = v_platform_source_id;
+
+  if v_count <> 1 then
+    raise exception 'Platform snapshots should be persisted for platform rule sources';
+  end if;
 
   insert into platform.rule_packs (pack_key, version, title, summary, manifest, checksum, created_by)
   values (
@@ -142,6 +160,14 @@ begin
   begin
     perform 1 from platform.rule_sources;
     raise exception 'Tenant member should not read platform rule sources';
+  exception
+    when sqlstate '42501' then
+      null;
+  end;
+
+  begin
+    perform 1 from platform.rule_source_snapshots;
+    raise exception 'Tenant member should not read platform rule source snapshots';
   exception
     when sqlstate '42501' then
       null;

@@ -188,7 +188,7 @@ async function loadPreviousPlatformSnapshot(
 ): Promise<PreviousSnapshot | undefined> {
   try {
     const { data, error } = await client
-      .from("rule_source_snapshots" as never)
+      .from("rule_source_snapshots")
       .select("id, content_hash, parsed_facts, fetched_at")
       .eq("rule_source_id", ruleSourceId)
       .order("fetched_at", { ascending: false })
@@ -237,7 +237,7 @@ async function savePlatformSnapshot(options: {
 
   try {
     const { data, error } = await client
-      .from("rule_source_snapshots" as never)
+      .from("rule_source_snapshots")
       .insert({
         rule_source_id: ruleSourceId,
         content_hash: fingerprint,
