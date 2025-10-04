@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: { bindingId:
       reason: parsed.reason,
       description: parsed.description ?? null,
       external_id: parsed.externalId ?? null,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
@@ -84,7 +84,7 @@ export async function DELETE(request: Request, { params }: { params: { bindingId
       binding_id: params.bindingId,
       reason: parsed.reason,
       second_actor_id: secondActorId,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

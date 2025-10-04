@@ -23,7 +23,7 @@ async function main() {
     .select(
       `id, job_type, run_after, attempts, payload, request:dsr_requests!inner(
         id,
-        tenant_org_id,
+        org_id,
         subject_org_id,
         status,
         type,
@@ -34,7 +34,7 @@ async function main() {
         requester_name,
         assignee_user_id,
         assignee_email,
-        tenant:organisations!dsr_requests_tenant_org_id_fkey(name),
+        tenant:organisations!dsr_requests_org_id_fkey(name),
         assignee:users!dsr_requests_assignee_user_id_fkey(email)
       )`
     )
@@ -143,9 +143,9 @@ async function main() {
         .update({ status: "acknowledged", ack_sent_at: ackSentAt, updated_at: ackSentAt })
         .eq("id", request.id);
       await client.from("audit_log").insert({
-        tenant_org_id: request.tenant_org_id,
-        tenant_id: request.tenant_org_id,
-        actor_org_id: request.tenant_org_id,
+        org_id: request.org_id,
+        tenant_id: request.org_id,
+        actor_org_id: request.org_id,
         on_behalf_of_org_id: request.subject_org_id ?? null,
         subject_org_id: request.subject_org_id ?? null,
         entity: "dsr_request",
@@ -183,9 +183,9 @@ async function main() {
         .update({ status: "escalated", updated_at: nowIso })
         .eq("id", request.id);
       await client.from("audit_log").insert({
-        tenant_org_id: request.tenant_org_id,
-        tenant_id: request.tenant_org_id,
-        actor_org_id: request.tenant_org_id,
+        org_id: request.org_id,
+        tenant_id: request.org_id,
+        actor_org_id: request.org_id,
         on_behalf_of_org_id: request.subject_org_id ?? null,
         subject_org_id: request.subject_org_id ?? null,
         entity: "dsr_request",

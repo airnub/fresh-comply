@@ -48,7 +48,7 @@ export async function resolveAdminContext(allowedRoles?: AdminRole[]): Promise<A
     return jsonError(403, "Forbidden");
   }
 
-  const tenantOrgId = readOrgId(user, "tenant_org_id");
+  const tenantOrgId = readOrgId(user, "org_id");
   const actorOrgId = readOrgId(user, "actor_org_id") ?? tenantOrgId;
   const onBehalfOfOrgId = readOrgId(user, "on_behalf_of_org_id");
 

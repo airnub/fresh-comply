@@ -55,7 +55,7 @@ export async function PATCH(
       step_type_id: stepTypeId,
       install_id: installId,
       patch: payload.patch,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });
@@ -112,7 +112,7 @@ export async function DELETE(
       actor_id: context.userId,
       step_type_id: stepTypeId,
       install_id: installId,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

@@ -31,6 +31,12 @@ function resolveServiceRoleEnv() {
 }
 
 export function getSupabaseServiceRoleClient(): SupabaseClient<Database> {
+  if (typeof window !== "undefined") {
+    throw new SupabaseServiceRoleConfigurationError(
+      "Supabase service-role client is restricted to server-side execution."
+    );
+  }
+
   if (!cachedClient) {
     const { url, serviceRoleKey } = resolveServiceRoleEnv();
     cachedClient = createClient<Database>(url, serviceRoleKey, {

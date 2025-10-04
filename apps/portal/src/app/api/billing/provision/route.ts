@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const { data: existingTenant, error: tenantLookupError } = await supabase
       .from("billing_tenants")
       .select("id, stripe_customer_id, billing_mode")
-      .eq("tenant_org_id", payload.tenantOrgId)
+      .eq("org_id", payload.tenantOrgId)
       .maybeSingle();
 
     if (tenantLookupError) {
@@ -83,14 +83,14 @@ export async function POST(request: Request) {
     });
 
     const tenantResult = await supabase.rpc("rpc_upsert_billing_tenant", {
-      p_tenant_org_id: payload.tenantOrgId,
+      p_org_id: payload.tenantOrgId,
       p_stripe_customer_id: customer.id,
       p_billing_mode: payload.billingMode ?? existingTenant?.billing_mode ?? "direct",
       p_partner_org_id: isValidUuid(payload.partnerOrgId ?? null) ? payload.partnerOrgId ?? null : null,
       p_default_price_id: payload.priceId,
       p_metadata: {
         ...(payload.metadata ?? {}),
-        tenant_org_id: payload.tenantOrgId,
+        org_id: payload.tenantOrgId,
         price_id: payload.priceId
       }
     });
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       priceId: payload.priceId,
       metadata: {
         ...(payload.metadata ?? {}),
-        tenant_org_id: payload.tenantOrgId
+        org_id: payload.tenantOrgId
       }
     });
 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     }
 
     const subscriptionResult = await supabase.rpc("rpc_upsert_billing_subscription", {
-      p_tenant_org_id: payload.tenantOrgId,
+      p_org_id: payload.tenantOrgId,
       p_billing_tenant_id: (tenantResult.data as { id?: string } | null)?.id ?? existingTenant?.id ?? null,
       p_stripe_subscription_id: subscription.id,
       p_status: subscription.status,

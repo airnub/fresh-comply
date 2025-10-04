@@ -1,6 +1,6 @@
 create table if not exists dsr_requests (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   subject_org_id uuid references organisations(id),
   assignee_user_id uuid references users(id),
   assignee_email text,
@@ -46,5 +46,5 @@ create table if not exists dsr_request_jobs (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists dsr_requests_tenant_status_idx on dsr_requests(tenant_org_id, status, due_at);
+create index if not exists dsr_requests_tenant_status_idx on dsr_requests(org_id, status, due_at);
 create index if not exists dsr_request_jobs_schedule_idx on dsr_request_jobs(job_type, run_after) where processed_at is null;

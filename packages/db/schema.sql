@@ -2,7 +2,7 @@ create extension if not exists pgcrypto;
 
 create table organisations(
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   name text not null,
   slug text unique not null,
   created_at timestamptz default now()
@@ -24,7 +24,7 @@ create table memberships(
 
 create table engagements(
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   engager_org_id uuid references organisations(id),
   client_org_id uuid references organisations(id),
   subject_org_id uuid references organisations(id),
@@ -51,7 +51,7 @@ create table workflow_runs(
   workflow_def_id uuid,
   subject_org_id uuid references organisations(id),
   engager_org_id uuid references organisations(id),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   status text check (status in ('draft','active','done','archived')) default 'active',
   orchestration_provider text not null default 'none',
   orchestration_workflow_id text,
@@ -59,13 +59,13 @@ create table workflow_runs(
   merged_workflow_snapshot jsonb,
   created_at timestamptz default now(),
   constraint workflow_runs_workflow_def_fk
-    foreign key (tenant_org_id, workflow_def_id) references workflow_defs(org_id, id)
+    foreign key (org_id, workflow_def_id) references workflow_defs(org_id, id)
 );
 
 create table steps(
   id uuid primary key default gen_random_uuid(),
   run_id uuid references workflow_runs(id),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   subject_org_id uuid references organisations(id),
   key text not null,
   title text not null,
@@ -153,7 +153,7 @@ create table workflow_overlay_layers(
 create table documents(
   id uuid primary key default gen_random_uuid(),
   run_id uuid references workflow_runs(id),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   subject_org_id uuid references organisations(id),
   template_id text,
   path text,
@@ -163,7 +163,7 @@ create table documents(
 
 create table audit_log(
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   tenant_id uuid not null references organisations(id),
   actor_user_id uuid references users(id),
   actor_org_id uuid references organisations(id),
@@ -192,7 +192,7 @@ comment on trigger audit_log_block_mutations on audit_log is 'Prevents UPDATE or
 
 create table tenant_domains (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  org_id uuid not null references organisations(id) on delete cascade,
   domain text not null check (domain = lower(domain)),
   is_primary boolean not null default false,
   verified_at timestamptz,
@@ -209,13 +209,13 @@ create table tenant_domains (
   unique(domain)
 );
 
-create unique index tenant_domains_tenant_domain_unique on tenant_domains(tenant_org_id, domain);
-create unique index tenant_domains_primary_unique on tenant_domains(tenant_org_id) where is_primary;
+create unique index tenant_domains_tenant_domain_unique on tenant_domains(org_id, domain);
+create unique index tenant_domains_primary_unique on tenant_domains(org_id) where is_primary;
 create index tenant_domains_lookup_idx on tenant_domains(domain, verified_at);
-create index tenant_domains_tenant_idx on tenant_domains(tenant_org_id, verified_at);
+create index tenant_domains_tenant_idx on tenant_domains(org_id, verified_at);
 
 create table tenant_branding (
-  tenant_org_id uuid primary key references organisations(id) on delete cascade,
+  org_id uuid primary key references organisations(id) on delete cascade,
   tokens jsonb not null default '{}'::jsonb,
   logo_url text,
   favicon_url text,
@@ -239,11 +239,11 @@ create policy "Service role manages tenant domains" on tenant_domains
 create policy "Tenant members manage domains" on tenant_domains
   for all using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   )
   with check (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   );
 
 create policy "Service role manages tenant branding" on tenant_branding
@@ -253,11 +253,11 @@ create policy "Service role manages tenant branding" on tenant_branding
 create policy "Tenant members manage branding" on tenant_branding
   for all using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   )
   with check (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   );
 
 create or replace function public.normalize_domain(host text)
@@ -272,7 +272,7 @@ grant execute on function public.normalize_domain(text) to anon, authenticated, 
 
 create or replace function public.resolve_tenant_branding(p_host text)
 returns table (
-  tenant_org_id uuid,
+  org_id uuid,
   domain text,
   tokens jsonb,
   logo_url text,
@@ -293,7 +293,7 @@ begin
   normalized := public.normalize_domain(p_host);
   return query
   select
-    d.tenant_org_id,
+    d.org_id,
     d.domain,
     coalesce(b.tokens, '{}'::jsonb) as tokens,
     b.logo_url,
@@ -303,7 +303,7 @@ begin
     coalesce(b.pdf_footer, '{}'::jsonb) as pdf_footer,
     coalesce(b.updated_at, d.updated_at) as updated_at
   from tenant_domains d
-  left join tenant_branding b on b.tenant_org_id = d.tenant_org_id
+  left join tenant_branding b on b.org_id = d.org_id
   where d.domain = normalized
     and d.verified_at is not null
   order by d.is_primary desc, coalesce(b.updated_at, d.updated_at) desc
@@ -338,7 +338,7 @@ $$;
 grant execute on function public.assert_tenant_membership(uuid) to authenticated, service_role;
 
 create or replace function public.rpc_upsert_tenant_branding(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_tokens jsonb,
   p_logo_url text,
   p_favicon_url text,
@@ -362,14 +362,14 @@ declare
   audit_entry jsonb;
   actor_id uuid := auth.uid();
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   select * into previous
   from tenant_branding
-  where tenant_org_id = p_tenant_org_id;
+  where org_id = p_org_id;
 
   insert into tenant_branding as tb (
-    tenant_org_id,
+    org_id,
     tokens,
     logo_url,
     favicon_url,
@@ -379,7 +379,7 @@ begin
     updated_at
   )
   values (
-    p_tenant_org_id,
+    p_org_id,
     normalized_tokens,
     p_logo_url,
     p_favicon_url,
@@ -388,7 +388,7 @@ begin
     normalized_pdf_footer,
     now()
   )
-  on conflict (tenant_org_id) do update
+  on conflict (org_id) do update
     set tokens = excluded.tokens,
         logo_url = excluded.logo_url,
         favicon_url = excluded.favicon_url,
@@ -399,7 +399,7 @@ begin
   returning * into result;
 
   audit_payload := jsonb_build_object(
-    'tenant_org_id', p_tenant_org_id,
+    'org_id', p_org_id,
     'previous', to_jsonb(previous),
     'current', to_jsonb(result)
   );
@@ -410,9 +410,9 @@ begin
     reason_code => 'tenant_branding_update',
     payload => audit_payload,
     target_kind => 'tenant_branding',
-    target_id => p_tenant_org_id,
-    tenant_org_id => p_tenant_org_id,
-    actor_org_id => p_tenant_org_id
+    target_id => p_org_id,
+    org_id => p_org_id,
+    actor_org_id => p_org_id
   );
 
   if audit_entry is not null then
@@ -431,7 +431,7 @@ $$;
 
 grant execute on function public.rpc_upsert_tenant_branding(uuid, jsonb, text, text, jsonb, jsonb, jsonb) to authenticated, service_role;
 
-create or replace function public.rpc_get_tenant_branding(p_tenant_org_id uuid)
+create or replace function public.rpc_get_tenant_branding(p_org_id uuid)
 returns tenant_branding
 language plpgsql
 stable
@@ -441,11 +441,11 @@ as $$
 declare
   result tenant_branding;
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   select * into result
   from tenant_branding
-  where tenant_org_id = p_tenant_org_id;
+  where org_id = p_org_id;
 
   return result;
 end;
@@ -454,7 +454,7 @@ $$;
 grant execute on function public.rpc_get_tenant_branding(uuid) to authenticated, service_role;
 
 create or replace function public.rpc_upsert_tenant_domain(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_domain text,
   p_is_primary boolean default false
 )
@@ -473,7 +473,7 @@ declare
   audit_entry jsonb;
   actor_id uuid := auth.uid();
 begin
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   normalized_domain := public.normalize_domain(p_domain);
 
@@ -490,7 +490,7 @@ begin
   previous := existing;
 
   if found then
-    if existing.tenant_org_id <> p_tenant_org_id then
+    if existing.org_id <> p_org_id then
       raise exception 'Domain % already claimed by another tenant', normalized_domain using errcode = '42501';
     end if;
 
@@ -501,14 +501,14 @@ begin
     returning * into result;
   else
     insert into tenant_domains as td (
-      tenant_org_id,
+      org_id,
       domain,
       is_primary,
       cert_status,
       updated_at
     )
     values (
-      p_tenant_org_id,
+      p_org_id,
       normalized_domain,
       coalesce(p_is_primary, false),
       'pending',
@@ -522,7 +522,7 @@ begin
       (
         select jsonb_agg(jsonb_build_object('id', id, 'domain', domain))
         from tenant_domains
-        where tenant_org_id = p_tenant_org_id
+        where org_id = p_org_id
           and id <> result.id
           and is_primary
       ),
@@ -532,7 +532,7 @@ begin
     update tenant_domains
     set is_primary = false,
         updated_at = now()
-    where tenant_org_id = p_tenant_org_id
+    where org_id = p_org_id
       and id <> result.id
       and is_primary;
   end if;
@@ -551,8 +551,8 @@ begin
     payload => audit_payload,
     target_kind => 'tenant_domain',
     target_id => result.id,
-    tenant_org_id => result.tenant_org_id,
-    actor_org_id => result.tenant_org_id
+    org_id => result.org_id,
+    actor_org_id => result.org_id
   );
 
   if audit_entry is not null then
@@ -597,7 +597,7 @@ begin
     raise exception 'Domain not found' using errcode = 'P0002';
   end if;
 
-  tenant_id := previous.tenant_org_id;
+  tenant_id := previous.org_id;
 
   perform public.assert_tenant_membership(tenant_id);
 
@@ -621,8 +621,8 @@ begin
     payload => audit_payload,
     target_kind => 'tenant_domain',
     target_id => result.id,
-    tenant_org_id => result.tenant_org_id,
-    actor_org_id => result.tenant_org_id
+    org_id => result.org_id,
+    actor_org_id => result.org_id
   );
 
   if audit_entry is not null then
@@ -665,7 +665,7 @@ begin
     raise exception 'Domain not found' using errcode = 'P0002';
   end if;
 
-  perform public.assert_tenant_membership(existing.tenant_org_id);
+  perform public.assert_tenant_membership(existing.org_id);
 
   delete from tenant_domains
   where id = p_domain_id;
@@ -685,8 +685,8 @@ begin
       payload => audit_payload,
       target_kind => 'tenant_domain',
       target_id => existing.id,
-      tenant_org_id => existing.tenant_org_id,
-      actor_org_id => existing.tenant_org_id
+      org_id => existing.org_id,
+      actor_org_id => existing.org_id
     );
 
     if audit_entry is not null then
@@ -735,7 +735,7 @@ create table billing_prices (
 
 create table billing_tenants (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  org_id uuid not null references organisations(id) on delete cascade,
   stripe_customer_id text unique,
   billing_mode billing_tenant_mode not null default 'direct',
   partner_org_id uuid references organisations(id),
@@ -743,12 +743,12 @@ create table billing_tenants (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint billing_tenants_tenant_unique unique (tenant_org_id)
+  constraint billing_tenants_tenant_unique unique (org_id)
 );
 
 create table billing_subscriptions (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id) on delete cascade,
+  org_id uuid not null references organisations(id) on delete cascade,
   billing_tenant_id uuid references billing_tenants(id) on delete set null,
   stripe_subscription_id text not null unique,
   status billing_subscription_status not null,
@@ -765,8 +765,8 @@ create table billing_subscriptions (
   updated_at timestamptz not null default now()
 );
 
-create index billing_tenants_tenant_idx on billing_tenants(tenant_org_id);
-create index billing_subscriptions_tenant_idx on billing_subscriptions(tenant_org_id);
+create index billing_tenants_tenant_idx on billing_tenants(org_id);
+create index billing_subscriptions_tenant_idx on billing_subscriptions(org_id);
 create index billing_subscriptions_status_idx on billing_subscriptions(status);
 create index billing_prices_active_idx on billing_prices(is_active);
 
@@ -791,7 +791,7 @@ create policy "Service role manages billing tenants" on billing_tenants
 create policy "Tenant members read billing tenants" on billing_tenants
   for select using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   );
 
 create policy "Service role manages billing subscriptions" on billing_subscriptions
@@ -801,7 +801,7 @@ create policy "Service role manages billing subscriptions" on billing_subscripti
 create policy "Tenant members read billing subscriptions" on billing_subscriptions
   for select using (
     auth.role() = 'service_role'
-    or public.is_member_of_org(tenant_org_id)
+    or public.is_member_of_org(org_id)
   );
 
 create or replace function public.rpc_upsert_billing_price(
@@ -880,7 +880,7 @@ grant execute on function public.rpc_upsert_billing_price(
 ) to authenticated, service_role;
 
 create or replace function public.rpc_upsert_billing_tenant(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_stripe_customer_id text,
   p_billing_mode billing_tenant_mode default 'direct',
   p_partner_org_id uuid default null,
@@ -895,14 +895,14 @@ as $$
 declare
   v_tenant billing_tenants;
 begin
-  if p_tenant_org_id is null then
+  if p_org_id is null then
     raise exception 'Tenant organisation id is required' using errcode = '23514';
   end if;
 
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   insert into billing_tenants as bt (
-    tenant_org_id,
+    org_id,
     stripe_customer_id,
     billing_mode,
     partner_org_id,
@@ -911,7 +911,7 @@ begin
     updated_at
   )
   values (
-    p_tenant_org_id,
+    p_org_id,
     p_stripe_customer_id,
     coalesce(p_billing_mode, 'direct'),
     p_partner_org_id,
@@ -919,7 +919,7 @@ begin
     coalesce(p_metadata, '{}'::jsonb),
     now()
   )
-  on conflict (tenant_org_id) do update
+  on conflict (org_id) do update
     set stripe_customer_id = excluded.stripe_customer_id,
         billing_mode = excluded.billing_mode,
         partner_org_id = excluded.partner_org_id,
@@ -942,7 +942,7 @@ grant execute on function public.rpc_upsert_billing_tenant(
 ) to authenticated, service_role;
 
 create or replace function public.rpc_upsert_billing_subscription(
-  p_tenant_org_id uuid,
+  p_org_id uuid,
   p_billing_tenant_id uuid default null,
   p_stripe_subscription_id text,
   p_status billing_subscription_status,
@@ -965,7 +965,7 @@ declare
   v_subscription billing_subscriptions;
   v_billing_tenant_id uuid;
 begin
-  if p_tenant_org_id is null then
+  if p_org_id is null then
     raise exception 'Tenant organisation id is required' using errcode = '23514';
   end if;
 
@@ -973,7 +973,7 @@ begin
     raise exception 'Stripe subscription id is required' using errcode = '23514';
   end if;
 
-  perform public.assert_tenant_membership(p_tenant_org_id);
+  perform public.assert_tenant_membership(p_org_id);
 
   if p_billing_tenant_id is not null then
     v_billing_tenant_id := p_billing_tenant_id;
@@ -981,13 +981,13 @@ begin
     select id
       into v_billing_tenant_id
     from billing_tenants
-    where tenant_org_id = p_tenant_org_id
+    where org_id = p_org_id
     order by updated_at desc
     limit 1;
   end if;
 
   insert into billing_subscriptions as bs (
-    tenant_org_id,
+    org_id,
     billing_tenant_id,
     stripe_subscription_id,
     status,
@@ -1003,7 +1003,7 @@ begin
     updated_at
   )
   values (
-    p_tenant_org_id,
+    p_org_id,
     v_billing_tenant_id,
     p_stripe_subscription_id,
     p_status,
@@ -1019,7 +1019,7 @@ begin
     now()
   )
   on conflict (stripe_subscription_id) do update
-    set tenant_org_id = excluded.tenant_org_id,
+    set org_id = excluded.org_id,
         billing_tenant_id = excluded.billing_tenant_id,
         status = excluded.status,
         stripe_price_id = excluded.stripe_price_id,
@@ -1056,7 +1056,7 @@ grant execute on function public.rpc_upsert_billing_subscription(
 
 create or replace view billing_subscription_overview as
 select
-  bt.tenant_org_id,
+  bt.org_id,
   bt.billing_mode,
   bt.stripe_customer_id,
   bt.partner_org_id,
@@ -1124,7 +1124,7 @@ grant select on v_step_type_versions to authenticated, service_role;
 
 create table dsr_requests (
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   subject_org_id uuid references organisations(id),
   assignee_user_id uuid references users(id),
   assignee_email text,
@@ -1170,7 +1170,7 @@ create table dsr_request_jobs (
   updated_at timestamptz not null default now()
 );
 
-create index dsr_requests_tenant_status_idx on dsr_requests(tenant_org_id, status, due_at);
+create index dsr_requests_tenant_status_idx on dsr_requests(org_id, status, due_at);
 create index dsr_request_jobs_schedule_idx on dsr_request_jobs(job_type, run_after) where processed_at is null;
 
 create table cro_companies (
@@ -1580,7 +1580,7 @@ as $$
   from claims;
 $$;
 
-create or replace function public.current_tenant_org_id()
+create or replace function public.current_org_id()
 returns uuid
 language sql
 stable
@@ -1589,7 +1589,7 @@ as $$
     select app.jwt() as payload
   )
   select case
-    when payload ? 'tenant_org_id' then nullif(payload->>'tenant_org_id', '')::uuid
+    when payload ? 'org_id' then nullif(payload->>'org_id', '')::uuid
     else null
   end
   from claims;
@@ -1643,8 +1643,8 @@ as $$
       where m.org_id = target_org_id
         and m.user_id = app.current_user_id()
         and (
-          public.current_tenant_org_id() is null
-          or o.tenant_org_id = public.current_tenant_org_id()
+          public.current_org_id() is null
+          or o.org_id = public.current_org_id()
         )
     );
 $$;
@@ -1669,8 +1669,8 @@ as $$
       from workflow_runs wr
       where wr.id = target_run_id
         and (
-          public.current_tenant_org_id() is null
-          or wr.tenant_org_id = public.current_tenant_org_id()
+          public.current_org_id() is null
+          or wr.org_id = public.current_org_id()
         )
         and (
           (wr.engager_org_id is not null and public.is_member_of_org(wr.engager_org_id))
@@ -1722,11 +1722,11 @@ create policy "Members read organisations" on organisations
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and (
         public.is_member_of_org(id)
         or public.jwt_has_org(id)
-        or id = public.current_tenant_org_id()
+        or id = public.current_org_id()
       )
     )
   );
@@ -1767,7 +1767,7 @@ create policy "Members view engagements" on engagements
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and (
         public.is_member_of_org(engager_org_id)
         or (client_org_id is not null and public.is_member_of_org(client_org_id))
@@ -1804,7 +1804,7 @@ create policy "Members read steps" on steps
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and public.can_access_run(run_id)
     )
   );
@@ -1819,7 +1819,7 @@ create policy "Members read documents" on documents
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and public.can_access_run(run_id)
     )
   );
@@ -1834,7 +1834,7 @@ create policy "Members read audit log" on audit_log
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and (
         (run_id is not null and public.can_access_run(run_id))
         or (actor_org_id is not null and public.is_member_of_org(actor_org_id))
@@ -1853,9 +1853,9 @@ create policy "Members read admin actions" on admin_actions
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and (
-        public.is_member_of_org(tenant_org_id)
+        public.is_member_of_org(org_id)
         or (actor_org_id is not null and public.is_member_of_org(actor_org_id))
         or (subject_org_id is not null and public.jwt_has_org(subject_org_id))
       )
@@ -1871,9 +1871,9 @@ create policy "Members view DSR requests" on dsr_requests
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
+      org_id = public.current_org_id()
       and (
-        public.is_member_of_org(tenant_org_id)
+        public.is_member_of_org(org_id)
         or (
           subject_org_id is not null
           and (
@@ -1890,15 +1890,15 @@ create policy "Members manage DSR requests" on dsr_requests
   using (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
-      and public.is_member_of_org(tenant_org_id)
+      org_id = public.current_org_id()
+      and public.is_member_of_org(org_id)
     )
   )
   with check (
     public.is_platform_service()
     or (
-      tenant_org_id = public.current_tenant_org_id()
-      and public.is_member_of_org(tenant_org_id)
+      org_id = public.current_org_id()
+      and public.is_member_of_org(org_id)
     )
   );
 
@@ -2182,7 +2182,7 @@ create policy "Members read overlay layers" on workflow_overlay_layers
 
 create table if not exists admin_actions(
   id uuid primary key default gen_random_uuid(),
-  tenant_org_id uuid not null references organisations(id),
+  org_id uuid not null references organisations(id),
   actor_id uuid references users(id),
   actor_org_id uuid references organisations(id),
   on_behalf_of_org_id uuid references organisations(id),
@@ -2232,7 +2232,7 @@ begin
   new.inserted_at := coalesce(new.inserted_at, now());
   new.meta_json := coalesce(new.meta_json, '{}'::jsonb);
   new.target_kind := coalesce(new.target_kind, new.entity);
-  new.tenant_id := coalesce(new.tenant_id, new.tenant_org_id);
+  new.tenant_id := coalesce(new.tenant_id, new.org_id);
 
   if new.tenant_id is null then
     raise exception 'tenant_id is required for audit chain';
@@ -2270,7 +2270,7 @@ begin
     digest(
       jsonb_build_object(
         'tenant_id', new.tenant_id,
-        'tenant_org_id', new.tenant_org_id,
+        'org_id', new.org_id,
         'actor_user_id', new.actor_user_id,
         'actor_org_id', new.actor_org_id,
         'on_behalf_of_org_id', new.on_behalf_of_org_id,
@@ -2312,7 +2312,7 @@ begin
   select row_hash
     into v_prev_hash
   from admin_actions
-  where tenant_org_id = new.tenant_org_id
+  where org_id = new.org_id
   order by inserted_at desc, created_at desc, id desc
   limit 1
   for update;
@@ -2324,13 +2324,13 @@ begin
   if new.prev_hash is null then
     new.prev_hash := v_prev_hash;
   elsif new.prev_hash <> v_prev_hash then
-    raise exception 'Invalid prev_hash for tenant %', new.tenant_org_id;
+    raise exception 'Invalid prev_hash for tenant %', new.org_id;
   end if;
 
   new.row_hash := encode(
     digest(
       jsonb_build_object(
-        'tenant_org_id', new.tenant_org_id,
+        'org_id', new.org_id,
         'actor_id', new.actor_id,
         'actor_org_id', new.actor_org_id,
         'on_behalf_of_org_id', new.on_behalf_of_org_id,
@@ -2368,7 +2368,7 @@ declare
   rec admin_actions%rowtype;
 begin
   if p_tenant_id is null then
-    raise exception 'tenant_org_id is required';
+    raise exception 'org_id is required';
   end if;
 
   perform set_config('app.admin_actions_allow_update', 'on', true);
@@ -2376,13 +2376,13 @@ begin
   for rec in
     select *
     from admin_actions
-    where tenant_org_id = p_tenant_id
+    where org_id = p_tenant_id
     order by inserted_at, created_at, id
   loop
     v_row_hash := encode(
       digest(
         jsonb_build_object(
-          'tenant_org_id', rec.tenant_org_id,
+          'org_id', rec.org_id,
           'actor_id', rec.actor_id,
           'actor_org_id', rec.actor_org_id,
           'on_behalf_of_org_id', rec.on_behalf_of_org_id,
@@ -2440,7 +2440,7 @@ language plpgsql
 as $$
 begin
   insert into audit_log(
-    tenant_org_id,
+    org_id,
     tenant_id,
     actor_user_id,
     actor_org_id,
@@ -2479,7 +2479,7 @@ language plpgsql
 as $$
 begin
   insert into audit_log(
-    tenant_org_id,
+    org_id,
     tenant_id,
     actor_user_id,
     actor_org_id,
@@ -2532,7 +2532,7 @@ create or replace function rpc_append_audit_entry(
   target_id uuid default null,
   requires_second boolean default false,
   second_actor_id uuid default null,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null,
@@ -2547,7 +2547,7 @@ as $$
 declare
   v_admin_action_id uuid;
   v_audit_id uuid;
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
   v_target_kind text;
   v_target_id uuid;
@@ -2565,9 +2565,9 @@ begin
     raise exception 'Second approver required';
   end if;
 
-  v_tenant_org_id := coalesce(tenant_org_id, actor_org_id, on_behalf_of_org_id, subject_org_id);
-  if v_tenant_org_id is null then
-    raise exception 'tenant_org_id is required';
+  v_org_id := coalesce(org_id, actor_org_id, on_behalf_of_org_id, subject_org_id);
+  if v_org_id is null then
+    raise exception 'org_id is required';
   end if;
 
   v_subject_org_id := subject_org_id;
@@ -2576,7 +2576,7 @@ begin
   v_payload := coalesce(payload, '{}'::jsonb);
 
   insert into admin_actions(
-    tenant_org_id,
+    org_id,
     actor_id,
     actor_org_id,
     on_behalf_of_org_id,
@@ -2592,7 +2592,7 @@ begin
     approved_at
   )
   values(
-    v_tenant_org_id,
+    v_org_id,
     actor_id,
     actor_org_id,
     on_behalf_of_org_id,
@@ -2610,7 +2610,7 @@ begin
   returning id into v_admin_action_id;
 
   insert into audit_log(
-    tenant_org_id,
+    org_id,
     tenant_id,
     actor_user_id,
     actor_org_id,
@@ -2626,8 +2626,8 @@ begin
     meta_json
   )
   values(
-    v_tenant_org_id,
-    v_tenant_org_id,
+    v_org_id,
+    v_org_id,
     actor_id,
     actor_org_id,
     on_behalf_of_org_id,
@@ -2647,7 +2647,7 @@ begin
     'admin_action_id', v_admin_action_id,
     'audit_id', v_audit_id,
     'action', action,
-    'tenant_org_id', v_tenant_org_id
+    'org_id', v_org_id
   );
 end;
 $$;
@@ -2655,7 +2655,7 @@ $$;
 create or replace function rpc_confirm_admin_action(
   action_id uuid,
   actor_id uuid,
-  tenant_org_id uuid,
+  org_id uuid,
   actor_org_id uuid,
   on_behalf_of_org_id uuid default null
 ) returns jsonb
@@ -2680,8 +2680,8 @@ begin
     raise exception 'actor_id is required';
   end if;
 
-  if tenant_org_id is null then
-    raise exception 'tenant_org_id is required';
+  if org_id is null then
+    raise exception 'org_id is required';
   end if;
 
   if actor_org_id is null then
@@ -2698,7 +2698,7 @@ begin
     raise exception 'Admin action % not found', action_id;
   end if;
 
-  if v_action.tenant_org_id <> tenant_org_id then
+  if v_action.org_id <> org_id then
     raise exception 'Tenant mismatch for admin action %', action_id;
   end if;
 
@@ -2725,7 +2725,7 @@ begin
     where id = action_id;
   perform set_config('app.admin_actions_allow_update', 'off', true);
 
-  perform refresh_admin_actions_hash_chain(v_action.tenant_org_id);
+  perform refresh_admin_actions_hash_chain(v_action.org_id);
 
   v_run_id := case
     when v_action.payload ? 'run_id' and jsonb_typeof(v_action.payload->'run_id') = 'string' then (v_action.payload->>'run_id')::uuid
@@ -2746,7 +2746,7 @@ begin
   );
 
   insert into audit_log(
-    tenant_org_id,
+    org_id,
     tenant_id,
     actor_user_id,
     actor_org_id,
@@ -2762,8 +2762,8 @@ begin
     meta_json
   )
   values(
-    v_action.tenant_org_id,
-    v_action.tenant_org_id,
+    v_action.org_id,
+    v_action.org_id,
     actor_id,
     actor_org_id,
     on_behalf_of_org_id,
@@ -2792,7 +2792,7 @@ create or replace function admin_create_step_type(
   actor_id uuid,
   reason text,
   step_type jsonb,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null
 ) returns jsonb
@@ -2806,8 +2806,8 @@ begin
     actor_id,
     reason,
     jsonb_build_object('step_type', step_type),
-    tenant_org_id => tenant_org_id,
-    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    org_id => org_id,
+    actor_org_id => coalesce(actor_org_id, org_id),
     on_behalf_of_org_id => on_behalf_of_org_id
   );
 end;
@@ -2818,7 +2818,7 @@ create or replace function admin_update_step_type(
   reason text,
   step_type_id uuid,
   patch jsonb,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null
 ) returns jsonb
@@ -2834,8 +2834,8 @@ begin
     jsonb_build_object('step_type_id', step_type_id, 'patch', patch),
     'step_type',
     step_type_id,
-    tenant_org_id => tenant_org_id,
-    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    org_id => org_id,
+    actor_org_id => coalesce(actor_org_id, org_id),
     on_behalf_of_org_id => on_behalf_of_org_id
   );
 end;
@@ -2847,7 +2847,7 @@ create or replace function admin_reassign_step(
   run_id uuid,
   step_id uuid,
   assignee_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -2857,15 +2857,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -2877,8 +2877,8 @@ begin
     jsonb_build_object('run_id', run_id, 'step_id', step_id, 'assignee_id', assignee_id),
     'step',
     step_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id,
@@ -2893,7 +2893,7 @@ create or replace function admin_update_step_due_date(
   run_id uuid,
   step_id uuid,
   new_due_date text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -2903,15 +2903,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -2923,8 +2923,8 @@ begin
     jsonb_build_object('run_id', run_id, 'step_id', step_id, 'due_date', new_due_date),
     'step',
     step_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id,
@@ -2939,7 +2939,7 @@ create or replace function admin_update_step_status(
   run_id uuid,
   step_id uuid,
   new_status text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -2949,15 +2949,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -2969,8 +2969,8 @@ begin
     jsonb_build_object('run_id', run_id, 'step_id', step_id, 'status', new_status),
     'step',
     step_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id,
@@ -2984,7 +2984,7 @@ create or replace function admin_regenerate_document(
   reason text,
   run_id uuid,
   document_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -2994,15 +2994,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -3013,8 +3013,8 @@ begin
     jsonb_build_object('run_id', run_id, 'document_id', document_id),
     'document',
     document_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id
@@ -3027,7 +3027,7 @@ create or replace function admin_resend_run_digest(
   reason text,
   run_id uuid,
   recipient_email text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3037,15 +3037,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -3056,8 +3056,8 @@ begin
     jsonb_build_object('run_id', run_id, 'recipient_email', recipient_email),
     'workflow_run',
     run_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id
@@ -3070,7 +3070,7 @@ create or replace function admin_cancel_run(
   reason text,
   run_id uuid,
   second_actor_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3080,15 +3080,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -3101,8 +3101,8 @@ begin
     run_id,
     true,
     second_actor_id,
-    coalesce(tenant_org_id, v_tenant_org_id),
-    coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    coalesce(org_id, v_org_id),
+    coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id,
     coalesce(subject_org_id, v_subject_org_id),
     run_id
@@ -3115,7 +3115,7 @@ create or replace function admin_approve_freshness_diff(
   reason text,
   diff_id uuid,
   notes text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3130,8 +3130,8 @@ begin
     actor_id,
     reason,
     jsonb_build_object('diff_id', diff_id, 'notes', notes),
-    tenant_org_id => tenant_org_id,
-    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    org_id => org_id,
+    actor_org_id => coalesce(actor_org_id, org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => subject_org_id
   );
@@ -3143,7 +3143,7 @@ create or replace function admin_reject_freshness_diff(
   reason text,
   diff_id uuid,
   notes text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3158,8 +3158,8 @@ begin
     actor_id,
     reason,
     jsonb_build_object('diff_id', diff_id, 'notes', notes),
-    tenant_org_id => tenant_org_id,
-    actor_org_id => coalesce(actor_org_id, tenant_org_id),
+    org_id => org_id,
+    actor_org_id => coalesce(actor_org_id, org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => subject_org_id
   );
@@ -3171,7 +3171,7 @@ create or replace function admin_acknowledge_dsr(
   reason text,
   request_id uuid,
   notes text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3181,15 +3181,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from dsr_requests
   where id = request_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'DSR request % not found', request_id;
   end if;
 
@@ -3200,8 +3200,8 @@ begin
     jsonb_build_object('request_id', request_id, 'notes', notes),
     'dsr_request',
     request_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
     subject_org_id => coalesce(subject_org_id, v_subject_org_id)
   );
@@ -3213,7 +3213,7 @@ create or replace function admin_resolve_dsr(
   reason text,
   request_id uuid,
   resolution text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3223,15 +3223,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from dsr_requests
   where id = request_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'DSR request % not found', request_id;
   end if;
 
@@ -3242,8 +3242,8 @@ begin
     jsonb_build_object('request_id', request_id, 'resolution', resolution),
     'dsr_request',
     request_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
     subject_org_id => coalesce(subject_org_id, v_subject_org_id)
   );
@@ -3255,7 +3255,7 @@ create or replace function admin_export_dsr_bundle(
   reason text,
   request_id uuid,
   destination text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3265,15 +3265,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from dsr_requests
   where id = request_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'DSR request % not found', request_id;
   end if;
 
@@ -3284,8 +3284,8 @@ begin
     jsonb_build_object('request_id', request_id, 'destination', destination),
     'dsr_request',
     request_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_subject_org_id),
     subject_org_id => coalesce(subject_org_id, v_subject_org_id)
   );
@@ -3298,7 +3298,7 @@ create or replace function admin_toggle_legal_hold(
   request_id uuid,
   enabled boolean,
   second_actor_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3308,15 +3308,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from dsr_requests
   where id = request_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'DSR request % not found', request_id;
   end if;
 
@@ -3329,8 +3329,8 @@ begin
     request_id,
     enabled,
     second_actor_id,
-    coalesce(tenant_org_id, v_tenant_org_id),
-    coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    coalesce(org_id, v_org_id),
+    coalesce(actor_org_id, org_id, v_org_id),
     coalesce(on_behalf_of_org_id, v_subject_org_id),
     coalesce(subject_org_id, v_subject_org_id)
   );
@@ -3345,7 +3345,7 @@ create or replace function admin_bind_secret_alias(
   provider text,
   external_id text,
   description text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3368,8 +3368,8 @@ begin
     jsonb_build_object('binding_id', v_binding_id, 'org_id', org_id, 'alias', alias, 'provider', provider, 'external_id', external_id, 'description', description),
     'tenant_secret_binding',
     v_binding_id,
-    tenant_org_id => coalesce(tenant_org_id, org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, org_id),
+    org_id => coalesce(org_id, org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, org_id),
     on_behalf_of_org_id => coalesce(on_behalf_of_org_id, org_id),
     subject_org_id => coalesce(subject_org_id, org_id)
   );
@@ -3382,7 +3382,7 @@ create or replace function admin_update_secret_alias(
   binding_id uuid,
   new_description text,
   new_external_id text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3412,8 +3412,8 @@ begin
     jsonb_build_object('binding_id', binding_id, 'description', new_description, 'external_id', new_external_id),
     'tenant_secret_binding',
     binding_id,
-    tenant_org_id => coalesce(tenant_org_id, v_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_org_id),
     subject_org_id => coalesce(subject_org_id, v_org_id)
   );
@@ -3425,7 +3425,7 @@ create or replace function admin_remove_secret_alias(
   reason text,
   binding_id uuid,
   second_actor_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3453,8 +3453,8 @@ begin
     binding_id,
     true,
     second_actor_id,
-    coalesce(tenant_org_id, v_org_id),
-    coalesce(actor_org_id, tenant_org_id, v_org_id),
+    coalesce(org_id, v_org_id),
+    coalesce(actor_org_id, org_id, v_org_id),
     coalesce(on_behalf_of_org_id, v_org_id),
     coalesce(subject_org_id, v_org_id)
   );
@@ -3465,7 +3465,7 @@ create or replace function admin_test_secret_alias(
   actor_id uuid,
   reason text,
   binding_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3490,8 +3490,8 @@ begin
     jsonb_build_object('binding_id', binding_id),
     'tenant_secret_binding',
     binding_id,
-    tenant_org_id => coalesce(tenant_org_id, v_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => coalesce(on_behalf_of_org_id, v_org_id),
     subject_org_id => coalesce(subject_org_id, v_org_id)
   );
@@ -3504,7 +3504,7 @@ create or replace function admin_temporal_signal(
   run_id uuid,
   signal text,
   payload jsonb,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3514,15 +3514,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -3533,8 +3533,8 @@ begin
     jsonb_build_object('run_id', run_id, 'signal', signal, 'payload', payload),
     'workflow_run',
     run_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id
@@ -3547,7 +3547,7 @@ create or replace function admin_temporal_retry(
   reason text,
   run_id uuid,
   activity_id text,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3557,15 +3557,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -3576,8 +3576,8 @@ begin
     jsonb_build_object('run_id', run_id, 'activity_id', activity_id),
     'workflow_run',
     run_id,
-    tenant_org_id => coalesce(tenant_org_id, v_tenant_org_id),
-    actor_org_id => coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    org_id => coalesce(org_id, v_org_id),
+    actor_org_id => coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id => on_behalf_of_org_id,
     subject_org_id => coalesce(subject_org_id, v_subject_org_id),
     run_id => run_id
@@ -3590,7 +3590,7 @@ create or replace function admin_temporal_cancel(
   reason text,
   run_id uuid,
   second_actor_id uuid,
-  tenant_org_id uuid default null,
+  org_id uuid default null,
   actor_org_id uuid default null,
   on_behalf_of_org_id uuid default null,
   subject_org_id uuid default null
@@ -3600,15 +3600,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_tenant_org_id uuid;
+  v_org_id uuid;
   v_subject_org_id uuid;
 begin
-  select tenant_org_id, subject_org_id
-    into v_tenant_org_id, v_subject_org_id
+  select org_id, subject_org_id
+    into v_org_id, v_subject_org_id
   from workflow_runs
   where id = run_id;
 
-  if v_tenant_org_id is null then
+  if v_org_id is null then
     raise exception 'Workflow run % not found', run_id;
   end if;
 
@@ -3621,8 +3621,8 @@ begin
     run_id,
     true,
     second_actor_id,
-    coalesce(tenant_org_id, v_tenant_org_id),
-    coalesce(actor_org_id, tenant_org_id, v_tenant_org_id),
+    coalesce(org_id, v_org_id),
+    coalesce(actor_org_id, org_id, v_org_id),
     on_behalf_of_org_id,
     coalesce(subject_org_id, v_subject_org_id),
     run_id

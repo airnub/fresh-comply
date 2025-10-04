@@ -25,7 +25,8 @@
     "dsr:jobs": "tsx scripts/dsr-jobs.ts",
     "dev:docs": "pnpm --filter @airnub/docs-site start",
     "build:docs": "pnpm --filter @airnub/docs-site build",
-    "deploy:docs": "pnpm --filter @airnub/docs-site deploy"
+    "deploy:docs": "pnpm --filter @airnub/docs-site deploy",
+    "test:rls-smoke": "node scripts/rls-smoke.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

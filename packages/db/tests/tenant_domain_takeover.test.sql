@@ -14,7 +14,7 @@ begin
   );
   perform set_config('request.jwt.claim.role', 'service_role', true);
 
-  insert into organisations (id, tenant_org_id, name, slug)
+  insert into organisations (id, org_id, name, slug)
   values
     (tenant_one, tenant_one, 'Tenant One', 'tenant-one'),
     (tenant_two, tenant_two, 'Tenant Two', 'tenant-two')
@@ -39,8 +39,8 @@ begin
     raise exception 'Domain record missing after takeover attempt';
   end if;
 
-  if domain_record.tenant_org_id <> tenant_one then
-    raise exception 'Domain ownership changed unexpectedly to %', domain_record.tenant_org_id;
+  if domain_record.org_id <> tenant_one then
+    raise exception 'Domain ownership changed unexpectedly to %', domain_record.org_id;
   end if;
 
   if domain_record.is_primary is distinct from true then

@@ -72,7 +72,7 @@ export async function approvePendingUpdate(id: string, reason: string): Promise<
       return { ok: false, error: "Moderation service unavailable" };
     }
 
-    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const tenantOrgId = readOrgId(context.user, "org_id");
     const partnerOrgId = readOrgId(context.user, "partner_org_id");
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
@@ -159,7 +159,7 @@ export async function rejectPendingUpdate(id: string, reason: string): Promise<M
       return { ok: false, error: "Moderation service unavailable" };
     }
 
-    const tenantOrgId = readOrgId(context.user, "tenant_org_id");
+    const tenantOrgId = readOrgId(context.user, "org_id");
     const partnerOrgId = readOrgId(context.user, "partner_org_id");
     annotateSpan(span, { tenantId: tenantOrgId, partnerOrgId });
 
@@ -402,7 +402,7 @@ async function appendModerationAudit(
       reason,
       diff_id: detectionId,
       notes: reason,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: partnerOrgId ?? tenantOrgId,
       on_behalf_of_org_id: partnerOrgId ?? tenantOrgId,
       subject_org_id: tenantOrgId,

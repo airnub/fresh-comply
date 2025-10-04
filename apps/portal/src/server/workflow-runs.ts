@@ -55,7 +55,7 @@ export async function createWorkflowRun(
   const insertPayload: Database["public"]["Tables"]["workflow_runs"]["Insert"] = {
     workflow_def_id: materialized.definitionVersion.workflowDefId,
     subject_org_id: input.subjectOrgId,
-    tenant_org_id: input.tenantOrgId,
+    org_id: input.tenantOrgId,
     engager_org_id: input.engagerOrgId ?? null,
     created_by_user_id: input.createdByUserId ?? null,
     status: input.status ?? "active",

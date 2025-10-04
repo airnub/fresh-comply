@@ -54,7 +54,7 @@ export async function POST(request: Request, { params }: { params: { stepTypeId:
       alias: binding.alias,
       provider: binding.provider,
       external_id: binding.external_id,
-      tenant_org_id: tenantOrgId,
+      org_id: tenantOrgId,
       actor_org_id: actorOrgId,
       on_behalf_of_org_id: context.onBehalfOfOrgId ?? null,
     });

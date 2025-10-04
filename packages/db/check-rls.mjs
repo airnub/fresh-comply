@@ -116,8 +116,8 @@ export function checkRlsSchema(schema) {
     throw new Error(`Missing required policies:\n - ${missingPolicies.join("\n - ")}`);
   }
 
-  if (!schema.includes("create or replace function public.is_member_of_org")) {
-    throw new Error("Function public.is_member_of_org is not defined in schema.sql");
+  if (!schema.includes("create or replace function app.has_org_access")) {
+    throw new Error("Function app.has_org_access is not defined in schema.sql");
   }
 
   if (!schema.includes("create or replace function public.can_access_run")) {
@@ -125,7 +125,7 @@ export function checkRlsSchema(schema) {
   }
 
   const policyRegex = /create\s+policy\s+"([^"]+)"\s+on\s+([^\s]+)[\s\S]*?;/gi;
-  const prohibitedColumns = ["tenant_org_id", "org_id"];
+  const prohibitedColumns = ["org_id", "org_id"];
   const policiesWithNullChecks = [];
 
   let policyMatch;
