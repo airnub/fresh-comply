@@ -1,0 +1,24 @@
+name: Migrations Centralized Guard
+on: [pull_request]
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1) Block SQL files outside supabase/migrations
+      - name: Forbid SQL outside supabase/migrations
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          BAD=$(echo "$CHANGED" | grep -E '\\.sql$' | grep -v '^supabase/migrations/' || true)
+          if [ -n "$BAD" ]; then
+            echo "❌ SQL files outside supabase/migrations detected:"; echo "$BAD"; exit 1; fi
+
+      # 2) Enforce Supabase filename pattern
+      - name: Enforce Supabase filename pattern
+        run: |
+          BAD=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} \
+            | grep '^supabase/migrations/' | grep -E '\\.sql$' \
+            | grep -vE '^supabase/migrations/[0-9]{14}_.+\\.sql$' || true)
+          if [ -n "$BAD" ]; then
+            echo "❌ Non-conforming migration filenames:"; echo "$BAD"; exit 1; fi
