@@ -1,0 +1,72 @@
+name: Docs Platform Guard
+on: [pull_request]
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require platform schema guidance in latest docs
+        env:
+          BASE: "${{ github.event.pull_request.base.sha }}"
+          HEAD: "${{ github.event.pull_request.head.sha }}"
+        run: |
+          set -e
+          python - <<'PY'
+import json, os, pathlib, re, subprocess, sys
+base = os.environ.get('BASE')
+head = os.environ.get('HEAD')
+if not base or not head:
+    sys.exit(0)
+changed = subprocess.check_output(['git', 'diff', '--name-only', base, head], text=True).splitlines()
+targets = []
+for rel in changed:
+    if not rel.endswith('.md'):
+        continue
+    if rel.startswith('docs/specs/') or rel.startswith('docs/architecture/'):
+        targets.append(pathlib.Path(rel))
+if not targets:
+    sys.exit(0)
+missing = []
+for path in targets:
+    m = re.match(r'(.+)\.v(\d+\.\d+\.\d+)\.md$', path.name)
+    if not m:
+        continue
+    slug = m.group(1)
+    versions = []
+    for candidate in path.parent.glob(f"{slug}.v*.md"):
+        m2 = re.match(r'.+\.v(\d+)\.(\d+)\.(\d+)\.md$', candidate.name)
+        if not m2:
+            continue
+        versions.append((tuple(map(int, m2.groups())), candidate))
+    if not versions:
+        continue
+    latest = max(versions)[1]
+    if latest.name != path.name:
+        continue
+    if 'create schema if not exists platform;' not in latest.read_text():
+        missing.append(str(path))
+if missing:
+    print('Missing platform schema guidance in updated docs:')
+    for m in missing:
+        print(f" - {m}")
+    sys.exit(1)
+PY
+      - name: Forbid global CREATE TABLE in app schema
+        env:
+          BASE: "${{ github.event.pull_request.base.sha }}"
+          HEAD: "${{ github.event.pull_request.head.sha }}"
+        run: |
+          set -e
+          BASE=${BASE:-}
+          HEAD=${HEAD:-}
+          if [ -z "$BASE" ] || [ -z "$HEAD" ]; then
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep -E '\.md$' || true)
+          if [ -z "$CHANGED" ]; then
+            exit 0
+          fi
+          BAD=$(echo "$CHANGED" | xargs -I{} sh -c "sed -n '/```/,/```/p' {}" | grep -Ei 'create\\s+table\\s+app\\.' || true)
+          if [ -n "$BAD" ]; then
+            echo "Found CREATE TABLE examples in app schema (should be platform.*)"; exit 1;
+          fi
