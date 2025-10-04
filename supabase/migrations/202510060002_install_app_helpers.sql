@@ -75,6 +75,10 @@ as $$
 declare
   subject uuid;
 begin
+  if target_org_id is null then
+    return false;
+  end if;
+
   begin
     subject := (app.jwt()->>'sub')::uuid;
   exception when others then
@@ -87,10 +91,19 @@ begin
 
   return exists (
     select 1
-    from public.realms r
-    join public.org_memberships m on m.org_id = r.provider_org_id and m.role = 'provider_admin'
-    where r.org_id = target_org_id
-      and m.user_id = subject
+      from public.orgs target_org
+      left join public.orgs provider_org
+        on provider_org.id = target_org.parent_org_id
+      join public.org_memberships m
+        on m.user_id = subject
+       and m.role = 'provider_admin'
+       and m.status = 'active'
+       and m.org_id = coalesce(provider_org.id, target_org.id)
+     where target_org.id = target_org_id
+       and (
+         provider_org.id is not null
+         or target_org.type = 'provider'
+       )
   );
 end;
 $$;
