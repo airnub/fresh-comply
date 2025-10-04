@@ -4,6 +4,7 @@ DECLARE
   provider_id uuid := gen_random_uuid();
   customer_id uuid := gen_random_uuid();
   provider_admin_id uuid := gen_random_uuid();
+  org_admin_id uuid := gen_random_uuid();
   unrelated_user_id uuid := gen_random_uuid();
   has_access boolean;
 BEGIN
@@ -14,7 +15,8 @@ BEGIN
 
   insert into public.org_memberships (org_id, user_id, role, status)
   values
-    (provider_id, provider_admin_id, 'provider_admin', 'active');
+    (provider_id, provider_admin_id, 'provider_admin', 'active'),
+    (provider_id, org_admin_id, 'org_admin', 'active');
 
   perform set_config('request.jwt.claims', jsonb_build_object('sub', provider_admin_id)::text, true);
 
@@ -26,6 +28,18 @@ BEGIN
   select app.has_org_access(customer_id) into has_access;
   if not has_access then
     raise exception 'app.has_org_access should grant provider admin access to descendant customers';
+  end if;
+
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', org_admin_id)::text, true);
+
+  select app.is_provider_admin_for(customer_id) into has_access;
+  if not has_access then
+    raise exception 'Org admin membership on provider should grant hierarchy access to customer orgs';
+  end if;
+
+  select app.has_org_access(customer_id) into has_access;
+  if not has_access then
+    raise exception 'app.has_org_access should allow provider org admins to reach descendant customers';
   end if;
 
   perform set_config('request.jwt.claims', jsonb_build_object('sub', unrelated_user_id)::text, true);
@@ -42,6 +56,8 @@ BEGIN
 
   perform set_config('request.jwt.claims', '{}'::text, true);
 
-  delete from public.org_memberships where org_id = provider_id and user_id = provider_admin_id;
+  delete from public.org_memberships
+   where org_id = provider_id
+     and user_id in (provider_admin_id, org_admin_id);
   delete from public.orgs where id in (customer_id, provider_id);
 END$$;

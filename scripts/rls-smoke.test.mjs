@@ -61,6 +61,17 @@ assertRegex(
   "Provider admin helper must traverse the org hierarchy with a recursive CTE and honor provider/org admin memberships.",
 );
 
+const migrationIsProviderAdminFor = extractFunctionDefinition(
+  migrationSql,
+  "app.is_provider_admin_for",
+);
+
+if (/public\.realms/i.test(migrationIsProviderAdminFor)) {
+  throw new Error(
+    "Provider admin helper must rely on org hierarchy metadata instead of public.realms joins.",
+  );
+}
+
 // Platform catalog policies must be locked to app.is_platform_admin
 assertRegex(
   /create\s+policy[\s\S]+on\s+platform\.rule_catalogs[\s\S]+app\.is_platform_admin\(\)/i,

@@ -93,20 +93,26 @@ begin
   end if;
 
   return exists (
+    with recursive ancestors as (
+      select o.id, o.parent_org_id, o.type
+        from public.orgs o
+       where o.id = target_org_id
+      union all
+      select parent.id, parent.parent_org_id, parent.type
+        from public.orgs parent
+        join ancestors child
+          on child.parent_org_id = parent.id
+    )
     select 1
-      from public.orgs target_org
-      left join public.orgs provider_org
-        on provider_org.id = target_org.parent_org_id
+      from ancestors a
+      join public.orgs provider
+        on provider.id = a.id
+       and provider.type = 'provider'
       join public.org_memberships m
-        on m.user_id = subject
-       and m.role = 'provider_admin'
+        on m.org_id = provider.id
+       and m.user_id = subject
        and m.status = 'active'
-       and m.org_id = coalesce(provider_org.id, target_org.id)
-     where target_org.id = target_org_id
-       and (
-         provider_org.id is not null
-         or target_org.type = 'provider'
-       )
+       and m.role in ('provider_admin', 'org_admin')
   );
 end;
 $$;
