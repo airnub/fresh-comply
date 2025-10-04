@@ -125,6 +125,24 @@ if (!schema.includes("create or replace function public.can_access_run")) {
   process.exit(1);
 }
 
+const policyRegex = /create\s+policy\s+"([^"]+)"\s+on\s+([^\s]+)[\s\S]*?;/gi;
+const policiesWithNullTenant = [];
+let policyMatch;
+while ((policyMatch = policyRegex.exec(schema)) !== null) {
+  const [policyBlock, policyName, tableName] = policyMatch;
+  if (policyBlock.toLowerCase().includes("tenant_org_id is null")) {
+    policiesWithNullTenant.push(`${tableName}.${policyName}`);
+  }
+}
+
+if (policiesWithNullTenant.length > 0) {
+  console.error(
+    "Policies must not rely on tenant_org_id being NULL:\n -",
+    policiesWithNullTenant.join("\n - ")
+  );
+  process.exit(1);
+}
+
 console.log(
   "✅ RLS enforcement verified for tables:",
   tablesWithRls.join(", ")

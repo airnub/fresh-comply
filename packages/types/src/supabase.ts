@@ -2357,6 +2357,36 @@ export type Database = {
       [_ in never]: never;
     };
   };
+  app: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      current_user_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+      is_org_member: {
+        Args: {
+          target_org_id: string;
+        };
+        Returns: boolean;
+      };
+      is_platform_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
 };
 
 export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];

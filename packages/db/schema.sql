@@ -1379,6 +1379,24 @@ create table adoption_records (
 create index adoption_records_scope_idx on adoption_records(tenant_org_id, scope, ref_id);
 create index adoption_records_run_idx on adoption_records(run_id);
 
+create schema if not exists app;
+
+create or replace function app.current_user_id()
+returns uuid
+language sql
+stable
+as $$
+  select auth.uid();
+$$;
+
+create or replace function app.is_platform_admin()
+returns boolean
+language sql
+stable
+as $$
+  select coalesce(auth.jwt()->>'role', '') = 'platform_admin';
+$$;
+
 create or replace function public.current_tenant_org_id()
 returns uuid
 language sql
@@ -1415,24 +1433,33 @@ as $$
     );
 $$;
 
-create or replace function public.is_member_of_org(target_org_id uuid)
+create or replace function app.is_org_member(target_org_id uuid)
 returns boolean
 language sql
 stable
 as $$
   select
     public.is_platform_service()
+    or app.is_platform_admin()
     or exists (
       select 1
       from memberships m
       join organisations o on o.id = m.org_id
       where m.org_id = target_org_id
-        and m.user_id = auth.uid()
+        and m.user_id = app.current_user_id()
         and (
           public.current_tenant_org_id() is null
           or o.tenant_org_id = public.current_tenant_org_id()
         )
     );
+$$;
+
+create or replace function public.is_member_of_org(target_org_id uuid)
+returns boolean
+language sql
+stable
+as $$
+  select app.is_org_member(target_org_id);
 $$;
 
 create or replace function public.can_access_run(target_run_id uuid)
@@ -1687,9 +1714,9 @@ create policy "Service role manages source registry" on source_registry
 create policy "Tenant members read source registry" on source_registry
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages source snapshots" on source_snapshot
@@ -1700,9 +1727,9 @@ create policy "Service role manages source snapshots" on source_snapshot
 create policy "Tenant members read source snapshots" on source_snapshot
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages change events" on change_event
@@ -1713,9 +1740,9 @@ create policy "Service role manages change events" on change_event
 create policy "Tenant members read change events" on change_event
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages rule versions" on rule_versions
@@ -1726,9 +1753,9 @@ create policy "Service role manages rule versions" on rule_versions
 create policy "Tenant members read rule versions" on rule_versions
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages template versions" on template_versions
@@ -1739,9 +1766,9 @@ create policy "Service role manages template versions" on template_versions
 create policy "Tenant members read template versions" on template_versions
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages workflow def versions" on workflow_def_versions
@@ -1752,9 +1779,9 @@ create policy "Service role manages workflow def versions" on workflow_def_versi
 create policy "Tenant members read workflow def versions" on workflow_def_versions
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages workflow pack versions" on workflow_pack_versions
@@ -1765,9 +1792,9 @@ create policy "Service role manages workflow pack versions" on workflow_pack_ver
 create policy "Tenant members read workflow pack versions" on workflow_pack_versions
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages moderation queue" on moderation_queue
@@ -1778,9 +1805,9 @@ create policy "Service role manages moderation queue" on moderation_queue
 create policy "Tenant members view moderation queue" on moderation_queue
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages release notes" on release_notes
@@ -1791,9 +1818,9 @@ create policy "Service role manages release notes" on release_notes
 create policy "Tenant members read release notes" on release_notes
   for select
   using (
-    auth.role() = 'service_role'
-    or tenant_org_id is null
-    or public.is_member_of_org(tenant_org_id)
+    public.is_platform_service()
+    or app.is_platform_admin()
+    or app.is_org_member(tenant_org_id)
   );
 
 create policy "Service role manages adoption records" on adoption_records
