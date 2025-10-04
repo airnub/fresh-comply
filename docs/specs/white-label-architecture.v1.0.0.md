@@ -34,7 +34,7 @@ status: Stable
 - Policies only allow:
   - Tenant users to read/write their tenant data and the client runs they **engage** (`engager_org_id = tenant_org_id`).
   - Client users to read/write their own `subject_org_id` data.
-  - Platform admins via service role (server‑only, audited).
+  - Platform admins via server-minted `{ role: 'platform_admin' }` (or boolean override) tokens; service-role keys stay server-only via `public.is_platform_service()` and are audited.
 
 **Acting‑on‑behalf**
 - Engagement records capture `{ actor_org_id, on_behalf_of_org_id }` for each action; audit trails include both.

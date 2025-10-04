@@ -30,16 +30,21 @@ as $$
   )
   select
     coalesce(payload->>'role', '') = 'platform_admin'
-    or coalesce(
-      case jsonb_typeof(payload->'is_platform_admin')
-        when 'boolean' then (payload->'is_platform_admin')::boolean
-        when 'string' then lower(payload->>'is_platform_admin') in ('true','t','1','yes','y','on')
-        when 'number' then (payload->>'is_platform_admin')::numeric <> 0
-        else null
-      end,
-      false
+    or (
+      payload ? 'is_platform_admin'
+      and coalesce(
+        case jsonb_typeof(payload->'is_platform_admin')
+          when 'boolean' then (payload->'is_platform_admin')::boolean
+          when 'string' then case
+            when lower(nullif(payload->>'is_platform_admin', '')) in ('true', 'false')
+              then (payload->>'is_platform_admin')::boolean
+            else null
+          end
+          else null
+        end,
+        false
+      )
     )
-    or coalesce(payload->>'role', '') = 'service_role'
   from claims;
 $$;
 

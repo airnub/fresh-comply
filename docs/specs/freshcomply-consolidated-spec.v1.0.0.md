@@ -21,7 +21,7 @@ status: Stable
 - Supabase Row Level Security (RLS) is enabled on all tenant tables. Policies rely on membership helpers instead of nullable org columns.
 - `app.is_org_member(target_org uuid)` gatekeeps tenant operations. It returns `true` when:
   - the request comes from the Supabase service role,
-  - the JWT contains `{ role: 'platform_admin' }` or `is_platform_admin: true`, or
+  - the JWT contains `{ role: 'platform_admin' }` or an explicit `is_platform_admin: true` claim,
   - the authenticated user has an active membership in the target org.
 - Admin override is universal: RLS policies include `app.is_platform_admin()` so operators can read/write across tenants for support and moderation.
 - Hash chains (`audit_log`, `admin_actions`) stamp the acting tenant to guarantee tamper evidence per tenant.
@@ -50,7 +50,7 @@ create or replace function app.is_org_member(target_org uuid) returns boolean;
 ```
 
 - `app.jwt()` unwraps `request.jwt.claims` (defaults to `{}`) to avoid null lookups in policies.
-- `app.is_platform_admin()` accepts either a role claim (`role = 'platform_admin'`) or explicit `is_platform_admin` boolean flag (minted by the admin API). Service automation using Supabase service keys continues to pass with `role = 'service_role'` (documented legacy fallback).
+- `app.is_platform_admin()` returns `true` when the JWT role is `platform_admin` or when the token includes an explicit boolean `is_platform_admin: true` override. Service automation should rely on `public.is_platform_service()` when using Supabase service-role keys.
 - `app.is_org_member()` wraps membership lookups and cascades platform admin/service allowances.
 - Use `public.is_member_of_org()` in policies to keep SQL migrations concise.
 

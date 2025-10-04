@@ -57,8 +57,8 @@ assertRegex(
 );
 
 assertRegex(
-  /create\s+or\s+replace\s+function\s+app\.is_provider_admin_for[\s\S]+with\s+recursive[\s\S]+public\.orgs[\s\S]+m\.role\s+in\s+\('provider_admin',\s*'org_admin'\)/i,
-  "Provider admin helper must traverse the org hierarchy with a recursive CTE and honor provider/org admin memberships.",
+  /create\s+or\s+replace\s+function\s+app\.is_provider_admin_for[\s\S]+with\s+recursive[\s\S]+public\.orgs[\s\S]+m\.role\s+(?:in\s+\('provider_admin',\s*'org_admin'\)|=\s+'provider_admin')/i,
+  "Provider admin helper must traverse the org hierarchy with a recursive CTE and honor provider/admin memberships.",
 );
 
 const migrationIsProviderAdminFor = extractFunctionDefinition(
@@ -103,9 +103,9 @@ if (
 
 const requiredFragments = [
   "coalesce(payload->>'role', '') = 'platform_admin'",
+  "payload ? 'is_platform_admin'",
   "jsonb_typeof(payload->'is_platform_admin')",
-  "lower(payload->>'is_platform_admin') in ('true','t','1','yes','y','on')",
-  "coalesce(payload->>'role', '') = 'service_role'",
+  "lower(nullif(payload->>'is_platform_admin', '')) in ('true', 'false')",
 ];
 
 for (const fragment of requiredFragments) {
@@ -117,7 +117,11 @@ for (const fragment of requiredFragments) {
   }
 }
 
-const truthyStrings = new Set(["true", "t", "1", "yes", "y", "on"]);
+if (/service_role/i.test(schemaIsPlatformAdmin)) {
+  throw new Error(
+    "app.is_platform_admin should not special-case service_role tokens; rely on public.is_platform_service().",
+  );
+}
 
 function simulateIsPlatformAdmin(claims = {}) {
   const payload = { ...claims };
@@ -127,32 +131,35 @@ function simulateIsPlatformAdmin(claims = {}) {
   }
 
   const helperFlag = payload.is_platform_admin;
-  let helperResult = false;
-
   if (typeof helperFlag === "boolean") {
-    helperResult = helperFlag;
-  } else if (typeof helperFlag === "string") {
-    helperResult = truthyStrings.has(helperFlag.toLowerCase());
-  } else if (typeof helperFlag === "number") {
-    helperResult = helperFlag !== 0;
+    return helperFlag === true;
   }
 
-  if (helperResult) {
-    return true;
+  if (typeof helperFlag === "string") {
+    const normalized = helperFlag.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+
+    if (normalized === "false") {
+      return false;
+    }
+
+    return false;
   }
 
-  return role === "service_role";
+  return false;
 }
 
 const helperTestVectors = [
   { name: "platform_admin role", claims: { role: "platform_admin" }, expected: true },
-  { name: "service_role bypass", claims: { role: "service_role" }, expected: true },
   { name: "boolean helper flag", claims: { is_platform_admin: true }, expected: true },
-  { name: "string helper flag", claims: { is_platform_admin: "yes" }, expected: true },
-  { name: "numeric helper flag", claims: { is_platform_admin: 1 }, expected: true },
+  { name: "string true helper flag", claims: { is_platform_admin: "true" }, expected: true },
+  { name: "service_role requires explicit override", claims: { role: "service_role" }, expected: false },
   { name: "member role denied", claims: { role: "member" }, expected: false },
   { name: "explicit string false", claims: { is_platform_admin: "false" }, expected: false },
-  { name: "numeric zero false", claims: { is_platform_admin: 0 }, expected: false },
+  { name: "string yes rejected", claims: { is_platform_admin: "yes" }, expected: false },
+  { name: "numeric rejected", claims: { is_platform_admin: 1 }, expected: false },
   { name: "missing claims", claims: {}, expected: false },
 ];
 
