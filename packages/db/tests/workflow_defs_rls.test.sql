@@ -45,6 +45,15 @@ begin
     (tenant_two, def_two, '1.0.0', '{}'::jsonb, 'checksum-two')
   on conflict (id) do nothing;
 
+  begin
+    insert into tenant_workflow_overlays (org_id, workflow_def_id, title, patch, status)
+    values (null, def_one, 'Invalid Overlay', '{}'::jsonb, 'draft');
+    raise exception 'tenant_workflow_overlays.org_id should reject NULL values';
+  exception
+    when not_null_violation then
+      null;
+  end;
+
   perform set_config(
     'request.jwt.claims',
     jsonb_build_object(

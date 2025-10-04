@@ -143,6 +143,15 @@ begin
   insert into tenant_step_type_installs (org_id, step_type_version_id, status)
   values (tenant_one, v_step_type_version_id, 'enabled')
   on conflict do nothing;
+
+  begin
+    insert into tenant_step_type_installs (org_id, step_type_version_id, status)
+    values (null, v_step_type_version_id, 'enabled');
+    raise exception 'tenant_step_type_installs.org_id should reject NULL values';
+  exception
+    when not_null_violation then
+      null;
+  end;
   insert into platform.rule_pack_proposals (
     detection_id,
     rule_pack_id,

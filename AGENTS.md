@@ -25,8 +25,8 @@ pnpm build
 Documentation (Source of Truth)
 Current (Canonical)
 
-Consolidated Product Spec (v2025-10-03)
-docs/specs/fresh-comply-spec.md
+Consolidated Architecture & Tenancy Spec (v2025-10-04)
+docs/specs/FreshComply-Consolidated-Spec.md
 
 Admin App Spec (v2025-10-03)
 docs/specs/admin-app-spec.md

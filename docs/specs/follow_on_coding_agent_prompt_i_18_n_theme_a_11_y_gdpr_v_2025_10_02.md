@@ -28,7 +28,7 @@
 ## 🧱 Tasks (Ordered)
 
 ### 1) Specs & Docs Updates
-- **Update** `docs/specs/fresh-comply-spec.md` with four new sections:
+- **Update** `docs/specs/FreshComply-Consolidated-Spec.md` with four new sections:
   - **Internationalization**: locales, routing model, message strategy, fallback rules, language negotiation, translation workflow.
   - **Theme & Design Tokens**: CSS variables, Tailwind tokens, dark/high‑contrast modes, motion & accessibility tokens.
   - **Accessibility**: WCAG 2.2 AA checklist, testing plan, component standards, PDF accessibility policy.
@@ -103,7 +103,7 @@
 ## 📄 Files to Create/Update
 
 **Docs**
-- `docs/specs/fresh-comply-spec.md` — add new sections (i18n, Theme, A11y, GDPR)
+- `docs/specs/FreshComply-Consolidated-Spec.md` — add new sections (i18n, Theme, A11y, GDPR)
 - `docs/LEGAL/PRIVACY.md`
 - `docs/LEGAL/TERMS.md`
 - `docs/LEGAL/DPA-TEMPLATE.md`
