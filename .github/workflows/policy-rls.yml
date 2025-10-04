@@ -1,0 +1,22 @@
+name: Policy Guards
+on: [pull_request]
+jobs:
+  rls-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Check RLS bad patterns
+        run: |
+          # Fail if any migration adds tenancy gates using IS NULL on org/tenant columns
+          if grep -RinE "(org_id|tenant_org_id)[[:space:]]+is[[:space:]]+null" **/*.sql; then
+            echo "Forbidden tenancy gate via IS NULL detected in SQL." >&2
+            exit 1
+          fi
+      - name: Block client writes to platform.*
+        run: |
+          # Adjust app paths if needed
+          if grep -RinE "from\\(['\"\"]platform\\." apps/ -n | grep -E "insert|update|upsert|delete"; then
+            echo "Client write to platform.* detected." >&2
+            exit 1
+          fi
