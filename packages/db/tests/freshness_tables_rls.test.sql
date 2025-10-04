@@ -16,6 +16,11 @@ declare
   v_adoption_id uuid;
   v_count integer;
 begin
+  perform set_config(
+    'request.jwt.claims',
+    jsonb_build_object('role', 'service_role')::text,
+    true
+  );
   perform set_config('request.jwt.claim.role', 'service_role', true);
 
   insert into organisations (id, tenant_org_id, name, slug)
@@ -127,6 +132,16 @@ begin
     raise exception 'Moderation queue insert did not append audit log entry';
   end if;
 
+  perform set_config(
+    'request.jwt.claims',
+    jsonb_build_object(
+      'role', 'authenticated',
+      'sub', user_one::text,
+      'tenant_org_id', tenant_one::text,
+      'org_ids', jsonb_build_array(tenant_one::text)
+    )::text,
+    true
+  );
   perform set_config('request.jwt.claim.role', 'authenticated', true);
   perform set_config('request.jwt.claim.sub', user_one::text, true);
   perform set_config('request.jwt.claim.tenant_org_id', tenant_one::text, true);
@@ -176,6 +191,16 @@ begin
     raise exception 'Adoption record insert did not append audit log entry';
   end if;
 
+  perform set_config(
+    'request.jwt.claims',
+    jsonb_build_object(
+      'role', 'authenticated',
+      'sub', user_two::text,
+      'tenant_org_id', tenant_two::text,
+      'org_ids', jsonb_build_array(tenant_two::text)
+    )::text,
+    true
+  );
   perform set_config('request.jwt.claim.sub', user_two::text, true);
   perform set_config('request.jwt.claim.tenant_org_id', tenant_two::text, true);
 

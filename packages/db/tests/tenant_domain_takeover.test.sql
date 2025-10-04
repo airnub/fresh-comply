@@ -7,6 +7,11 @@ declare
   tenant_two constant uuid := '00000000-0000-0000-0000-000000000002';
   domain_record tenant_domains%rowtype;
 begin
+  perform set_config(
+    'request.jwt.claims',
+    jsonb_build_object('role', 'service_role')::text,
+    true
+  );
   perform set_config('request.jwt.claim.role', 'service_role', true);
 
   insert into organisations (id, tenant_org_id, name, slug)
