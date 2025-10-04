@@ -173,3 +173,95 @@ test("POST surfaces audit failures", async () => {
     assert.equal(json.error, "audit ledger append refused");
   });
 });
+
+test("resolveTenantBranding never reads SUPABASE_SERVICE_ROLE_KEY", async () => {
+  const originalEnv = process.env;
+  const originalUrl = originalEnv.NEXT_PUBLIC_SUPABASE_URL;
+  const originalAnonKey = originalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const originalServiceRole = originalEnv.SUPABASE_SERVICE_ROLE_KEY;
+
+  let serviceRoleAccessed = false;
+
+  const proxyEnv = new Proxy(originalEnv, {
+    get(target, property, receiver) {
+      if (property === "SUPABASE_SERVICE_ROLE_KEY") {
+        serviceRoleAccessed = true;
+      }
+      return Reflect.get(target, property, receiver);
+    },
+    set(target, property, value, receiver) {
+      return Reflect.set(target, property, value, receiver);
+    },
+    deleteProperty(target, property) {
+      return Reflect.deleteProperty(target, property);
+    },
+    has(target, property) {
+      return Reflect.has(target, property);
+    }
+  });
+
+  process.env = proxyEnv as NodeJS.ProcessEnv;
+
+  try {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://unit-test.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "unit-test-anon-key";
+
+    const fetchCalls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      fetchCalls.push({ input, init });
+      return new Response(
+        JSON.stringify([
+          {
+            tenant_org_id: "tenant-test",
+            domain: "tenant-no-service-role.example.com",
+            tokens: {},
+            logo_url: null,
+            favicon_url: null,
+            typography: null,
+            pdf_header: null,
+            pdf_footer: null,
+            updated_at: null
+          }
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    };
+
+    const { resolveTenantBranding } = await import("../../../../lib/tenant-branding");
+
+    const branding = await resolveTenantBranding("tenant-no-service-role.example.com", {
+      fetchImpl
+    });
+
+    assert.equal(serviceRoleAccessed, false);
+    assert.equal(fetchCalls.length, 1);
+
+    const headers = fetchCalls[0]?.init?.headers as Record<string, string> | undefined;
+    assert.equal(headers?.apikey, "unit-test-anon-key");
+    assert.equal(headers?.Authorization, "Bearer unit-test-anon-key");
+    assert.equal(branding.tenantOrgId, "tenant-test");
+  } finally {
+    process.env = originalEnv;
+
+    if (originalUrl === undefined) {
+      delete originalEnv.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      originalEnv.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+    }
+
+    if (originalAnonKey === undefined) {
+      delete originalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    } else {
+      originalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalAnonKey;
+    }
+
+    if (originalServiceRole === undefined) {
+      delete originalEnv.SUPABASE_SERVICE_ROLE_KEY;
+    } else {
+      originalEnv.SUPABASE_SERVICE_ROLE_KEY = originalServiceRole;
+    }
+  }
+});
