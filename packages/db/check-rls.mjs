@@ -40,8 +40,8 @@ const requiredPolicies = {
   memberships: ["Users can read their memberships", "Service role manages memberships"],
   engagements: ["Members view engagements", "Service role manages engagements"],
   workflow_defs: [
-    "Authenticated can view workflow definitions",
-    "Service role manages workflow definitions"
+    "Org members read workflow definitions",
+    "Org members manage workflow definitions"
   ],
   workflow_runs: ["Members access workflow runs", "Service role manages workflow runs"],
   steps: ["Members read steps", "Service role manages steps"],
